@@ -5,6 +5,10 @@ import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
 import {
+  TranslationService,
+  translationService as defaultTranslationService,
+} from '@/ai/translate-service';
+import {
   SettingsRepository,
   settingsRepository as defaultSettingsRepository,
 } from '@/storage/settings-repository';
@@ -17,12 +21,14 @@ export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
   explain: ExplainService;
+  translate: TranslationService;
 }
 
 export const defaultDeps: BackgroundDeps = {
   vocabulary: defaultVocabularyRepository,
   settings: defaultSettingsRepository,
   explain: defaultExplainService,
+  translate: defaultTranslationService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -138,8 +144,12 @@ export async function saveDifficultWords(
   if (entries.length > 0) {
     await broadcast({ type: 'vocabulary-changed' });
   }
-  return entries;
-}
+  return entries;/** Translate a single page unit (paragraph, heading, list item…) via the AI layer. */
+export async function translateUnit(
+  deps: BackgroundDeps,
+  payload: { text: string; language?: string },
+): Promise<string> {
+  return deps.translate.translate({ text: payload.text, language: payload.language });}
 
 /** Build the handler map used by the service worker's message router. */
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
@@ -167,6 +177,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         message.payload.precedingText,
       ),
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
+    translate: (message) => translateUnit(deps, message.payload),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

@@ -26,6 +26,7 @@ export type Message =
   | { type: 'save-current-selection' }
   | { type: 'explain'; payload: { word: string; context?: string; kind?: ExplainKind; pageTitle?: string; precedingText?: string } }
   | { type: 'save-difficult-words'; payload: DifficultWordsPayload }
+  | { type: 'translate'; payload: { text: string; language?: string } }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
@@ -51,6 +52,7 @@ export interface ResponseMap {
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
   'save-difficult-words': VocabularyEntry[];
+  translate: string;
   'get-highlight-data': HighlightData;
   'vocabulary-changed': void;
   'settings-changed': void;

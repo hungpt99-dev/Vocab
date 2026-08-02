@@ -7,6 +7,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+<<<<<<< HEAD
 - **Reading-mode accessibility.** In-page overlays (selection toolbar, hover card, toast) now follow the
   OS light/dark theme via `prefers-color-scheme`, constrain themselves to narrow viewports (toolbar
   wraps, toast goes edge-to-edge on small screens, the card scrolls when tall), and the selection
@@ -23,6 +24,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Reading experience controls.** The hover card over a saved word can hide the original word and/or the
   translation, and its width, font size and spacing are adjustable. Settings apply live to open pages via
   CSS custom properties, so the overlay reflows instantly.
+=======
+- **Structured paragraph-by-paragraph translation.** Select any text and choose **Translate** from the
+  selection toolbar to translate the whole page. The DOM is walked and each paragraph-sized block
+  (headings, paragraphs, list items, table cells, block quotes) is translated as its own unit — never
+  the page as a single block. Text nodes are translated around `[[n]]` markers, so headings, lists,
+  links and inline markup keep every tag and attribute and the page layout is never disturbed; code
+  blocks, scripts, form controls and the extension's own nodes are left untouched. The AI call goes
+  through the shared provider abstraction (`TranslationService`), so no content-script code touches a
+  provider SDK, and it honours the user's target-language setting with per-request fallback.
+>>>>>>> 1bc71b5 (feat(vocab): structured paragraph-by-paragraph page translation)
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

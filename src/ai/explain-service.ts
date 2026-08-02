@@ -1,20 +1,11 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
-import { getProvider } from './registry';
+import { runAiCall, runWithFallback } from './pipeline';
 import type { ExplainRequest } from './types';
 import { AiError } from './types';
-import { withRetry, type RetryOptions } from './retry';
-import { createRateLimiter, type RateLimiter } from './rate-limiter';
 
-/**
- * AI calls share a single rate limiter so concurrent requests (e.g. several
- * auto-explain saves at once) do not burst the provider. Defaults to at most
- * 5 requests per 10 seconds — friendly to local models and free tiers alike.
- */
-const rateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
-
-const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
+const EXPLAIN_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
 interface CacheEntry {
   explanation: Explanation;
@@ -33,7 +24,7 @@ export class ExplainService {
 
   constructor(
     private readonly settings: SettingsRepository = settingsRepository,
-    cacheTtlMs = 1000 * 60 * 60 * 24,
+    cacheTtlMs = EXPLAIN_CACHE_TTL_MS,
   ) {
     this.cacheTtlMs = cacheTtlMs;
   }
@@ -53,56 +44,30 @@ export class ExplainService {
     if (!active) {
       throw new AiError('unknown_provider', 'No active AI provider is configured.');
     }
-    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
     const cached = this.readCache(active, request);
     if (cached) return cached;
 
-    const explanation = await this.runWithFallback(active, fallback, request, signal);
-    this.writeCache(active, request, explanation);
-    return explanation;
+    const { value, active: servedBy } = await runWithFallback(
+      settings,
+      (provider, sig) => this.runOnce(provider, request, sig),
+      signal,
+    );
+    this.writeCache(servedBy, request, value);
+    return value;
   }
 
   /** Run a single request against a specific saved provider. */
-  async runOnce(
+  runOnce(
     provider: SavedProvider,
     request: ExplainRequest,
     signal?: AbortSignal,
   ): Promise<Explanation> {
-    const adapter = getProvider(provider.type);
-    await rateLimiter.acquire(signal);
-    return withRetry(
-      () =>
-        adapter.explain(request, {
-          apiKey: provider.apiKey,
-          model: provider.model,
-          baseUrl: provider.baseUrl,
-          temperature: provider.temperature,
-          maxTokens: provider.maxTokens,
-          signal,
-          timeoutMs: provider.timeoutMs,
-        }),
-      { ...RETRY_OPTIONS, signal },
+    return runAiCall(
+      provider,
+      (adapter, config) => adapter.explain(request, config),
+      signal,
     );
-  }
-
-  private async runWithFallback(
-    active: SavedProvider,
-    fallback: SavedProvider | undefined,
-    request: ExplainRequest,
-    signal?: AbortSignal,
-  ): Promise<Explanation> {
-    try {
-      return await this.runOnce(active, request, signal);
-    } catch (primaryError) {
-      if (!fallback) throw primaryError;
-      // Only fall back on transient/retryable failures, never on a hard config error.
-      const code = primaryError instanceof AiError ? primaryError.code : 'unknown';
-      if (code === 'missing_api_key' || code === 'unauthorized' || code === 'bad_response') {
-        throw primaryError;
-      }
-      return this.runOnce(fallback, request, signal);
-    }
   }
 
   private cacheKey(provider: SavedProvider, request: ExplainRequest): string {

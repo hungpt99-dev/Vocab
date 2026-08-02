@@ -1,8 +1,14 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { buildExplainSystemPrompt, buildExplainWordUserPrompt } from '../prompts';
-import { toExplanation } from '../parse';
-import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
+import {
+  EXPLAIN_WORD_SYSTEM_PROMPT,
+  TRANSLATE_SYSTEM_PROMPT,
+  buildExplainSystemPrompt,
+  buildExplainWordUserPrompt,
+  buildTranslateUserPrompt,
+} from '../prompts';
+import { extractTranslation, toExplanation } from '../parse';
+import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -17,6 +23,32 @@ export class GeminiProvider implements AiProvider {
   readonly requiresApiKey = true;
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
+    const content = await this.complete(
+      config,
+      EXPLAIN_WORD_SYSTEM_PROMPT,
+      buildExplainWordUserPrompt(request),
+      'application/json',
+    );
+    return toExplanation(content, { provider: this.id, model: config.model || this.defaultModel });
+  }
+
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
+    const content = await this.complete(
+      config,
+      TRANSLATE_SYSTEM_PROMPT,
+      buildTranslateUserPrompt(request),
+      'text/plain',
+    );
+    return extractTranslation(content);
+  }
+
+  /** Post one generateContent call with a system instruction and read the text. */
+  private async complete(
+    config: ProviderConfig,
+    system: string,
+    user: string,
+    responseMimeType: string,
+  ): Promise<string> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
     }
@@ -37,7 +69,7 @@ export class GeminiProvider implements AiProvider {
           ...(config.maxTokens !== undefined && config.maxTokens !== null
             ? { maxOutputTokens: config.maxTokens }
             : {}),
-          responseMimeType: 'application/json',
+          responseMimeType,
         },
       },
     });
@@ -46,6 +78,6 @@ export class GeminiProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Gemini returned an empty response.');
     }
-    return toExplanation(content, { provider: this.id, model });
+    return content;
   }
 }

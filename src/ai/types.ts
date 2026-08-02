@@ -16,6 +16,13 @@ export interface ExplainRequest {
   kind?: ExplainKind;
 }
 
+export interface TranslateRequest {
+  /** Text of a single translation unit (paragraph, heading, list item…). */
+  text: string;
+  /** Target language; falls back to the user's target-language setting. */
+  language?: string;
+}
+
 export interface ProviderConfig {
   apiKey: string;
   model: string;
@@ -37,6 +44,7 @@ export interface AiProvider {
   /** Whether this provider requires an API key (local runtimes do not). */
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
+  translate(request: TranslateRequest, config: ProviderConfig): Promise<string>;
 }
 
 export type AiErrorCode =

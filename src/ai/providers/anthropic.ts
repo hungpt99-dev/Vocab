@@ -1,8 +1,14 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { buildExplainSystemPrompt, buildExplainWordUserPrompt } from '../prompts';
-import { toExplanation } from '../parse';
-import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
+import {
+  EXPLAIN_WORD_SYSTEM_PROMPT,
+  TRANSLATE_SYSTEM_PROMPT,
+  buildExplainSystemPrompt,
+  buildExplainWordUserPrompt,
+  buildTranslateUserPrompt,
+} from '../prompts';
+import { extractTranslation, toExplanation } from '../parse';
+import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface AnthropicResponse {
   content?: Array<{ type?: string; text?: string }>;
@@ -18,6 +24,29 @@ export class AnthropicProvider implements AiProvider {
   readonly requiresApiKey = true;
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
+    const { content, model } = await this.complete(
+      config,
+      buildExplainSystemPrompt(request.kind),
+      buildExplainWordUserPrompt(request),
+    );
+    return toExplanation(content, { provider: this.id, model });
+  }
+
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
+    const { content } = await this.complete(
+      config,
+      TRANSLATE_SYSTEM_PROMPT,
+      buildTranslateUserPrompt(request),
+    );
+    return extractTranslation(content);
+  }
+
+  /** Post one Messages API call with a system prompt and read the text. */
+  private async complete(
+    config: ProviderConfig,
+    system: string,
+    user: string,
+  ): Promise<{ content: string; model: string }> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Anthropic.');
     }
@@ -39,8 +68,8 @@ export class AnthropicProvider implements AiProvider {
         model,
         max_tokens: config.maxTokens ?? 1024,
         temperature: config.temperature ?? 0.2,
-        system: buildExplainSystemPrompt(request.kind),
-        messages: [{ role: 'user', content: buildExplainWordUserPrompt(request) }],
+        system,
+        messages: [{ role: 'user', content: user }],
       },
     });
 
@@ -51,6 +80,6 @@ export class AnthropicProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Anthropic returned an empty response.');
     }
-    return toExplanation(content, { provider: this.id, model: data.model ?? model });
+    return { content, model: data.model ?? model };
   }
 }
