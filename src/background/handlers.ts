@@ -49,6 +49,8 @@ export async function saveSelection(
       const explanation = await deps.explain.explainWith(settings, {
         word: entry.word,
         context: entry.sentence,
+        pageTitle: selection.sourceTitle,
+        precedingText: selection.precedingText,
       });
       return await deps.vocabulary.update(entry.id, { explanation });
     } catch {
@@ -82,8 +84,10 @@ export async function explainWord(
   deps: BackgroundDeps,
   word: string,
   context?: string,
+  pageTitle?: string,
+  precedingText?: string,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context });
+  const explanation = await deps.explain.explain({ word, context, pageTitle, precedingText });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
@@ -108,7 +112,14 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       return entry;
     },
     'get-highlight-data': () => buildHighlightData(deps),
-    explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    explain: (message) =>
+      explainWord(
+        deps,
+        message.payload.word,
+        message.payload.context,
+        message.payload.pageTitle,
+        message.payload.precedingText,
+      ),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

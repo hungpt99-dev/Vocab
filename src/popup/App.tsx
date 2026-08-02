@@ -77,7 +77,7 @@ function LibraryScreen() {
       try {
         const explanation = await sendMessage({
           type: 'explain',
-          payload: { word: entry.word, context: entry.sentence },
+          payload: { word: entry.word, context: entry.sentence, pageTitle: entry.sourceTitle },
         });
         await update(entry.id, { explanation });
       } catch (cause) {

@@ -22,6 +22,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Connection test.** The Options page can test a saved provider on demand and reports a clear message.
 
 ### Changed
+- **Richer page context for AI explanations.** `ExplainRequest` now carries the page title
+  (`pageTitle`) and a short excerpt of the text preceding the selection (`precedingText`), captured by
+  the content script and passed through the save and explain flows. The prompt includes both, so the
+  model can pick the right sense from context.
+- **Term preservation.** The explainer prompt instructs the model to keep proper nouns, brand names,
+  technical terms and code snippets verbatim — never translating them in the translation or examples.
+- The response cache key now includes `pageTitle` and `precedingText`, so the same word on different
+  pages is not served a stale explanation.
 - `ExplainService` is now the single application entry point for AI: it resolves the active provider,
   applies caching, rate-limiting, retry/backoff and optional fallback. Feature code never references a
   provider SDK.

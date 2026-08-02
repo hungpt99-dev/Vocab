@@ -4,6 +4,8 @@ import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/
 export interface SelectionPayload {
   word: string;
   sentence: string;
+  /** Short excerpt of text immediately before the selection on the page. */
+  precedingText: string;
   sourceUrl: string;
   sourceTitle: string;
 }
@@ -12,7 +14,7 @@ export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'explain'; payload: { word: string; context?: string; pageTitle?: string; precedingText?: string } }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }

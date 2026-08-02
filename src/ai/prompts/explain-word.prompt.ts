@@ -18,16 +18,22 @@ export const EXPLAIN_WORD_SYSTEM_PROMPT = [
   'relatedWords has up to 5 related terms (hypernyms, hyponyms, variants);',
   'pronunciation is IPA including slashes; collocations has up to 5 common word partners;',
   'grammar briefly notes part of speech, countability and irregular forms.',
+  'Preserve proper nouns, brand names, technical terms and code snippets verbatim —',
+  'never translate them in the translation or examples.',
 ].join(' ');
 
 /** Build the user turn for a word-explanation request. */
 export function buildExplainWordUserPrompt({
   word,
   context,
+  pageTitle,
+  precedingText,
   language = 'English',
 }: ExplainRequest): string {
   const lines = [`Word or phrase: "${word}"`];
   if (context) lines.push(`It appeared in this sentence: "${context}"`);
+  if (pageTitle) lines.push(`Page title: "${pageTitle}"`);
+  if (precedingText) lines.push(`Preceding text on the page: "${precedingText}"`);
   lines.push(`Explain it in ${language}. Respond with JSON only.`);
   return lines.join('\n');
 }

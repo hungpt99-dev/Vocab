@@ -54,7 +54,13 @@ describe('readActiveSelection', () => {
   it('asks the active tab for its selection', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'cake', sentence: 'I like cake.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: {
+        word: 'cake',
+        sentence: 'I like cake.',
+        precedingText: 'Everyone says',
+        sourceUrl: 'https://x',
+        sourceTitle: 'X',
+      },
     });
 
     expect(await readActiveSelection()).toMatchObject({ word: 'cake' });
@@ -75,6 +81,7 @@ describe('saveSelection', () => {
   const selection = {
     word: 'serendipity',
     sentence: 'Pure serendipity.',
+    precedingText: 'She found it by',
     sourceUrl: 'https://example.com',
     sourceTitle: 'Example',
   };
@@ -95,6 +102,21 @@ describe('saveSelection', () => {
     await deps.settings.update({ autoExplainOnSave: true });
     const entry = await saveSelection(deps, selection);
     expect(entry.explanation?.meaning).toBe('A fortunate accident.');
+  });
+
+  it('passes page context to the explainer when auto-explain is on', async () => {
+    await deps.settings.update({ autoExplainOnSave: true });
+    await saveSelection(deps, selection);
+
+    expect(deps.explain.explainWith).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        word: 'serendipity',
+        context: 'Pure serendipity.',
+        pageTitle: 'Example',
+        precedingText: 'She found it by',
+      }),
+    );
   });
 
   it('still saves when auto-explain fails', async () => {
@@ -135,6 +157,17 @@ describe('explainWord', () => {
     expect((await deps.vocabulary.get(entry.id))?.explanation?.meaning).toBe('A fortunate accident.');
   });
 
+  it('forwards page context to the explainer', async () => {
+    await explainWord(deps, 'serendipity', 'context', 'Page Title', 'preceding');
+
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'serendipity',
+      context: 'context',
+      pageTitle: 'Page Title',
+      precedingText: 'preceding',
+    });
+  });
+
   it('returns an explanation for an unsaved word without storing it', async () => {
     const result = await explainWord(deps, 'unsaved');
     expect(result.meaning).toBe('A fortunate accident.');
@@ -157,7 +190,10 @@ describe('createHandlers', () => {
   });
 
   it('returns null when saving with no active selection', async () => {
-    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: { word: '  ', sentence: '', sourceUrl: '', sourceTitle: '' } });
+    chromeMock().tabs.sendMessage.mockResolvedValue({
+      ok: true,
+      data: { word: '  ', sentence: '', precedingText: '', sourceUrl: '', sourceTitle: '' },
+    });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
     expect(result).toEqual({ ok: true, data: null });
   });
@@ -165,7 +201,13 @@ describe('createHandlers', () => {
   it('saves the current selection when one exists', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'ephemeral', sentence: 'It is ephemeral.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: {
+        word: 'ephemeral',
+        sentence: 'It is ephemeral.',
+        precedingText: 'Time is',
+        sourceUrl: 'https://x',
+        sourceTitle: 'X',
+      },
     });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
 
