@@ -41,6 +41,8 @@ export interface Settings {
   activeProviderId: string;
   /** Optional provider tried once when the active one fails. */
   fallbackProviderId?: string;
+  /** Language explanations are written in (the user's language). */
+  targetLanguage: string;
   highlightEnabled: boolean;
   highlightColor: string;
   /** Ask the AI automatically the first time a word is saved. */

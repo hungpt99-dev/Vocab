@@ -37,6 +37,7 @@ export class VocabularyRepository {
         note: input.note ?? existing.note,
         tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
         favorite: input.favorite ?? existing.favorite,
+        sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
         explanation: input.explanation ?? existing.explanation,
         updatedAt: now,
       };
@@ -55,6 +56,7 @@ export class VocabularyRepository {
       note: input.note ?? '',
       tags: normalizeTags(input.tags ?? []),
       favorite: input.favorite ?? false,
+      sourceLanguage: input.sourceLanguage ?? '',
       explanation: input.explanation ?? null,
       createdAt: now,
       updatedAt: now,

@@ -71,3 +71,33 @@ export function extractSentence(haystack: string, selection: string, window = 16
 export function isPhrase(input: string): boolean {
   return collapseWhitespace(input).includes(' ');
 }
+
+const SCRIPT_RANGES: ReadonlyArray<readonly [string, RegExp]> = [
+  ['Chinese', /[⺀-鿿豈-﫿]/],
+  ['Japanese', /[぀-ヿ]/],
+  ['Hangul', /[가-힯]/],
+  ['Cyrillic', /[Ѐ-ӿ]/],
+  ['Arabic', /[؀-ۿݐ-ݿ]/],
+  ['Devanagari', /[ऀ-ॿ]/],
+  ['Thai', /[฀-๿]/],
+  ['Greek', /[Ͱ-Ͽ]/],
+];
+
+const LATIN = /[A-Za-z]/;
+
+/**
+ * Best-effort source-language detection from Unicode script coverage.
+ * Not a full classifier — it answers the one question the explainer needs:
+ * "what script is this word in?" so translation can run source → target.
+ * Returns a BCP-47-ish label, or '' when nothing recognisable is present.
+ */
+export function detectLanguage(text: string): string {
+  const sample = collapseWhitespace(text);
+  if (!sample) return '';
+
+  for (const [label, range] of SCRIPT_RANGES) {
+    if (range.test(sample)) return label;
+  }
+  if (LATIN.test(sample)) return 'English';
+  return '';
+}

@@ -2,10 +2,18 @@
 export interface Explanation {
   meaning: string;
   simpleExplanation: string;
+  /** Translation of the word into the user's configured target language. */
+  translation: string;
   examples: string[];
   synonyms: string[];
+  /** Words with the opposite meaning. */
+  antonyms: string[];
+  /** Words related in meaning or usage (hypernyms, hyponyms, variants). */
+  relatedWords: string[];
   pronunciation: string;
   collocations: string[];
+  /** Brief grammatical notes: part of speech, countability, irregular forms. */
+  grammar: string;
   /** Provider id that generated this explanation. */
   provider: string;
   /** Model identifier used, when reported. */
@@ -29,6 +37,8 @@ export interface VocabularyEntry {
   note: string;
   tags: string[];
   favorite: boolean;
+  /** Detected language of the word/phrase, when known (BCP-47-ish label). */
+  sourceLanguage: string;
   explanation: Explanation | null;
   createdAt: number;
   updatedAt: number;
@@ -44,6 +54,8 @@ export interface NewVocabularyEntry {
   note?: string;
   tags?: string[];
   favorite?: boolean;
+  /** Detected source language; defaults to '' and is filled by the caller when known. */
+  sourceLanguage?: string;
   explanation?: Explanation | null;
 }
 
@@ -59,6 +71,7 @@ export type VocabularyPatch = Partial<
     | 'note'
     | 'tags'
     | 'favorite'
+    | 'sourceLanguage'
     | 'explanation'
   >
 >;
