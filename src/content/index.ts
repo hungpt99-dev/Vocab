@@ -1,13 +1,14 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
-import { SETTINGS_KEY } from '@/storage/settings-repository';
+import { SETTINGS_KEY, DEFAULT_SETTINGS } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
 import type { HighlightData } from '@/shared/messaging/contract';
+import type { ReadingExperience } from '@/shared/types/settings';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
-import { applyHighlightColor, injectStyles } from './styles';
+import { applyHighlightColor, applyReadingExperience, injectStyles } from './styles';
 import { showToast } from './toast';
 
 const RESCAN_DELAY_MS = 400;
@@ -16,6 +17,7 @@ const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
+let readingExperience: ReadingExperience = DEFAULT_SETTINGS.readingExperience;
 let observer: MutationObserver | null = null;
 let rescanTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -123,6 +125,8 @@ async function refresh(): Promise<void> {
   }
 
   applyHighlightColor(data.color);
+  applyReadingExperience(data.readingExperience);
+  readingExperience = data.readingExperience;
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
 
@@ -182,7 +186,12 @@ function attachHoverListeners(): void {
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
     if (!(mark instanceof HTMLElement)) return;
     const entry = entriesById.get(mark.getAttribute(HIGHLIGHT_ATTR) ?? '');
-    if (entry) hoverCard.show(mark, entry);
+    if (entry) {
+      hoverCard.show(mark, entry, {
+        showOriginal: readingExperience.showOriginal,
+        showTranslation: readingExperience.showTranslation,
+      });
+    }
   };
   const closeFor = (target: EventTarget | null): void => {
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;

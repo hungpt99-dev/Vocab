@@ -1,5 +1,5 @@
 import type { Settings, SavedProvider, SettingsPatch, AiProviderId } from '@/shared/types/settings';
-import { DEFAULT_HIGHLIGHT_COLOR } from '@/shared/styles/tokens';
+import { DEFAULT_HIGHLIGHT_COLOR, reading as readingTokens } from '@/shared/styles/tokens';
 
 export const SETTINGS_KEY = 'avs:settings';
 
@@ -40,6 +40,13 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
+  readingExperience: {
+    showOriginal: true,
+    showTranslation: true,
+    width: readingTokens.width,
+    fontSize: readingTokens.fontSize,
+    spacing: readingTokens.spacing,
+  },
 };
 
 /** Promote the old single-provider fields into the new providers array. */

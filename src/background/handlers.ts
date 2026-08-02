@@ -67,6 +67,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
   return {
     enabled: settings.highlightEnabled,
     color: settings.highlightColor,
+    readingExperience: settings.readingExperience,
     entries: entries.map((entry) => ({
       id: entry.id,
       word: entry.word,

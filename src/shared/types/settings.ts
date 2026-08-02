@@ -34,6 +34,26 @@ export interface SavedProvider {
   enabled: boolean;
 }
 
+/**
+ * User-tunable presentation of the reading overlay (hover card).
+ *
+ * Values are numeric so the content script can write them to CSS custom
+ * properties; defaults mirror the design tokens so the out-of-the-box look
+ * is unchanged.
+ */
+export interface ReadingExperience {
+  /** Show the saved word as a heading on the hover card. */
+  showOriginal: boolean;
+  /** Show the saved meaning on the hover card. */
+  showTranslation: boolean;
+  /** Hover card max width in px. */
+  width: number;
+  /** Hover card font size in px. */
+  fontSize: number;
+  /** Hover card line-height multiplier; also scales row gaps. */
+  spacing: number;
+}
+
 export interface Settings {
   /** All providers the user has configured. */
   providers: SavedProvider[];
@@ -47,6 +67,8 @@ export interface Settings {
   highlightColor: string;
   /** Ask the AI automatically the first time a word is saved. */
   autoExplainOnSave: boolean;
+  /** Reading overlay presentation, applied live to open pages. */
+  readingExperience: ReadingExperience;
 }
 
 export type SettingsPatch = Partial<Settings>;

@@ -6,6 +6,7 @@ import {
   layout,
   motion,
   radius,
+  reading,
   spacing,
   typography,
   zIndex,
@@ -14,6 +15,9 @@ import {
 const STYLE_ID = 'avs-styles';
 
 export const HIGHLIGHT_COLOR_VAR = '--avs-highlight-color';
+export const CARD_WIDTH_VAR = '--avs-card-width';
+export const CARD_FONT_SIZE_VAR = '--avs-card-font-size';
+export const CARD_SPACING_VAR = '--avs-card-spacing';
 
 /**
  * Inject (once) the stylesheet used by highlights, hover card and toasts.
@@ -44,18 +48,23 @@ export function injectStyles(doc: Document = document): void {
     .avs-card {
       position: fixed;
       z-index: ${zIndex.overlay};
-      max-width: ${layout.overlayMaxWidth};
+      max-width: var(${CARD_WIDTH_VAR}, ${reading.width}px);
       padding: ${spacing.md} ${spacing.lg};
       border-radius: ${radius.md};
       background: ${color.overlaySurface};
       color: ${color.overlayText};
-      font: ${typography.overlayBody} ${typography.systemStack};
+      font-family: ${typography.systemStack};
+      font-size: var(${CARD_FONT_SIZE_VAR}, ${reading.fontSize}px);
+      line-height: var(${CARD_SPACING_VAR}, ${reading.spacing});
       box-shadow: ${elevation.overlay};
       pointer-events: none;
     }
     .avs-card[hidden] { display: none; }
-    .avs-card-word { font-weight: 600; margin-bottom: ${spacing.xs}; }
-    .avs-card-row { margin-top: ${spacing.xs}; }
+    .avs-card-word {
+      font-weight: 600;
+      margin-bottom: calc(${spacing.xs} * var(${CARD_SPACING_VAR}, ${reading.spacing}));
+    }
+    .avs-card-row { margin-top: calc(${spacing.xs} * var(${CARD_SPACING_VAR}, ${reading.spacing})); }
     .avs-card-label {
       color: ${color.overlayMuted};
       font-size: ${typography.overlayLabel};
@@ -121,4 +130,18 @@ export function injectStyles(doc: Document = document): void {
 /** Apply the user's highlight colour as a CSS custom property. */
 export function applyHighlightColor(value: string, doc: Document = document): void {
   doc.documentElement.style.setProperty(HIGHLIGHT_COLOR_VAR, value);
+}
+
+/**
+ * Apply the user's reading overlay preferences as CSS custom properties so an
+ * open hover card reflows instantly when settings change.
+ */
+export function applyReadingExperience(
+  experience: { width: number; fontSize: number; spacing: number },
+  doc: Document = document,
+): void {
+  const root = doc.documentElement;
+  root.style.setProperty(CARD_WIDTH_VAR, `${experience.width}px`);
+  root.style.setProperty(CARD_FONT_SIZE_VAR, `${experience.fontSize}px`);
+  root.style.setProperty(CARD_SPACING_VAR, String(experience.spacing));
 }

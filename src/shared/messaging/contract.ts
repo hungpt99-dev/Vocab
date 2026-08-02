@@ -1,4 +1,5 @@
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
+import type { ReadingExperience } from '@/shared/types/settings';
 
 /** Payload the content script reports about the current selection. */
 export interface SelectionPayload {
@@ -24,6 +25,8 @@ export type MessageType = Message['type'];
 export interface HighlightData {
   enabled: boolean;
   color: string;
+  /** Reading overlay presentation, applied live via CSS custom properties. */
+  readingExperience: ReadingExperience;
   entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt'> & {
     meaning: string;
   }>;

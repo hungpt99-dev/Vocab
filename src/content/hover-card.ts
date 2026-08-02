@@ -3,6 +3,14 @@ import type { HighlightEntry } from './matcher';
 const CARD_ID = 'avs-hover-card';
 const OFFSET = 10;
 
+/** Which sections of the reading overlay are visible. */
+export interface HoverCardOptions {
+  showOriginal: boolean;
+  showTranslation: boolean;
+}
+
+const DEFAULT_OPTIONS: HoverCardOptions = { showOriginal: true, showTranslation: true };
+
 /** Format an epoch timestamp for display in the hover card. */
 export function formatSavedDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, {
@@ -45,9 +53,9 @@ export class HoverCard {
     return card;
   }
 
-  show(anchor: HTMLElement, entry: HighlightEntry): void {
+  show(anchor: HTMLElement, entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     const card = this.ensureElement();
-    card.replaceChildren(...renderContent(entry));
+    card.replaceChildren(...renderContent(entry, options));
     card.hidden = false;
 
     anchor.setAttribute('aria-describedby', CARD_ID);
@@ -74,15 +82,19 @@ export class HoverCard {
   }
 }
 
-function renderContent(entry: HighlightEntry): HTMLElement[] {
+function renderContent(entry: HighlightEntry, options: HoverCardOptions): HTMLElement[] {
   const nodes: HTMLElement[] = [];
 
-  const word = document.createElement('div');
-  word.className = 'avs-card-word';
-  word.textContent = entry.word;
-  nodes.push(word);
+  if (options.showOriginal) {
+    const word = document.createElement('div');
+    word.className = 'avs-card-word';
+    word.textContent = entry.word;
+    nodes.push(word);
+  }
 
-  nodes.push(row('Meaning', entry.meaning || 'No explanation yet — open the popup to ask your AI.'));
+  if (options.showTranslation) {
+    nodes.push(row('Meaning', entry.meaning || 'No explanation yet — open the popup to ask your AI.'));
+  }
   if (entry.note) nodes.push(row('Note', entry.note));
   nodes.push(row('Saved', formatSavedDate(entry.createdAt)));
 

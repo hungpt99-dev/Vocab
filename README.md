@@ -154,6 +154,11 @@ Open the popup and choose **Settings**, or right-click the extension icon → *O
 | Base URL | provider default | For proxies, gateways or non-standard ports |
 | Highlight saved words | on | Applies to open tabs immediately |
 | Highlight colour | `#fde68a` | Applies to open tabs immediately |
+| Show original word | on | Hover card heading over a saved word |
+| Show translation | on | Hover card meaning block |
+| Translation width | `320px` | Hover card max width, `240–480px` |
+| Card font size | `13px` | Hover card text, `11–18px` |
+| Card spacing | `1.5` | Hover card line-height and row gaps, `1.2–2.0` |
 | Explain automatically on save | off | Costs an API call per saved word |
 
 Use **Test connection** to verify a provider before saving words.

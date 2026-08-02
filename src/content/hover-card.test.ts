@@ -68,6 +68,36 @@ describe('HoverCard', () => {
     expect(document.getElementById('avs-hover-card')!.textContent).toContain('No explanation yet');
   });
 
+  it('hides the original word when requested', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: false, showTranslation: true });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).not.toContain(entry.word);
+    expect(element.textContent).toContain('A fortunate accident.');
+  });
+
+  it('hides the translation when requested', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: true, showTranslation: false });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).toContain(entry.word);
+    expect(element.textContent).not.toContain('A fortunate accident.');
+  });
+
+  it('keeps note and date when both sections are hidden', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: false, showTranslation: false });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).toContain('from an article');
+    expect(element.textContent).toContain('Saved');
+  });
+
   it('hides and clears the aria link', () => {
     document.body.innerHTML = '<mark id="m">x</mark>';
     const anchor = document.getElementById('m') as HTMLElement;
