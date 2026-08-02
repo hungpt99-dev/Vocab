@@ -1,12 +1,17 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
-import type { HighlightData } from '@/shared/messaging/contract';
+import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
-import { HoverCard } from './hover-card';
+import { CARD_ACTION_EVENT, HoverCard, type CardActionDetail } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import {
+  SelectionToolbar,
+  readToolbarSelection,
+  type ToolbarActionId,
+  type ToolbarState,
+} from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -31,6 +36,7 @@ void bootstrap();
 async function bootstrap(): Promise<void> {
   injectStyles();
   attachHoverListeners();
+  attachCardActions();
   attachSelectionToolbar();
   watchSettings();
   await refresh();
@@ -68,8 +74,8 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
-    void handleToolbarAction(detail.action, detail.text);
+    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string; state?: ToolbarState }>).detail;
+    void handleToolbarAction(detail.action, detail.text, detail.state);
   }) as EventListener);
 }
 
@@ -82,7 +88,11 @@ function toolbarElement(): HTMLElement | null {
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
+async function handleToolbarAction(
+  action: ToolbarActionId,
+  text: string,
+  state?: ToolbarState,
+): Promise<void> {
   switch (action) {
     case 'copy': {
       try {
@@ -94,11 +104,65 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'save': {
+      await saveFromReading(text, state?.selection);
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / translate are wired in later issues (VOC-44..48).
       // For now surface what was requested so the toolbar is demonstrably live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
+  }
+}
+
+/**
+ * Save the word selected on the page straight into the vocabulary. Uses the
+ * selection metadata captured when the toolbar opened, because clicking the
+ * toolbar clears the page selection.
+ */
+async function saveFromReading(
+  text: string,
+  selection?: SelectionPayload,
+): Promise<void> {
+  const word = text.trim();
+  if (!word) {
+    showToast('Select a word first.', 'error');
+    toolbar.hide();
+    return;
+  }
+  try {
+    const entry = await sendMessage({
+      type: 'save-entry',
+      payload: selection
+        ? { word, sentence: selection.sentence, sourceUrl: selection.sourceUrl, sourceTitle: selection.sourceTitle }
+        : { word },
+    });
+    showToast(`Saved "${entry.word}"`, 'success');
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : 'Could not save the word.', 'error');
+  }
+  toolbar.hide();
+}
+
+/**
+ * Route a hover-card shortcut. The AI request goes through the message bus to
+ * the provider-agnostic ExplainService in the background worker; the content
+ * script never touches a provider directly.
+ */
+async function handleCardExplain(entry: HighlightEntry): Promise<void> {
+  hoverCard.setExplaining(true);
+  try {
+    const explanation = await sendMessage({ type: 'explain', payload: { word: entry.word } });
+    hoverCard.update({
+      ...entry,
+      meaning: explanation.meaning,
+      pronunciation: explanation.pronunciation,
+    });
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : 'The AI request failed.', 'error');
+  } finally {
+    hoverCard.setExplaining(false);
   }
 }
 
@@ -178,22 +242,36 @@ function isOwnNode(node: Node): boolean {
 }
 
 function attachHoverListeners(): void {
-  const openFor = (target: EventTarget | null): void => {
+  const openFor = (event: Event): void => {
+    const target = event.target;
+    // Hovering the card itself (its AI shortcut) must not close or swap it.
+    if (target instanceof Element && hoverCard.contains(target)) return;
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
     if (!(mark instanceof HTMLElement)) return;
     const entry = entriesById.get(mark.getAttribute(HIGHLIGHT_ATTR) ?? '');
     if (entry) hoverCard.show(mark, entry);
   };
-  const closeFor = (target: EventTarget | null): void => {
-    const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
+  const closeFor = (event: Event): void => {
+    // Moving onto the card keeps it open so its AI shortcut can be clicked.
+    const related = (event as MouseEvent).relatedTarget;
+    if (related instanceof Node && hoverCard.contains(related)) return;
+    const mark = event.target instanceof Element ? event.target.closest(`.${HIGHLIGHT_CLASS}`) : null;
     hoverCard.hide(mark instanceof HTMLElement ? mark : undefined);
   };
 
-  document.addEventListener('mouseover', (event) => openFor(event.target));
-  document.addEventListener('mouseout', (event) => closeFor(event.target));
-  document.addEventListener('focusin', (event) => openFor(event.target));
-  document.addEventListener('focusout', (event) => closeFor(event.target));
+  document.addEventListener('mouseover', openFor);
+  document.addEventListener('mouseout', closeFor);
+  document.addEventListener('focusin', openFor);
+  document.addEventListener('focusout', closeFor);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hoverCard.hide();
   });
+}
+
+/** Wire hover-card shortcuts (currently the AI-explain action). */
+function attachCardActions(): void {
+  document.addEventListener(CARD_ACTION_EVENT, ((event: Event) => {
+    const detail = (event as CustomEvent<CardActionDetail>).detail;
+    if (detail.action === 'explain') void handleCardExplain(detail.entry);
+  }) as EventListener);
 }

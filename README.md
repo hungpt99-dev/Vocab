@@ -53,7 +53,7 @@ explains your words — stays under your control.
 | **Save a selection** | Right-click menu, popup form, or `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS) |
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
-| **On-page highlighting** | Saved words highlighted everywhere; hover or keyboard-focus shows meaning, note and saved date |
+| **On-page highlighting** | Saved words highlighted everywhere — including both columns of bilingual (original/translation) pages; hover or keyboard-focus shows meaning, pronunciation, note, saved date and an AI-explain shortcut |
 | **AI Explain** | Meaning, simple explanation, examples, synonyms, IPA pronunciation and collocations |
 | **Bring your own key** | OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama and LM Studio |
 | **Portable data** | Versioned JSON export and import, with merge or replace |
@@ -181,16 +181,19 @@ Adding a provider is usually a one-object change: see
 
 ## Usage
 
-**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, or
-open the popup (the selection is prefilled) and click **Save to vocabulary**.
+**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, open
+the popup (the selection is prefilled) and click **Save to vocabulary**, or use the floating
+**Save** button that appears above any selection.
 
 **Browse your library.** The popup lists entries newest first. Search matches words, notes, sentences
 and tags. Filter by favourites or tag.
 
-**Explain a word.** Click **AI explain** on an entry. The result is cached until you refresh it.
+**Explain a word.** Click **AI explain** on an entry, or on a hover card over a highlighted word. The
+result is cached until you refresh it.
 
-**Highlighting.** Saved words are highlighted as you browse. Hover — or tab to a highlight — to see the
-meaning, your note and the saved date. Press `Escape` to dismiss.
+**Highlighting.** Saved words are highlighted as you browse, in both the original and translated text
+of bilingual pages. Hover — or tab to a highlight — to see the meaning, pronunciation, your note and
+the saved date, plus an **AI explain** shortcut. Press `Escape` to dismiss.
 
 **Back up.** Settings → *Export JSON*. Restore with *Import JSON* using **merge** (keeps newer entries)
 or **replace** (clears first).

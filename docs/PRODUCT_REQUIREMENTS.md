@@ -23,6 +23,7 @@ Status reflects the current release, v0.1.0. See [Roadmap](ROADMAP.md) for what 
 | FR-1.6 | Saving the same word twice updates the existing entry rather than creating a duplicate. | Done |
 | FR-1.7 | Capture confirms with an on-page toast that does not require dismissal. | Done |
 | FR-1.8 | Optionally, an explanation is requested automatically when a word is saved. | Done (off by default) |
+| FR-1.9 | The user can save any word directly from reading mode via the floating toolbar's Save action, without leaving the page. | Done |
 
 **Acceptance criteria.** Selecting text on any HTTP(S) page and using any of the three routes produces
 exactly one entry containing the selected text, the sentence containing it, and the page URL. The page
@@ -78,6 +79,8 @@ than creating a duplicate (consistent with FR-1.6).
 | FR-3.6 | Content added after page load is highlighted. | Done |
 | FR-3.7 | Highlight colour is user-configurable and applies to open pages immediately. | Done |
 | FR-3.8 | Highlighting can be disabled entirely, taking effect on open pages immediately. | Done |
+| FR-3.9 | Hovering a highlight shows the IPA pronunciation when the entry has an explanation, and an AI explain shortcut that fetches an explanation in place. | Done |
+| FR-3.10 | Saved vocabulary is highlighted in both columns of a two-column (original + translation) reading layout. | Done |
 
 **Acceptance criteria.** After saving a word, loading a page containing it shows every occurrence
 highlighted. Changing the colour or toggling the feature updates already-open tabs without a reload.

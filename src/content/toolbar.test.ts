@@ -102,7 +102,7 @@ describe('SelectionToolbar', () => {
     element.querySelector<HTMLButtonElement>('[data-action="copy"]')!.click();
 
     expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { action: 'copy', text: 'hello' } }),
+      expect.objectContaining({ detail: expect.objectContaining({ action: 'copy', text: 'hello' }) }),
     );
     toolbarUi.destroy();
   });

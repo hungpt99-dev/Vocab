@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Vocabulary integration in reading mode: saved words are highlighted in both the original and the
+  translated column of bilingual pages; the hover card shows the IPA pronunciation (when available),
+  note, saved date and an in-place **AI explain** shortcut; and the selection toolbar's **Save to
+  Vocabulary** button persists the selected word straight from the page. The AI request is routed
+  through the provider-agnostic `ExplainService` in the background worker — the content script never
+  couples to a provider.
 - AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
 - New runtime dependency `react-window` (virtualized lists) with `@types/react-window`.
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,

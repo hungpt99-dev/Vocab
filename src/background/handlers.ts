@@ -74,6 +74,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
       note: entry.note,
       createdAt: entry.createdAt,
       meaning: entry.explanation?.meaning ?? '',
+      pronunciation: entry.explanation?.pronunciation ?? '',
     })),
   };
 }

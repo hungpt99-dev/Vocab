@@ -3,6 +3,14 @@ import type { HighlightEntry } from './matcher';
 const CARD_ID = 'avs-hover-card';
 const OFFSET = 10;
 
+/** Custom event dispatched when a card shortcut is activated. */
+export const CARD_ACTION_EVENT = 'avs-card-action';
+
+export interface CardActionDetail {
+  action: 'explain';
+  entry: HighlightEntry;
+}
+
 /** Format an epoch timestamp for display in the hover card. */
 export function formatSavedDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, {
@@ -28,9 +36,10 @@ export function computePosition(
   return { top, left };
 }
 
-/** Accessible tooltip showing the meaning, note and saved date of an entry. */
+/** Accessible tooltip showing the meaning, pronunciation, note and an AI shortcut. */
 export class HoverCard {
   private element: HTMLElement | null = null;
+  private explaining = false;
 
   private ensureElement(): HTMLElement {
     if (this.element?.isConnected) return this.element;
@@ -46,8 +55,10 @@ export class HoverCard {
   }
 
   show(anchor: HTMLElement, entry: HighlightEntry): void {
+    this.explaining = false;
+
     const card = this.ensureElement();
-    card.replaceChildren(...renderContent(entry));
+    this.render(entry);
     card.hidden = false;
 
     anchor.setAttribute('aria-describedby', CARD_ID);
@@ -63,6 +74,27 @@ export class HoverCard {
     card.style.left = `${left}px`;
   }
 
+  /** True when the node lives inside the card, so it can keep itself open. */
+  contains(node: Node): boolean {
+    return !!this.element?.isConnected && this.element.contains(node);
+  }
+
+  /** Re-render with freshly fetched information, keeping the card open. */
+  update(entry: HighlightEntry): void {
+    if (!this.element || this.element.hidden) return;
+    this.render(entry);
+  }
+
+  /** Toggle the loading state of the AI-explain shortcut. */
+  setExplaining(explaining: boolean): void {
+    this.explaining = explaining;
+    const button = this.element?.querySelector<HTMLButtonElement>('.avs-card-explain');
+    if (button) {
+      button.disabled = explaining;
+      button.textContent = explaining ? 'Explaining…' : 'AI explain';
+    }
+  }
+
   hide(anchor?: HTMLElement): void {
     anchor?.removeAttribute('aria-describedby');
     if (this.element) this.element.hidden = true;
@@ -72,9 +104,14 @@ export class HoverCard {
     this.element?.remove();
     this.element = null;
   }
+
+  private render(entry: HighlightEntry): void {
+    if (!this.element) return;
+    this.element.replaceChildren(...renderContent(entry, this.explaining));
+  }
 }
 
-function renderContent(entry: HighlightEntry): HTMLElement[] {
+function renderContent(entry: HighlightEntry, explaining: boolean): HTMLElement[] {
   const nodes: HTMLElement[] = [];
 
   const word = document.createElement('div');
@@ -82,9 +119,27 @@ function renderContent(entry: HighlightEntry): HTMLElement[] {
   word.textContent = entry.word;
   nodes.push(word);
 
-  nodes.push(row('Meaning', entry.meaning || 'No explanation yet — open the popup to ask your AI.'));
+  if (entry.pronunciation) nodes.push(row('Pronunciation', entry.pronunciation));
+  nodes.push(row('Meaning', entry.meaning || 'No explanation yet — use AI explain below.'));
   if (entry.note) nodes.push(row('Note', entry.note));
   nodes.push(row('Saved', formatSavedDate(entry.createdAt)));
+
+  const explain = document.createElement('button');
+  explain.type = 'button';
+  explain.className = 'avs-card-explain';
+  explain.textContent = explaining ? 'Explaining…' : 'AI explain';
+  explain.disabled = explaining;
+  explain.setAttribute('aria-label', `Explain "${entry.word}" with AI`);
+  explain.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.dispatchEvent(
+      new CustomEvent<CardActionDetail>(CARD_ACTION_EVENT, {
+        detail: { action: 'explain', entry },
+      }),
+    );
+  });
+  nodes.push(explain);
 
   return nodes;
 }
