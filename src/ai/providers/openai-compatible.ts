@@ -1,9 +1,20 @@
 import type { AiProviderId } from '@/shared/types/settings';
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import {
+  EXPLAIN_WORD_SYSTEM_PROMPT,
+  TRANSLATE_SYSTEM_PROMPT,
+  buildExplainWordUserPrompt,
+  buildTranslateUserPrompt,
+} from '../prompts';
 import { toExplanation } from '../parse';
-import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
+import {
+  AiError,
+  type AiProvider,
+  type ExplainRequest,
+  type ProviderConfig,
+  type TranslateRequest,
+} from '../types';
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -44,6 +55,33 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
+    const { content, model } = await this.complete(
+      config,
+      EXPLAIN_WORD_SYSTEM_PROMPT,
+      buildExplainWordUserPrompt(request),
+    );
+    return toExplanation(content, { provider: this.id, model });
+  }
+
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
+    const { content } = await this.complete(
+      config,
+      TRANSLATE_SYSTEM_PROMPT,
+      buildTranslateUserPrompt(request),
+    );
+    return content;
+  }
+
+  /**
+   * Shared chat-completions transport used by every capability. Handles the
+   * API-key gate, message body and empty-response check once, so `explain` and
+   * `translate` cannot drift.
+   */
+  private async complete(
+    config: ProviderConfig,
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<{ content: string; model: string }> {
     if (this.requiresApiKey && !config.apiKey) {
       throw new AiError('missing_api_key', `An API key is required for ${this.label}.`);
     }
@@ -61,8 +99,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       body: {
         model,
         messages: [
-          { role: 'system', content: EXPLAIN_WORD_SYSTEM_PROMPT },
-          { role: 'user', content: buildExplainWordUserPrompt(request) },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
         temperature: config.temperature ?? 0.2,
         ...(config.maxTokens !== undefined && config.maxTokens !== null
@@ -75,7 +113,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', `${this.label} returned an empty response.`);
     }
-    return toExplanation(content, { provider: this.id, model: data.model ?? model });
+    return { content, model: data.model ?? model };
   }
 }
 

@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Reading mode.** Select text on a page and choose **More → Reading mode** to open a bilingual view of
+  the article. The reading mode fetches a translation of each paragraph through the configured AI
+  provider and supports five instantly switchable layouts: side-by-side, original-first,
+  translation-first, hover-translation and toggle-translation.
+- **Provider abstraction gains translation.** Every `AiProvider` now implements `translate()`, and a
+  new `TranslateService` shares the explanation rate-limit, retry/backoff and fallback behaviour.
+  Per-block translation failures degrade to an "unavailable" note instead of failing the whole article.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

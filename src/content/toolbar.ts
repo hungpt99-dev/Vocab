@@ -36,6 +36,9 @@ const ICON_COPY = wrap(
   '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 );
 const ICON_MORE = wrap('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
+const ICON_BOOK_OPEN = wrap(
+  '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+);
 
 const TOOLBAR_ACTIONS = [
   { id: 'explain', label: 'Explain with AI', icon: ICON_SPARKLES },
@@ -46,6 +49,14 @@ const TOOLBAR_ACTIONS = [
 ] as const;
 
 export type ToolbarActionId = (typeof TOOLBAR_ACTIONS)[number]['id'];
+
+/** Actions hidden behind the 'More' trigger. */
+const TOOLBAR_MENU_ACTIONS = [{ id: 'reading-mode', label: 'Reading mode', icon: ICON_BOOK_OPEN }] as const;
+
+export type ToolbarMenuActionId = (typeof TOOLBAR_MENU_ACTIONS)[number]['id'];
+
+/** Every action the toolbar can emit, including menu-only ones. */
+export type ToolbarAnyActionId = ToolbarActionId | ToolbarMenuActionId;
 
 /**
  * Classify a selection's text into a unit. Mirrors the existing `isPhrase`
@@ -105,6 +116,8 @@ export function computeToolbarPosition(
  */
 export class SelectionToolbar {
   private element: HTMLElement | null = null;
+  private menu: HTMLElement | null = null;
+  private moreButton: HTMLButtonElement | null = null;
   private state: ToolbarState | null = null;
   private scrollHandler = (): void => this.reposition();
 
@@ -129,6 +142,11 @@ export class SelectionToolbar {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (action.id === 'more') {
+          this.toggleMenu();
+          return;
+        }
+        this.closeMenu();
         if (this.state) {
           document.dispatchEvent(
             new CustomEvent('avs-toolbar-action', {
@@ -138,10 +156,42 @@ export class SelectionToolbar {
         }
       });
       toolbar.append(button);
+      if (action.id === 'more') this.moreButton = button;
     }
+
+    const menu = document.createElement('div');
+    menu.id = `${TOOLBAR_ID}-menu`;
+    menu.className = 'avs-toolbar-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'More actions');
+    menu.hidden = true;
+
+    for (const action of TOOLBAR_MENU_ACTIONS) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'avs-toolbar-menu-item';
+      item.dataset.action = action.id;
+      item.setAttribute('role', 'menuitem');
+      item.innerHTML = `${action.icon}<span>${action.label}</span>`;
+      item.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeMenu();
+        if (this.state) {
+          document.dispatchEvent(
+            new CustomEvent('avs-toolbar-action', {
+              detail: { action: action.id, text: this.state.text },
+            }),
+          );
+        }
+      });
+      menu.append(item);
+    }
+    toolbar.append(menu);
 
     document.body.append(toolbar);
     this.element = toolbar;
+    this.menu = menu;
     return toolbar;
   }
 
@@ -155,6 +205,7 @@ export class SelectionToolbar {
 
   hide(): void {
     if (this.element) this.element.hidden = true;
+    this.closeMenu();
     this.state = null;
     window.removeEventListener('scroll', this.scrollHandler, true);
   }
@@ -163,10 +214,39 @@ export class SelectionToolbar {
     return !!this.element?.isConnected && !this.element.hidden;
   }
 
+  get isMenuOpen(): boolean {
+    return !!this.menu?.isConnected && !this.menu.hidden;
+  }
+
+  toggleMenu(): void {
+    if (this.isMenuOpen) {
+      this.closeMenu();
+    } else {
+      this.openMenu();
+    }
+  }
+
+  private openMenu(): void {
+    if (!this.menu || !this.moreButton) return;
+    this.menu.hidden = false;
+    this.moreButton.setAttribute('aria-expanded', 'true');
+    this.reposition();
+    // Move keyboard focus into the menu for a smooth popover interaction.
+    this.menu.querySelector<HTMLElement>('.avs-toolbar-menu-item')?.focus();
+  }
+
+  private closeMenu(): void {
+    if (!this.menu || !this.moreButton) return;
+    this.menu.hidden = true;
+    this.moreButton.removeAttribute('aria-expanded');
+  }
+
   destroy(): void {
     this.hide();
     this.element?.remove();
     this.element = null;
+    this.menu = null;
+    this.moreButton = null;
   }
 
   private reposition(): void {

@@ -5,14 +5,7 @@ import { getProvider } from './registry';
 import type { ExplainRequest } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
-import { createRateLimiter, type RateLimiter } from './rate-limiter';
-
-/**
- * AI calls share a single rate limiter so concurrent requests (e.g. several
- * auto-explain saves at once) do not burst the provider. Defaults to at most
- * 5 requests per 10 seconds — friendly to local models and free tiers alike.
- */
-const rateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+import { aiRateLimiter } from './rate-limiter';
 
 const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
 
@@ -70,7 +63,7 @@ export class ExplainService {
     signal?: AbortSignal,
   ): Promise<Explanation> {
     const adapter = getProvider(provider.type);
-    await rateLimiter.acquire(signal);
+    await aiRateLimiter.acquire(signal);
     return withRetry(
       () =>
         adapter.explain(request, {

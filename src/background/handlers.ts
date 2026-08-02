@@ -3,6 +3,7 @@ import type { HighlightData, SelectionPayload } from '@/shared/messaging/contrac
 import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
+import { TranslateService, translateService as defaultTranslateService } from '@/ai/translate-service';
 import {
   SettingsRepository,
   settingsRepository as defaultSettingsRepository,
@@ -16,12 +17,14 @@ export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
   explain: ExplainService;
+  translate: TranslateService;
 }
 
 export const defaultDeps: BackgroundDeps = {
   vocabulary: defaultVocabularyRepository,
   settings: defaultSettingsRepository,
   explain: defaultExplainService,
+  translate: defaultTranslateService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -109,6 +112,8 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'get-highlight-data': () => buildHighlightData(deps),
     explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    'translate-blocks': (message) =>
+      deps.translate.translateBlocks(message.payload.blocks),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

@@ -43,6 +43,8 @@ src/
 │   ├── highlighter.ts        Safe text-node walking and mark wrapping
 │   ├── hover-card.ts         Accessible tooltip with viewport clamping
 │   ├── selection.ts          Reads selection + surrounding sentence
+│   ├── toolbar.ts            Floating selection toolbar with a 'More' menu
+│   ├── reading-mode.ts       Bilingual article overlay with five switchable layouts
 │   ├── styles.ts             Injected CSS and the highlight colour variable
 │   └── toast.ts              Transient status messages
 │

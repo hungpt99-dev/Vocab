@@ -54,6 +54,7 @@ explains your words — stays under your control.
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
 | **On-page highlighting** | Saved words highlighted everywhere; hover or keyboard-focus shows meaning, note and saved date |
+| **Reading mode** | Read any article bilingually in five switchable layouts (side-by-side, original-first, translation-first, hover-translation, toggle-translation) |
 | **AI Explain** | Meaning, simple explanation, examples, synonyms, IPA pronunciation and collocations |
 | **Bring your own key** | OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama and LM Studio |
 | **Portable data** | Versioned JSON export and import, with merge or replace |

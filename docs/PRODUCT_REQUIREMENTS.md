@@ -149,6 +149,33 @@ doing so.
 
 ---
 
+## 6. Reading mode
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| FR-6.1 | The user can enter reading mode from the selection toolbar (More → Reading mode). | Done |
+| FR-6.2 | Reading mode shows the article's title and top-level paragraphs/headings, skipping navigation and code. | Done |
+| FR-6.3 | Each paragraph is translated into the user's target language through the configured AI provider. | Done |
+| FR-6.4 | Five layouts are available: side-by-side, original-first, translation-first, hover-translation, toggle-translation. | Done |
+| FR-6.5 | Switching layout is instant and never reloads the page or rebuilds the article. | Done |
+| FR-6.6 | A block whose translation failed shows an "unavailable" note without blocking the rest. | Done |
+
+**Acceptance criteria.** Selecting text and choosing **More → Reading mode** opens a full-page bilingual
+view of the article. Changing the layout dropdown updates the arrangement immediately. The page is not
+navigated or reloaded, and closing reading mode returns to the untouched page.
+
+**Edge cases.**
+
+| Case | Required behaviour |
+| --- | --- |
+| Page with no extractable article content | Reading mode is not opened; a toast explains why. |
+| No active AI provider configured | A status banner explains the requirement instead of a dead UI. |
+| A single paragraph fails to translate | That block shows "Translation unavailable"; the rest still translate. |
+| Very long articles | Extraction is bounded to the first blocks so translation stays fast. |
+| Keyboard users in hover-translation layout | Paragraphs are focusable, so the translation appears on focus as well as hover. |
+
+---
+
 ## Non-functional requirements
 
 | ID | Requirement | Target | How it is verified |

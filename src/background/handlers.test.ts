@@ -11,6 +11,7 @@ import { createDatabase } from '@/storage/database';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
+import { TranslateService } from '@/ai/translate-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -47,6 +48,9 @@ beforeEach(async () => {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),
     }) as unknown as ExplainService,
+    translate: Object.assign(new TranslateService(settings), {
+      translateBlocks: vi.fn(async (blocks: string[]) => blocks.map((_, index) => `translated-${index}`)),
+    }) as unknown as TranslateService,
   };
 });
 
@@ -185,5 +189,15 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('handles translate-blocks', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'translate-blocks', payload: { blocks: ['Hello.', 'Goodbye.'] } },
+      sender,
+    );
+    expect(result).toEqual({ ok: true, data: ['translated-0', 'translated-1'] });
+    expect(deps.translate.translateBlocks).toHaveBeenCalledWith(['Hello.', 'Goodbye.']);
   });
 });

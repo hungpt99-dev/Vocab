@@ -6,7 +6,8 @@ import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import { ReadingMode, extractReadableContent } from './reading-mode';
+import { SelectionToolbar, readToolbarSelection, type ToolbarAnyActionId } from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -14,6 +15,7 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const readingMode = new ReadingMode();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -68,7 +70,7 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
+    const detail = (event as CustomEvent<{ action: ToolbarAnyActionId; text: string }>).detail;
     void handleToolbarAction(detail.action, detail.text);
   }) as EventListener);
 }
@@ -82,7 +84,7 @@ function toolbarElement(): HTMLElement | null {
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
+async function handleToolbarAction(action: ToolbarAnyActionId, text: string): Promise<void> {
   switch (action) {
     case 'copy': {
       try {
@@ -94,8 +96,18 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'reading-mode': {
+      const content = extractReadableContent();
+      if (content.blocks.length === 0) {
+        showToast('No readable article content found on this page.', 'error');
+        return;
+      }
+      readingMode.open(content);
+      toolbar.hide();
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / translate / save are wired in later issues (VOC-44..48).
       // For now surface what was requested so the toolbar is demonstrably live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
@@ -165,7 +177,7 @@ function stopObserving(): void {
   observer = null;
 }
 
-/** Ignore mutations caused by our own highlight, card and toast nodes. */
+/** Ignore mutations caused by our own highlight, card, toast, toolbar and overlay nodes. */
 function isOwnNode(node: Node): boolean {
   if (node.nodeType !== Node.ELEMENT_NODE) return false;
   const element = node as Element;
@@ -173,7 +185,8 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.classList.contains('avs-reading-mode')
   );
 }
 

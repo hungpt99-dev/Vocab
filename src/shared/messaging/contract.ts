@@ -14,6 +14,7 @@ export type Message =
   | { type: 'save-current-selection' }
   | { type: 'explain'; payload: { word: string; context?: string } }
   | { type: 'get-highlight-data' }
+  | { type: 'translate-blocks'; payload: { blocks: string[] } }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } };
@@ -35,6 +36,8 @@ export interface ResponseMap {
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
   'get-highlight-data': HighlightData;
+  /** One translated string per input block; null marks a per-block failure. */
+  'translate-blocks': Array<string | null>;
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;
