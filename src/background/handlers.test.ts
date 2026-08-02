@@ -4,7 +4,9 @@ import {
   createHandlers,
   explainWord,
   readActiveSelection,
+  saveDifficultWords,
   saveSelection,
+  splitVocabularyTerm,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -140,6 +142,91 @@ describe('explainWord', () => {
     expect(result.meaning).toBe('A fortunate accident.');
     expect(await deps.vocabulary.count()).toBe(0);
   });
+
+  it('forwards the analysis kind to the explain service', async () => {
+    await explainWord(deps, 'a sentence.', 'context', 'summarize');
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'a sentence.',
+      context: 'context',
+      kind: 'summarize',
+    });
+  });
+});
+
+describe('splitVocabularyTerm', () => {
+  it('splits a "term: meaning" item', () => {
+    expect(splitVocabularyTerm('serendipity: a fortunate accident')).toEqual({
+      word: 'serendipity',
+      meaning: 'a fortunate accident',
+    });
+  });
+
+  it('splits a "term — meaning" item', () => {
+    expect(splitVocabularyTerm('ephemeral — short-lived')).toEqual({
+      word: 'ephemeral',
+      meaning: 'short-lived',
+    });
+  });
+
+  it('returns the whole item as the word when there is no separator', () => {
+    expect(splitVocabularyTerm('just-a-phrase')).toEqual({ word: 'just-a-phrase', meaning: '' });
+  });
+});
+
+describe('saveDifficultWords', () => {
+  it('saves each difficult word extracted by the AI', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['serendipity: a fortunate accident', 'ephemeral: short-lived'],
+    });
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'Serendipity is ephemeral.',
+      context: 'Serendipity is ephemeral.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ word: 'serendipity', note: 'a fortunate accident' });
+    expect(entries[1]).toMatchObject({ word: 'ephemeral', note: 'short-lived' });
+    expect(await deps.vocabulary.findByWord('serendipity')).toBeDefined();
+  });
+
+  it('asks for a vocabulary analysis and saves nothing when no words are found', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(explanation);
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'Nothing hard here.',
+      context: 'Nothing hard here.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'Nothing hard here.',
+      context: 'Nothing hard here.',
+      kind: 'vocabulary',
+    });
+    expect(entries).toEqual([]);
+    expect(await deps.vocabulary.count()).toBe(0);
+  });
+
+  it('skips empty extracted terms', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['', '  ', 'cake: a baked dessert'],
+    });
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'The cake.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ word: 'cake' });
+  });
 });
 
 describe('createHandlers', () => {
@@ -185,5 +272,42 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('handles explain with an analysis kind', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'The cat sat down.', kind: 'simplify' } },
+      sender,
+    );
+    expect(result.ok).toBe(true);
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'The cat sat down.',
+      kind: 'simplify',
+    });
+  });
+
+  it('handles save-difficult-words', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['serendipity: a fortunate accident'],
+    });
+
+    const result = await dispatch(
+      createHandlers(deps),
+      {
+        type: 'save-difficult-words',
+        payload: {
+          word: 'Serendipity.',
+          context: 'Serendipity.',
+          sourceUrl: 'https://example.com',
+          sourceTitle: 'Example',
+        },
+      },
+      sender,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(await deps.vocabulary.findByWord('serendipity')).toBeDefined();
   });
 });

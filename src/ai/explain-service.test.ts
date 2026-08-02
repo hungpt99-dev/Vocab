@@ -39,6 +39,29 @@ describe('ExplainService', () => {
     });
   });
 
+  it('caches explanations separately per analysis kind', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [{ id: 'p1', type: 'anthropic', name: 'Claude', apiKey: 'key-123', baseUrl: '', model: '', enabled: true }],
+      activeProviderId: 'p1',
+    });
+    const fetchMock = vi.fn(async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ type: 'text', text: payload }] }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const service = new ExplainService(settings);
+    await service.explain({ word: 'The cat sat down.', kind: 'sentence' });
+    await service.explain({ word: 'The cat sat down.', kind: 'grammar' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('falls back to a second provider on a transient error', async () => {
     const settings = new SettingsRepository();
     await settings.update({

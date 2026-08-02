@@ -27,7 +27,8 @@ export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'explain'; payload: { word: string; context?: string; kind?: ExplainKind } }
+  | { type: 'save-difficult-words'; payload: DifficultWordsPayload }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
@@ -42,6 +43,7 @@ export interface ResponseMap {
   'get-selection': SelectionPayload | null;
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
+  'save-difficult-words': VocabularyEntry[];
   'get-highlight-data': HighlightData;
   'vocabulary-changed': void;
   'settings-changed': void;
@@ -79,7 +81,8 @@ error with no useful detail.
 | Message | From | To |
 | --- | --- | --- |
 | `save-entry` | Popup | Worker |
-| `explain` | Popup | Worker |
+| `explain` | Popup / Content script | Worker |
+| `save-difficult-words` | Content script | Worker |
 | `save-current-selection` | Popup | Worker |
 | `get-selection` | Worker | Content script |
 | `show-toast` | Worker | Content script |
