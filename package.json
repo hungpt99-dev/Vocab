@@ -6,7 +6,9 @@
   "description": "Local-first Chrome extension to save, review and AI-explain vocabulary while browsing.",
   "scripts": {
     "dev": "vite build --watch --mode development",
-    "build": "tsc -b --noEmit false --emitDeclarationOnly false || true && vite build",
+    "build": "npm run build:app && npm run build:content",
+    "build:app": "vite build",
+    "build:content": "vite build --config vite.content.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -1,0 +1,47 @@
+import { AiError } from './types';
+/** Pull a JSON object out of a model response that may be fenced or padded. */
+export function extractJsonObject(raw) {
+    const text = raw.trim();
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const candidate = fenced?.[1]?.trim() ?? text;
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start === -1 || end <= start) {
+        throw new AiError('bad_response', 'The AI response did not contain a JSON object.');
+    }
+    try {
+        return JSON.parse(candidate.slice(start, end + 1));
+    }
+    catch {
+        throw new AiError('bad_response', 'The AI response was not valid JSON.');
+    }
+}
+function asString(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+function asStringArray(value) {
+    if (Array.isArray(value)) {
+        return value.map(asString).filter(Boolean);
+    }
+    const single = asString(value);
+    return single ? [single] : [];
+}
+/** Coerce an arbitrary model response into a well-formed Explanation. */
+export function toExplanation(raw, meta) {
+    const parsed = extractJsonObject(raw);
+    const meaning = asString(parsed.meaning);
+    if (!meaning) {
+        throw new AiError('bad_response', 'The AI response was missing a meaning.');
+    }
+    return {
+        meaning,
+        simpleExplanation: asString(parsed.simpleExplanation) || meaning,
+        examples: asStringArray(parsed.examples),
+        synonyms: asStringArray(parsed.synonyms),
+        pronunciation: asString(parsed.pronunciation),
+        collocations: asStringArray(parsed.collocations),
+        provider: meta.provider,
+        model: meta.model,
+        generatedAt: Date.now(),
+    };
+}

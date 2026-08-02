@@ -18,15 +18,12 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
         background: resolve(__dirname, 'src/background/index.ts'),
-        content: resolve(__dirname, 'src/content/index.ts'),
       },
       output: {
         // Background and content scripts must have stable, predictable filenames
         // because manifest.json references them directly.
         entryFileNames: (chunk) =>
-          chunk.name === 'background' || chunk.name === 'content'
-            ? '[name].js'
-            : 'assets/[name]-[hash].js',
+          chunk.name === 'background' ? '[name].js' : 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       },
