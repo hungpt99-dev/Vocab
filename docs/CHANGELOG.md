@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
+- New runtime dependency `react-window` (virtualized lists) with `@types/react-window`.
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,
   decision log, coding standards, design system, folder structure, API guidelines, AI provider, storage,
   security, testing, development, deployment, release process, contributing, roadmap, known limitations.
@@ -19,7 +20,9 @@ All notable changes to this project are documented here. The format is based on
 - CI workflow running typecheck, lint, unit tests, build and Playwright E2E in parallel jobs.
 
 ### Changed
-- Content script styling now reads from the shared token module instead of hardcoded hex values; no
+- Library list is now virtualized (`react-window`) so large vocabularies render only visible cards; rows re-measure on expand/edit via ResizeObserver.
+- The delete confirmation is now a portaled modal (`createPortal`) rendered above the UI, so it is never trapped inside a virtualized row.
+- Content script styling now reads from the shared token module instead of hardcoded hex values; no visible change to end users.
   visible change to end users.
 
 ### Fixed

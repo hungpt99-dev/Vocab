@@ -92,6 +92,8 @@ export const motion = {
 } as const;
 
 export const zIndex = {
+  /** Above in-page content but below injected overlays. Used by portaled modals. */
+  modal: 60,
   /** Maximum signed 32-bit value: overlays must beat any host-page stacking. */
   overlay: 2147483647,
 } as const;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { VocabularyEntry, VocabularyPatch } from '@/shared/types/vocabulary';
 import { Button } from '@/shared/ui/Button';
 import { IconButton } from '@/shared/ui/IconButton';
@@ -6,6 +7,7 @@ import { Spinner } from '@/shared/ui/Spinner';
 import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
 import { ExplanationView } from './ExplanationView';
+import { zIndex } from '@/shared/styles/tokens';
 
 export interface EntryCardProps {
   entry: VocabularyEntry;
@@ -40,7 +42,7 @@ export function EntryCard({
   };
 
   return (
-    <li className="border-b border-slate-200 p-3 last:border-b-0 dark:border-slate-700">
+    <div className="border-b border-slate-200 p-3 last:border-b-0 dark:border-slate-700">
       {editing ? (
         <div className="flex flex-col gap-2">
           <TextField
@@ -133,21 +135,37 @@ export function EntryCard({
             )}
           </div>
 
-          {confirming && (
-            <div role="alertdialog" aria-label={`Delete ${entry.word}?`} className="mt-2 rounded-md bg-red-50 p-2 dark:bg-red-950">
-              <p className="text-xs text-red-800 dark:text-red-200">Delete “{entry.word}” permanently?</p>
-              <div className="mt-1.5 flex gap-2">
-                <Button size="sm" variant="danger" onClick={() => void onDelete(entry.id)}>
-                  Delete
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setConfirming(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
+          {confirming &&
+            createPortal(
+              <div
+                className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
+                style={{ zIndex: zIndex.modal }}
+                onClick={() => setConfirming(false)}
+              >
+                <div
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-label={`Delete ${entry.word}?`}
+                  className="w-full max-w-xs rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <p className="text-sm text-slate-800 dark:text-slate-100">
+                    Delete “{entry.word}” permanently?
+                  </p>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => setConfirming(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => void onDelete(entry.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )}
         </>
       )}
-    </li>
+    </div>
   );
 }
