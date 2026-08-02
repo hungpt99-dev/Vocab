@@ -25,14 +25,15 @@ summary; the issue tracker is authoritative.
 
 | Priority | Item | Why |
 | --- | --- | --- |
-| 1 | **Spaced-repetition review mode** | The product is a learning tool; passive recall is the missing half |
-| 2 | **Pronunciation audio** | Speak the IPA the model returns; low effort, high learning value |
-| 3 | **Bulk library operations** (multi-select delete/tag/export) | One-at-a-time editing does not scale to a real vocabulary |
-| 4 | **Streaming AI explanations** | Cut perceived latency; the interface is already partial-shaped |
-| 5 | **Per-site highlight lists** | Let cautious users restrict where the script runs |
-| 6 | **CSV / Anki export** | Interoperability with other study tools |
-| 7 | **Offline / cached explanations on first save** | Reduce cost for words saved in volume |
-| 8 | **Tag autocomplete and tag colours** | Faster organisation of a growing library |
+| 1 | **Reading mode** (entry + layouts shipped) | Bilingual reading is a core learning path; translation engine and per-site controls follow |
+| 2 | **Spaced-repetition review mode** | The product is a learning tool; passive recall is the missing half |
+| 3 | **Pronunciation audio** | Speak the IPA the model returns; low effort, high learning value |
+| 4 | **Bulk library operations** (multi-select delete/tag/export) | One-at-a-time editing does not scale to a real vocabulary |
+| 5 | **Streaming AI explanations** | Cut perceived latency; the interface is already partial-shaped |
+| 6 | **Per-site highlight lists** | Let cautious users restrict where the script runs |
+| 7 | **CSV / Anki export** | Interoperability with other study tools |
+| 8 | **Offline / cached explanations on first save** | Reduce cost for words saved in volume |
+| 9 | **Tag autocomplete and tag colours** | Faster organisation of a growing library |
 
 Priority is a judgement, not a commitment. Items are pulled into a milestone when someone starts them.
 

@@ -28,6 +28,7 @@ export type Message =
   | { type: 'save-difficult-words'; payload: DifficultWordsPayload }
   | { type: 'translate'; payload: { text: string; language?: string } }
   | { type: 'get-highlight-data' }
+  | { type: 'translate-blocks'; payload: { blocks: string[] } }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } };
@@ -54,6 +55,8 @@ export interface ResponseMap {
   'save-difficult-words': VocabularyEntry[];
   translate: string;
   'get-highlight-data': HighlightData;
+  /** One translated string per input block; null marks a per-block failure. */
+  'translate-blocks': Array<string | null>;
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;

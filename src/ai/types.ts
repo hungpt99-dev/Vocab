@@ -23,6 +23,13 @@ export interface TranslateRequest {
   language?: string;
 }
 
+export interface TranslateRequest {
+  /** Source text to translate. */
+  text: string;
+  /** Target language name, e.g. "Russian". */
+  language: string;
+}
+
 export interface ProviderConfig {
   apiKey: string;
   model: string;

@@ -152,6 +152,55 @@ describe('SelectionToolbar', () => {
     expect(document.querySelectorAll('.avs-toolbar')).toHaveLength(1);
     toolbarUi.destroy();
   });
+
+  it('opens the More menu and emits the reading-mode action from it', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+
+    toolbarUi.toggleMenu();
+    expect(toolbarUi.isMenuOpen).toBe(true);
+
+    const menuItem = document.querySelector<HTMLButtonElement>('[data-action="reading-mode"]');
+    expect(menuItem).not.toBeNull();
+    expect(menuItem?.getAttribute('role')).toBe('menuitem');
+
+    const handler = vi.fn();
+    document.addEventListener('avs-toolbar-action', handler);
+    menuItem!.click();
+
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { action: 'reading-mode', text: 'hello' } }),
+    );
+    expect(toolbarUi.isMenuOpen).toBe(false);
+    toolbarUi.destroy();
+  });
+
+  it('closes the More menu when the toolbar hides', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+    toolbarUi.toggleMenu();
+    expect(toolbarUi.isMenuOpen).toBe(true);
+
+    toolbarUi.hide();
+    expect(toolbarUi.isMenuOpen).toBe(false);
+    toolbarUi.destroy();
+  });
+
+  it('marks the More trigger as expanded while the menu is open', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+
+    const moreButton = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
+    toolbarUi.toggleMenu();
+    expect(moreButton.getAttribute('aria-expanded')).toBe('true');
+
+    toolbarUi.toggleMenu();
+    expect(moreButton.hasAttribute('aria-expanded')).toBe(false);
+    toolbarUi.destroy();
+  });
 });
 
 describe('SelectionToolbar keyboard navigation', () => {

@@ -89,3 +89,10 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
     },
   };
 }
+
+/**
+ * One rate limiter shared by every AI capability (explanations and reading-mode
+ * translations) so concurrent requests do not burst the provider. Defaults to at
+ * most 5 requests per 10 seconds — friendly to local models and free tiers.
+ */
+export const aiRateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
