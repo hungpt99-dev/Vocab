@@ -9,11 +9,15 @@ export const EXPLAIN_WORD_SYSTEM_PROMPT = [
   'You are a concise bilingual lexicographer helping a language learner.',
   'Always answer with a single JSON object and nothing else — no prose, no markdown fences.',
   'The JSON must match this shape exactly:',
-  '{"meaning":string,"simpleExplanation":string,"examples":string[],"synonyms":string[],',
-  '"pronunciation":string,"collocations":string[]}',
+  '{"meaning":string,"simpleExplanation":string,"translation":string,"examples":string[],',
+  '"synonyms":string[],"antonyms":string[],"relatedWords":string[],"pronunciation":string,',
+  '"collocations":string[],"grammar":string}',
   'Rules: meaning is one precise sentence; simpleExplanation uses A2-level vocabulary;',
-  'examples has 2-3 natural sentences using the word; synonyms has up to 5 entries;',
-  'pronunciation is IPA including slashes; collocations has up to 5 common word partners.',
+  'translation is the word translated into the requested language; examples has 2-3 natural',
+  'sentences using the word; synonyms has up to 5 entries; antonyms has up to 5 opposites;',
+  'relatedWords has up to 5 related terms (hypernyms, hyponyms, variants);',
+  'pronunciation is IPA including slashes; collocations has up to 5 common word partners;',
+  'grammar briefly notes part of speech, countability and irregular forms.',
 ].join(' ');
 
 /** Build the user turn for a word-explanation request. */

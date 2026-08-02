@@ -5,10 +5,14 @@ import { AiError } from './types';
 const valid = JSON.stringify({
   meaning: 'A fortunate accident.',
   simpleExplanation: 'Finding something good by luck.',
+  translation: 'Serendipidad',
   examples: ['It was serendipity.', 'Pure serendipity!'],
   synonyms: ['luck', 'chance'],
+  antonyms: ['misfortune'],
+  relatedWords: ['fortune', 'coincidence'],
   pronunciation: '/ˌsɛrənˈdɪpɪti/',
   collocations: ['sheer serendipity'],
+  grammar: 'Noun, uncountable.',
 });
 
 describe('extractJsonObject', () => {
@@ -39,10 +43,22 @@ describe('toExplanation', () => {
   it('maps a complete response', () => {
     const explanation = toExplanation(valid, meta);
     expect(explanation.meaning).toBe('A fortunate accident.');
+    expect(explanation.translation).toBe('Serendipidad');
+    expect(explanation.antonyms).toEqual(['misfortune']);
+    expect(explanation.relatedWords).toEqual(['fortune', 'coincidence']);
+    expect(explanation.grammar).toBe('Noun, uncountable.');
     expect(explanation.examples).toHaveLength(2);
     expect(explanation.synonyms).toEqual(['luck', 'chance']);
     expect(explanation.provider).toBe('openai');
     expect(explanation.generatedAt).toBeGreaterThan(0);
+  });
+
+  it('defaults the optional enrichment fields to empty when absent', () => {
+    const explanation = toExplanation('{"meaning":"m"}', meta);
+    expect(explanation.translation).toBe('');
+    expect(explanation.antonyms).toEqual([]);
+    expect(explanation.relatedWords).toEqual([]);
+    expect(explanation.grammar).toBe('');
   });
 
   it('falls back simpleExplanation to meaning', () => {

@@ -25,6 +25,7 @@ const entry: VocabularyEntry = {
   note: '',
   tags: [],
   favorite: false,
+  sourceLanguage: '',
   explanation: null,
   createdAt: 1,
   updatedAt: 1,

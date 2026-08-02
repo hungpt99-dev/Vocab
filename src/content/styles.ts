@@ -77,8 +77,41 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-toast[data-variant='success'] { background: ${color.status.success}; }
     .avs-toast[data-variant='error'] { background: ${color.status.danger}; }
+    .avs-toolbar {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      display: flex;
+      align-items: center;
+      gap: ${spacing.xs};
+      padding: ${spacing.xs} ${spacing.sm};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      box-shadow: ${elevation.overlay};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+    }
+    .avs-toolbar[hidden] { display: none; }
+    .avs-toolbar-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      cursor: pointer;
+    }
+    .avs-toolbar-btn:hover { background: ${color.overlaySurfaceAlt}; }
+    .avs-toolbar-btn:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;

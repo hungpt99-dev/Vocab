@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   providers: defaultProviders(),
   activeProviderId: 'prov_default',
   fallbackProviderId: undefined,
+  targetLanguage: 'English',
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
