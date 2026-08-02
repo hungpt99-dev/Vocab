@@ -96,14 +96,24 @@ test('options page persists settings and toggles highlighting', async ({ page, e
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
   await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
 
+  // Edit the default provider, switch it to Anthropic and set a key.
+  await page.getByRole('button', { name: /^Edit/ }).first().click();
   await page.getByLabel('Provider', { exact: true }).selectOption('anthropic');
   await page.getByLabel('API key').fill('sk-test-key');
+  await page.getByRole('button', { name: 'Save' }).click();
+
   await page.getByLabel('Highlight colour').fill('#ff8800');
   await page.getByLabel(/Highlight saved words/).uncheck();
 
   await page.reload();
+  await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
+
+  // Reopen the editor to verify the provider persisted.
+  await page.getByRole('button', { name: /^Edit/ }).first().click();
   await expect(page.getByLabel('Provider', { exact: true })).toHaveValue('anthropic');
   await expect(page.getByLabel('API key')).toHaveValue('sk-test-key');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
   await expect(page.getByLabel('Highlight colour')).toHaveValue('#ff8800');
   await expect(page.getByLabel(/Highlight saved words/)).not.toBeChecked();
 });

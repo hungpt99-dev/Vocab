@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getProvider, listProviders } from './registry';
-import { AI_PROVIDER_IDS } from '@/shared/types/settings';
+import { AI_PROVIDER_IDS, type AiProviderId } from '@/shared/types/settings';
 import { AiError } from './types';
 
 describe('registry', () => {
@@ -15,13 +15,13 @@ describe('registry', () => {
     expect(providers).toHaveLength(AI_PROVIDER_IDS.length);
     for (const provider of providers) {
       expect(provider.label).toBeTruthy();
+      if (provider.id === 'custom') continue;
       expect(provider.defaultModel).toBeTruthy();
       expect(provider.defaultBaseUrl).toMatch(/^https?:\/\//);
     }
   });
 
   it('throws for an unknown provider', () => {
-    // @ts-expect-error deliberately invalid id
-    expect(() => getProvider('nope')).toThrow(AiError);
+    expect(() => getProvider('nope' as AiProviderId)).toThrow(AiError);
   });
 });

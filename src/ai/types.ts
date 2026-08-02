@@ -13,6 +13,10 @@ export interface ProviderConfig {
   apiKey: string;
   model: string;
   baseUrl: string;
+  /** Sampling temperature (0–1). Provider falls back to its own default. */
+  temperature?: number;
+  /** Max tokens to generate. Provider falls back to its own default. */
+  maxTokens?: number;
   /** Abort signal so callers can cancel in-flight requests. */
   signal?: AbortSignal;
   timeoutMs?: number;

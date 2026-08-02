@@ -49,12 +49,14 @@ test('options page exposes labelled sections and controls', async ({ page, exten
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
 
   // Landmark regions carry accessible names.
-  await expect(page.getByRole('region', { name: 'AI provider' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'AI providers' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Highlighting' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your data' })).toBeVisible();
 
-  // The API key is masked.
+  // The API key is masked. Open the default provider's editor to reveal it.
+  await page.getByRole('button', { name: /^Edit/ }).first().click();
   await expect(page.getByLabel('API key')).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Cancel' }).click();
 
   // There is exactly one h1 and headings do not skip levels.
   expect(await page.getByRole('heading', { level: 1 }).count()).toBe(1);

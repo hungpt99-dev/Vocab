@@ -1,7 +1,7 @@
 import type { AiProviderId } from '@/shared/types/settings';
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { buildUserPrompt, SYSTEM_PROMPT } from '../prompt';
+import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
 import { toExplanation } from '../parse';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
 
@@ -60,11 +60,14 @@ export class OpenAiCompatibleProvider implements AiProvider {
       timeoutMs: config.timeoutMs,
       body: {
         model,
-        temperature: 0.2,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserPrompt(request) },
+          { role: 'system', content: EXPLAIN_WORD_SYSTEM_PROMPT },
+          { role: 'user', content: buildExplainWordUserPrompt(request) },
         ],
+        temperature: config.temperature ?? 0.2,
+        ...(config.maxTokens !== undefined && config.maxTokens !== null
+          ? { max_tokens: config.maxTokens }
+          : {}),
       },
     });
 
@@ -93,6 +96,34 @@ export const OPENAI_COMPATIBLE_PRESETS: OpenAiCompatiblePreset[] = [
     extraHeaders: { 'X-Title': 'AI Vocabulary Saver' },
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    defaultModel: 'deepseek-chat',
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    requiresApiKey: true,
+  },
+  {
+    id: 'mistral',
+    label: 'Mistral',
+    defaultModel: 'mistral-small-latest',
+    defaultBaseUrl: 'https://api.mistral.ai/v1',
+    requiresApiKey: true,
+  },
+  {
+    id: 'groq',
+    label: 'Groq',
+    defaultModel: 'llama-3.3-70b-versatile',
+    defaultBaseUrl: 'https://api.groq.com/openai/v1',
+    requiresApiKey: true,
+  },
+  {
+    id: 'together',
+    label: 'Together AI',
+    defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    defaultBaseUrl: 'https://api.together.xyz/v1',
+    requiresApiKey: true,
+  },
+  {
     id: 'lmstudio',
     label: 'LM Studio (local)',
     defaultModel: 'local-model',
@@ -104,6 +135,13 @@ export const OPENAI_COMPATIBLE_PRESETS: OpenAiCompatiblePreset[] = [
     label: 'Ollama (local)',
     defaultModel: 'llama3.1',
     defaultBaseUrl: 'http://localhost:11434/v1',
+    requiresApiKey: false,
+  },
+  {
+    id: 'custom',
+    label: 'Custom (OpenAI-compatible)',
+    defaultModel: '',
+    defaultBaseUrl: '',
     requiresApiKey: false,
   },
 ];

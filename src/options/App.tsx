@@ -30,7 +30,7 @@ function SettingsScreen() {
         <Spinner label="Loading settings…" />
       ) : (
         <>
-          <ProviderSettings settings={settings} onChange={update} notify={notify} />
+          <ProviderSettings settings={settings} onChange={update} />
           <AppearanceSettings settings={settings} onChange={update} />
           <DataSettings notify={notify} />
         </>

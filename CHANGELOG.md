@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
+  with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
+  remove and switch between any number of providers from the Options page.
+- **More providers.** Added DeepSeek, Mistral, Groq and Together AI (all OpenAI-compatible presets) and a
+  `custom` entry for any OpenAI-compatible endpoint (OpenRouter, self-hosted vLLM, corporate gateways,
+  local runtimes on non-default ports).
+- **Per-provider configuration.** Each saved provider carries its own API key, base URL, model,
+  temperature, max tokens and timeout.
+- **Fallback.** On a transient failure, `ExplainService` retries once against the configured fallback
+  provider before surfacing the error (hard errors like a bad key are not retried).
+- **Response caching.** In-memory 24 h cache keyed by provider/model/word/context, so repeated requests
+  are free and instant.
+- **Connection test.** The Options page can test a saved provider on demand and reports a clear message.
+
+### Changed
+- `ExplainService` is now the single application entry point for AI: it resolves the active provider,
+  applies caching, rate-limiting, retry/backoff and optional fallback. Feature code never references a
+  provider SDK.
+- Prompts moved into `src/ai/prompts/` (e.g. `explain-word.prompt.ts`) and are imported by the adapters.
+- AI error messages are user-facing and never include the API key; the 300-character provider-text
+  cap and header masking keep credentials out of logs and surfaces.
+
 ## [0.1.0] — 2026-08-02
 
 First working release. The extension can be loaded in Chrome and every core feature is functional.

@@ -345,3 +345,40 @@ also subject to `chrome.storage.local` quota, which is irrelevant at this size.
 
 **Future considerations.** Anything needing cross-surface change notification belongs here; anything
 needing querying or growth belongs in IndexedDB.
+
+---
+
+## ADR-015 — Multi-provider model with active/fallback and per-provider config
+
+**Problem.** The original settings stored a single provider (`provider`, `apiKey`, `model`, `baseUrl`).
+The AI Provider Architecture standard requires users to save and switch between multiple providers,
+configure each independently, and designate a fallback — none of which a single scalar field supports.
+
+**Options considered.**
+
+| Option | Assessment |
+| --- | --- |
+| Keep one provider, add a hardcoded fallback list in code | Violates "users control providers" and "adding a provider needs no business-logic change". |
+| `providers: SavedProvider[]` + `activeProviderId` + `fallbackProviderId` | **Chosen.** A list the UI fully manages, with `ExplainService` resolving the active entry. |
+| A map keyed by provider id | Less explicit about ordering/UI listing; arrays are simpler to render and order. |
+
+**Chosen.** Settings are now `{ providers: SavedProvider[], activeProviderId, fallbackProviderId }`.
+`ExplainService.explain()` reads the active `SavedProvider`, checks the in-memory cache, then runs through
+rate-limit + retry; on a transient failure it retries **once** against `fallbackProviderId` (hard errors
+such as a bad key are never retried). Each `SavedProvider` carries its own `apiKey`, `baseUrl`, `model`,
+`temperature`, `maxTokens` and `timeoutMs`. A `custom` provider type lets users point at any
+OpenAI-compatible endpoint. `SettingsRepository.get()` migrates the legacy single-provider shape forward
+so existing installs keep working.
+
+**Reason.** The provider list is data the UI owns, so adding/removing/switching providers is a pure data
+operation with zero business-logic change — exactly the standard's "adding a provider requires minimal
+changes" (new presets are still a one-line data entry; new wire formats are one adapter file). Fallback
+is opt-in and bounded to a single retry to avoid quota surprises.
+
+**Trade-offs.** A small migration shim lives in `SettingsRepository`; settings are now a list, so consumers
+resolve the active entry rather than reading a scalar. The cache is in-memory only (cleared on service-
+worker eviction) — acceptable because explanations are also persisted on the entry.
+
+**Enforcement.** `settings-repository.test.ts` covers migration and merge; `explain-service.test.ts`
+covers provider resolution, the missing-key guard and fallback; `registry.test.ts` guarantees every
+`AI_PROVIDER_IDS` entry resolves.

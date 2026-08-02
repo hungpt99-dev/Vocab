@@ -1,17 +1,66 @@
-import type { Settings, SettingsPatch } from '@/shared/types/settings';
+import type { Settings, SavedProvider, SettingsPatch, AiProviderId } from '@/shared/types/settings';
 import { DEFAULT_HIGHLIGHT_COLOR } from '@/shared/styles/tokens';
 
 export const SETTINGS_KEY = 'avs:settings';
 
+/**
+ * Legacy single-provider shape (pre multi-provider model). Kept only to migrate
+ * existing stored settings forward; new writes never use it.
+ */
+interface LegacySettings {
+  provider?: AiProviderId;
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+  highlightEnabled?: boolean;
+  highlightColor?: string;
+  autoExplainOnSave?: boolean;
+}
+
+/** A default OpenAI provider so first-run users have something active. */
+function defaultProviders(): SavedProvider[] {
+  return [
+    {
+      id: 'prov_default',
+      type: 'openai',
+      name: 'OpenAI',
+      apiKey: '',
+      baseUrl: '',
+      model: '',
+      enabled: true,
+    },
+  ];
+}
+
 export const DEFAULT_SETTINGS: Settings = {
-  provider: 'openai',
-  apiKey: '',
-  model: '',
-  baseUrl: '',
+  providers: defaultProviders(),
+  activeProviderId: 'prov_default',
+  fallbackProviderId: undefined,
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
 };
+
+/** Promote the old single-provider fields into the new providers array. */
+function migrateLegacy(value: Partial<Settings> & Partial<LegacySettings>): Partial<Settings> {
+  if (Array.isArray(value.providers) && value.providers.length > 0) return value;
+  if (!value.provider) return value;
+
+  const legacy: SavedProvider = {
+    id: 'prov_default',
+    type: value.provider,
+    name: value.provider,
+    apiKey: value.apiKey ?? '',
+    baseUrl: value.baseUrl ?? '',
+    model: value.model ?? '',
+    enabled: true,
+  };
+  return {
+    ...value,
+    providers: [legacy],
+    activeProviderId: 'prov_default',
+  };
+}
 
 /**
  * Settings live in `chrome.storage.local` (not IndexedDB) so the service
@@ -21,8 +70,9 @@ export const DEFAULT_SETTINGS: Settings = {
 export class SettingsRepository {
   async get(): Promise<Settings> {
     const stored = await chrome.storage.local.get(SETTINGS_KEY);
-    const value = stored[SETTINGS_KEY] as Partial<Settings> | undefined;
-    return { ...DEFAULT_SETTINGS, ...(value ?? {}) };
+    const value = (stored[SETTINGS_KEY] as (Partial<Settings> & Partial<LegacySettings>) | undefined) ?? {};
+    const merged = migrateLegacy(value);
+    return { ...DEFAULT_SETTINGS, ...merged };
   }
 
   async update(patch: SettingsPatch): Promise<Settings> {
