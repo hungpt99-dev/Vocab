@@ -11,6 +11,7 @@ import { createDatabase } from '@/storage/database';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
+import { TranslationService } from '@/ai/translate-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -47,6 +48,10 @@ beforeEach(async () => {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),
     }) as unknown as ExplainService,
+    translate: Object.assign(new TranslationService(settings), {
+      translate: vi.fn(async () => 'Traduit.'),
+      translateWith: vi.fn(async () => 'Traduit.'),
+    }) as unknown as TranslationService,
   };
 });
 
@@ -185,5 +190,15 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('handles translate through the translation service', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'translate', payload: { text: 'Hello world.' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: true, data: 'Traduit.' });
+    expect(deps.translate.translate).toHaveBeenCalledWith({ text: 'Hello world.', language: undefined });
   });
 });

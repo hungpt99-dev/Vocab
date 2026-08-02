@@ -55,6 +55,7 @@ explains your words — stays under your control.
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
 | **On-page highlighting** | Saved words highlighted everywhere; hover or keyboard-focus shows meaning, note and saved date |
 | **AI Explain** | Meaning, simple explanation, examples, synonyms, IPA pronunciation and collocations |
+| **Page translation** | Translate a page paragraph-by-paragraph; headings, lists, links and code preserved, layout untouched |
 | **Bring your own key** | OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama and LM Studio |
 | **Portable data** | Versioned JSON export and import, with merge or replace |
 | **Accessible** | Keyboard navigable, screen-reader labelled, respects `prefers-reduced-motion` and dark mode |
@@ -188,6 +189,10 @@ open the popup (the selection is prefilled) and click **Save to vocabulary**.
 and tags. Filter by favourites or tag.
 
 **Explain a word.** Click **AI explain** on an entry. The result is cached until you refresh it.
+
+**Translate a page.** Select any text, then click **Translate** on the selection toolbar. Each
+paragraph, heading, list item and table cell is translated individually — never the whole page as one
+block — so headings, lists, links and code blocks stay intact and the layout is unchanged.
 
 **Highlighting.** Saved words are highlighted as you browse. Hover — or tab to a highlight — to see the
 meaning, your note and the saved date. Press `Escape` to dismiss.

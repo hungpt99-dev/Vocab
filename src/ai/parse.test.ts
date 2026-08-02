@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractJsonObject, toExplanation } from './parse';
+import { extractJsonObject, extractTranslation, toExplanation } from './parse';
 import { AiError } from './types';
 
 const valid = JSON.stringify({
@@ -77,5 +77,27 @@ describe('toExplanation', () => {
 
   it('rejects a response without a meaning', () => {
     expect(() => toExplanation('{"synonyms":["a"]}', meta)).toThrow(/missing a meaning/);
+  });
+});
+
+describe('extractTranslation', () => {
+  it('returns plain text unchanged', () => {
+    expect(extractTranslation('Bonjour le monde.')).toBe('Bonjour le monde.');
+  });
+
+  it('strips markdown fences', () => {
+    expect(extractTranslation('```\nBonjour le monde.\n```')).toBe('Bonjour le monde.');
+  });
+
+  it('strips fenced blocks with a language hint', () => {
+    expect(extractTranslation('```text\nBonjour le monde.\n```')).toBe('Bonjour le monde.');
+  });
+
+  it('keeps placeholder markers intact', () => {
+    expect(extractTranslation('Bonjour [[0]]monde [[1]]!')).toBe('Bonjour [[0]]monde [[1]]!');
+  });
+
+  it('rejects an empty response', () => {
+    expect(() => extractTranslation('   ')).toThrow(AiError);
   });
 });

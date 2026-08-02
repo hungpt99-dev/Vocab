@@ -9,6 +9,7 @@ import { readSelection } from './selection';
 import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
+import { translateCurrentPage } from './translate/translate';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -94,8 +95,27 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'translate': {
+      toolbar.hide();
+      try {
+        const result = await translateCurrentPage();
+        if (result.translated > 0) {
+          showToast(
+            `Translated ${result.translated} passage${result.translated === 1 ? '' : 's'}`,
+            'success',
+          );
+        } else if (result.error) {
+          showToast(`Translation failed: ${result.error}`, 'error');
+        } else {
+          showToast('Nothing to translate', 'error');
+        }
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Translation failed.', 'error');
+      }
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / save / more are wired in later issues (VOC-44..48).
       // For now surface what was requested so the toolbar is demonstrably live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
