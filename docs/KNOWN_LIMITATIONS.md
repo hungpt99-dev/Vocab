@@ -25,7 +25,7 @@ These are known gaps to be closed, not permanent decisions.
 
 | # | Limitation | Impact | Planned |
 | --- | --- | --- | --- |
-| L1 | **No automatic retry** on AI failure | A transient 429 or 5xx fails immediately; the user retries manually | Retry only `rate_limited`, `server_error`, `network` with backoff ([AI providers](AI_PROVIDER.md#retry-policy)) |
+| L1 | ~~**No automatic retry** on AI failure~~ **Resolved** — transient failures now retry with backoff ([AI providers](AI_PROVIDER.md#retry-policy), [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures)) | — | — |
 | L2 | **No streaming** of explanations | Long generations feel slow; the full response waits on the network | Optional streaming method on `AiProvider`, with backoff-safe cancellation |
 | L3 | **Highlighting cost on very large pages** | A page with many text nodes costs CPU per load; idle-batched, but not free | Bench a tokenised matcher if real-world pages show jank |
 | L4 | **No bulk library operations** | Managing hundreds of words is one-by-one | Multi-select delete/tag/export |

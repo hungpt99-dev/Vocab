@@ -21,6 +21,7 @@ differently, or when it was forced by a non-obvious platform behaviour. Routine 
 | [011](#adr-011--no-undef-disabled-for-typescript) | `no-undef` disabled for TypeScript | Accepted |
 | [012](#adr-012--a-single-design-token-module-for-two-styling-paths) | A single design token module for two styling paths | Accepted |
 | [013](#adr-013--settings-in-chromestoragelocal-not-indexeddb) | Settings in `chrome.storage.local`, not IndexedDB | Accepted |
+| [014](#adr-014--retry-and-rate-limit-only-transient-ai-failures) | Retry and rate-limit only transient AI failures | Accepted |
 
 ---
 
@@ -294,6 +295,37 @@ arrays need spreading where Tailwind expects mutable ones.
 **Enforcement.** `src/shared/styles/tokens.test.ts` asserts that Tailwind's palette is the token
 object and that every hex literal in the injected stylesheet is a known token. Hardcoding a colour
 fails the test suite. See [Design system](DESIGN_SYSTEM.md).
+
+---
+
+## ADR-014 — Retry and rate-limit only transient AI failures
+
+**Problem.** The engineering standard requires retries, timeouts and rate limiting for AI calls. A
+naive implementation would retry every failure and burst the provider.
+
+**Options considered.**
+
+| Option | Assessment |
+| --- | --- |
+| Retry every error | Replays `unauthorized`/`bad_response`, wasting the user's money and quota with no chance of success |
+| No retry at all | A transient 429 or 5xx forces the user to retry by hand |
+| **Retry only transient codes, with backoff, behind a shared rate limiter** | **Chosen.** |
+
+**Chosen.** `withRetry()` (src/ai/retry.ts) retries `rate_limited`, `server_error`, `network` and
+`timeout` up to three times with exponential backoff + jitter, capped at 10 s. `createRateLimiter()`
+(src/ai/rate-limiter.ts) is a shared token bucket (5 req / 10 s) so concurrent requests do not burst the
+provider. Aborts fail immediately and are honoured during backoff.
+
+**Reason.** Retrying permanent failures is actively harmful for a bring-your-own-key product — it spends
+the user's quota. Retrying transient failures is purely beneficial. The rate limiter prevents a new
+failure mode (self-inflicted 429s) that auto-explain would otherwise introduce.
+
+**Trade-offs.** Calls can now take longer under sustained failure (backoff up to ~3.5 s across three
+attempts). Acceptable: the user is blocked on this call anyway, and it is bounded by the existing 30 s
+timeout.
+
+**Future considerations.** If a provider returns a `Retry-After` header, honouring it would refine the
+backoff. Streaming (not yet implemented) would bypass the simple retry wrapper.
 
 ---
 

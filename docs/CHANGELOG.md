@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,
   decision log, coding standards, design system, folder structure, API guidelines, AI provider, storage,
   security, testing, development, deployment, release process, contributing, roadmap, known limitations.
@@ -22,6 +23,7 @@ All notable changes to this project are documented here. The format is based on
   visible change to end users.
 
 ### Fixed
+- AI calls now retry transient failures and are rate-limited; previously a transient 429/5xx failed immediately.
 - Content script emitted as ESM (silent highlighting failure) — now built as a standalone IIFE.
 - Settings checkbox reverted mid-interaction — now applied optimistically.
 - Live setting changes did not reach open tabs when the service worker was evicted — content scripts now

@@ -120,17 +120,34 @@ partial entry.
 
 ## Retry policy
 
-**Not implemented.** A failed request surfaces immediately to the user.
+**Implemented.** Transient failures retry automatically with exponential backoff and jitter, up to
+three attempts. See `src/ai/retry.ts` and `src/ai/explain-service.ts`.
 
-This is deliberate rather than forgotten. Retrying indiscriminately is harmful: replaying an
-`unauthorized` or `bad_response` request wastes the user's quota and money without any chance of
-succeeding.
+Only transient errors are retried — replaying an auth, key, format or unknown-provider failure would
+only waste the user's quota:
 
-If retry is added, it should apply **only** to `rate_limited`, `server_error` and `network`, use
-exponential backoff with jitter, cap total elapsed time within the existing timeout budget, and remain
-cancellable. Tracked in [Known limitations](KNOWN_LIMITATIONS.md).
+| Code | Retried? | Reason |
+| --- | --- | --- |
+| `rate_limited`, `server_error`, `network`, `timeout` | **Yes** | Transient; a replay may succeed |
+| `unauthorized`, `missing_api_key`, `bad_response`, `unknown_provider` | No | Permanent; retrying is futile |
 
----
+Behaviour:
+
+- Backoff is `500ms × 2^attempt` plus up to 25% jitter, capped at 10 s.
+- Aborting (e.g. closing the popup) fails immediately and never schedules a retry.
+- The abort signal is honoured *during* the backoff delay, not only between attempts.
+- Non-`AiError` rejections are normalised to `network` before classification, so a fetch failure is
+  retried like any other transient error.
+
+Covered by `src/ai/resilience.test.ts`.
+
+## Rate limiting
+
+**Implemented.** All AI calls share one token-bucket limiter (5 requests / 10 s) in
+`src/ai/rate-limiter.ts`, so concurrent requests — for example auto-explain firing on several saves at
+once — do not burst the provider. The limiter pauses rather than drops a request, because the extension
+is user-driven and a short wait beats a lost call. If a provider still returns `rate_limited` after the
+retries, that error surfaces to the user as a clear message.
 
 ## Streaming
 
