@@ -14,3 +14,5 @@ vite.config.js
 vite.content.config.js
 vitest.config.js
 playwright.config.js
+tsconfig.tsbuildinfo
+*.tsbuildinfo
