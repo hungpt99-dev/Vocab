@@ -9,6 +9,15 @@ export interface ExplainRequest {
   language?: string;
 }
 
+export interface TranslateRequest {
+  /** Source text to translate. */
+  text: string;
+  /** Target language name, e.g. "English". */
+  targetLanguage: string;
+  /** Optional source language hint; the model detects it when omitted. */
+  sourceLanguage?: string;
+}
+
 export interface ProviderConfig {
   apiKey: string;
   model: string;
@@ -30,6 +39,8 @@ export interface AiProvider {
   /** Whether this provider requires an API key (local runtimes do not). */
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
+  /** Translate text into the target language. Returns the plain-text translation. */
+  translate(request: TranslateRequest, config: ProviderConfig): Promise<string>;
 }
 
 export type AiErrorCode =

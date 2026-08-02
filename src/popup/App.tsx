@@ -12,6 +12,7 @@ import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
+import { TranslatePanel } from '@/features/capture/TranslatePanel';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
 
@@ -94,6 +95,7 @@ function LibraryScreen() {
   return (
     <>
       <SaveForm selection={selection} saving={saving} onSave={handleSave} />
+      <TranslatePanel selection={selection} />
 
       {error && (
         <p role="alert" className={`px-3 py-1.5 text-xs ${tints.dangerText}`}>

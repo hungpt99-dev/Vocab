@@ -1,8 +1,8 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import { EXPLAIN_WORD_SYSTEM_PROMPT, TRANSLATE_SYSTEM_PROMPT, buildExplainWordUserPrompt, buildTranslateUserPrompt } from '../prompts';
 import { toExplanation } from '../parse';
-import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
+import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -17,6 +17,35 @@ export class GeminiProvider implements AiProvider {
   readonly requiresApiKey = true;
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
+    const { content, model } = await this.complete(
+      [
+        { role: 'system', content: EXPLAIN_WORD_SYSTEM_PROMPT },
+        { role: 'user', content: buildExplainWordUserPrompt(request) },
+      ],
+      config,
+      true,
+    );
+    return toExplanation(content, { provider: this.id, model });
+  }
+
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
+    const { content } = await this.complete(
+      [
+        { role: 'system', content: TRANSLATE_SYSTEM_PROMPT },
+        { role: 'user', content: buildTranslateUserPrompt(request) },
+      ],
+      config,
+      false,
+    );
+    return content;
+  }
+
+  /** Run a generateContent call and extract the text plus the model id. */
+  private async complete(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    config: ProviderConfig,
+    json: boolean,
+  ): Promise<{ content: string; model: string }> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
     }
@@ -30,14 +59,14 @@ export class GeminiProvider implements AiProvider {
       signal: config.signal,
       timeoutMs: config.timeoutMs,
       body: {
-        systemInstruction: { parts: [{ text: EXPLAIN_WORD_SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: buildExplainWordUserPrompt(request) }] }],
+        systemInstruction: { parts: [{ text: messages[0]?.content }] },
+        contents: [{ role: 'user', parts: [{ text: messages[1]?.content }] }],
         generationConfig: {
           temperature: config.temperature ?? 0.2,
+          ...(json ? { responseMimeType: 'application/json' } : {}),
           ...(config.maxTokens !== undefined && config.maxTokens !== null
             ? { maxOutputTokens: config.maxTokens }
             : {}),
-          responseMimeType: 'application/json',
         },
       },
     });
@@ -46,6 +75,6 @@ export class GeminiProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Gemini returned an empty response.');
     }
-    return toExplanation(content, { provider: this.id, model });
+    return { content, model };
   }
 }

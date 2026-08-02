@@ -2,7 +2,7 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
 import { getProvider } from './registry';
-import type { ExplainRequest } from './types';
+import type { AiProvider, ExplainRequest, ProviderConfig, TranslateRequest } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
 import { createRateLimiter, type RateLimiter } from './rate-limiter';
@@ -58,42 +58,93 @@ export class ExplainService {
     const cached = this.readCache(active, request);
     if (cached) return cached;
 
-    const explanation = await this.runWithFallback(active, fallback, request, signal);
+    const explanation = await this.runWithFallback(
+      active,
+      fallback,
+      (provider, s) => this.runOnce(provider, request, s),
+      signal,
+    );
     this.writeCache(active, request, explanation);
     return explanation;
   }
 
-  /** Run a single request against a specific saved provider. */
+  async translate(request: TranslateRequest, signal?: AbortSignal): Promise<string> {
+    const settings = await this.settings.get();
+    return this.translateWith(settings, request, signal);
+  }
+
+  /** Translate using an explicit settings object. */
+  async translateWith(
+    settings: Settings,
+    request: TranslateRequest,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
+    if (!active) {
+      throw new AiError('unknown_provider', 'No active AI provider is configured.');
+    }
+    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
+
+    return this.runWithFallback(
+      active,
+      fallback,
+      (provider, s) => this.runOnceTranslate(provider, request, s),
+      signal,
+    );
+  }
+
+  /** Run a single explanation request against a specific saved provider. */
   async runOnce(
     provider: SavedProvider,
     request: ExplainRequest,
     signal?: AbortSignal,
   ): Promise<Explanation> {
+    return this.run(provider, (adapter, config) => adapter.explain(request, config), signal);
+  }
+
+  /** Run a single translation request against a specific saved provider. */
+  private async runOnceTranslate(
+    provider: SavedProvider,
+    request: TranslateRequest,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    return this.run(provider, (adapter, config) => adapter.translate(request, config), signal);
+  }
+
+  /** Run one request through the provider abstraction with rate-limit + retry. */
+  private async run<T>(
+    provider: SavedProvider,
+    call: (adapter: AiProvider, config: ProviderConfig) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const adapter = getProvider(provider.type);
     await rateLimiter.acquire(signal);
     return withRetry(
-      () =>
-        adapter.explain(request, {
-          apiKey: provider.apiKey,
-          model: provider.model,
-          baseUrl: provider.baseUrl,
-          temperature: provider.temperature,
-          maxTokens: provider.maxTokens,
-          signal,
-          timeoutMs: provider.timeoutMs,
-        }),
+      () => call(adapter, this.buildConfig(provider, signal)),
       { ...RETRY_OPTIONS, signal },
     );
   }
 
-  private async runWithFallback(
+  private buildConfig(provider: SavedProvider, signal?: AbortSignal): ProviderConfig {
+    return {
+      apiKey: provider.apiKey,
+      model: provider.model,
+      baseUrl: provider.baseUrl,
+      temperature: provider.temperature,
+      maxTokens: provider.maxTokens,
+      signal,
+      timeoutMs: provider.timeoutMs,
+    };
+  }
+
+  private async runWithFallback<T>(
     active: SavedProvider,
     fallback: SavedProvider | undefined,
-    request: ExplainRequest,
+    run: (provider: SavedProvider, signal?: AbortSignal) => Promise<T>,
     signal?: AbortSignal,
-  ): Promise<Explanation> {
+  ): Promise<T> {
     try {
-      return await this.runOnce(active, request, signal);
+      return await run(active, signal);
     } catch (primaryError) {
       if (!fallback) throw primaryError;
       // Only fall back on transient/retryable failures, never on a hard config error.
@@ -101,7 +152,7 @@ export class ExplainService {
       if (code === 'missing_api_key' || code === 'unauthorized' || code === 'bad_response') {
         throw primaryError;
       }
-      return this.runOnce(fallback, request, signal);
+      return run(fallback, signal);
     }
   }
 
