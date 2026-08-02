@@ -217,6 +217,9 @@ describe('SelectionToolbar keyboard navigation', () => {
     press(first, 'Enter');
     expect(document.activeElement).toBe(first);
     toolbarUi.destroy();
+  });
+});
+
 describe('SMART_ASSIST_ACTIONS', () => {
   it('exposes the six smart-AI actions with routing metadata', () => {
     expect(SMART_ASSIST_ACTIONS.map((action) => action.label)).toEqual([
