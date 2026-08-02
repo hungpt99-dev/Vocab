@@ -18,10 +18,13 @@ export interface DifficultWordsPayload {
   context?: string;
   sourceUrl: string;
   sourceTitle: string;
+  /** Detected source language of the selection (BCP-47-ish label, '' when unknown). */
+  sourceLanguage: string;
 }
 
 export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
+  | { type: 'save-selection'; payload: SelectionPayload }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
   | { type: 'explain'; payload: { word: string; context?: string; kind?: ExplainKind; pageTitle?: string; precedingText?: string } }
@@ -49,6 +52,7 @@ export interface HighlightData {
 
 export interface ResponseMap {
   'save-entry': VocabularyEntry;
+  'save-selection': VocabularyEntry;
   'get-selection': SelectionPayload | null;
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;

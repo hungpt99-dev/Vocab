@@ -59,6 +59,7 @@ function LibraryScreen() {
           sentence: selection?.word === word ? selection.sentence : '',
           sourceUrl: selection?.sourceUrl ?? '',
           sourceTitle: selection?.sourceTitle ?? '',
+          sourceLanguage: selection?.sourceLanguage ?? '',
         });
         notify(`Saved “${word}”.`, 'success');
         await reload();

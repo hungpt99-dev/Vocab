@@ -52,6 +52,7 @@ async function handleCapture(
       precedingText: fromPage?.precedingText ?? '',
       sourceUrl: fromPage?.sourceUrl || pageUrl,
       sourceTitle: fromPage?.sourceTitle || pageTitle,
+      sourceLanguage: fromPage?.sourceLanguage ?? '',
     });
     await notify(tabId, `Saved "${word}" to your vocabulary.`, 'success');
     await broadcast({ type: 'vocabulary-changed' });

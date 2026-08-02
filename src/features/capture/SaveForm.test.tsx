@@ -9,6 +9,7 @@ const selection = {
   precedingText: 'Everyone noticed',
   sourceUrl: 'https://example.com',
   sourceTitle: 'Example',
+  sourceLanguage: 'English',
 };
 
 describe('SaveForm', () => {
