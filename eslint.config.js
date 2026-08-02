@@ -33,4 +33,14 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', 'src/test/**', 'e2e/**', 'scripts/**'],
     rules: { 'no-console': 'off', '@typescript-eslint/no-explicit-any': 'off' },
   },
+  {
+    // Playwright fixtures take a callback named `use`, which the React hooks
+    // rule misreads as a hook call.
+    files: ['e2e/**'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      // Playwright's fixture signature requires the `{}` first parameter.
+      'no-empty-pattern': 'off',
+    },
+  },
 );

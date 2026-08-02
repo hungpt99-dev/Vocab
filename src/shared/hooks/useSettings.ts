@@ -28,6 +28,9 @@ export function useSettings(): UseSettingsResult {
   }, []);
 
   const update = useCallback(async (patch: SettingsPatch) => {
+    // Apply optimistically so controlled inputs never flicker back to their
+    // previous value while the asynchronous write is in flight.
+    setSettings((current) => ({ ...current, ...patch }));
     setSettings(await settingsRepository.update(patch));
   }, []);
 

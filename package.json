@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && xvfb-run -a playwright test",
     "package": "npm run build && cd dist && zip -r ../ai-vocabulary-saver.zip . -x '*.map'"
   },
   "dependencies": {

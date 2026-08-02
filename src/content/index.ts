@@ -1,4 +1,5 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
+import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
 import type { HighlightData } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
@@ -28,7 +29,18 @@ void bootstrap();
 async function bootstrap(): Promise<void> {
   injectStyles();
   attachHoverListeners();
+  watchSettings();
   await refresh();
+}
+
+/**
+ * Observe settings directly rather than relying on a relay from the service
+ * worker, which may be asleep when the user changes a preference.
+ */
+function watchSettings(): void {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes[SETTINGS_KEY]) void refresh();
+  });
 }
 
 /** Pull the latest vocabulary + settings and re-apply highlighting. */
