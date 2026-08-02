@@ -1,4 +1,5 @@
 import { Button } from '@/shared/ui/Button';
+import { StarIcon } from '@/shared/ui/Icons';
 
 export interface LibraryFilters {
   search: string;
@@ -23,7 +24,7 @@ export function LibraryToolbar({ filters, tags, count, onChange }: LibraryToolba
           onChange={(event) => onChange({ ...filters, search: event.target.value })}
           placeholder="Search words, notes and tags"
           aria-label="Search vocabulary"
-          className="h-8 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          className="h-8 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1"
         />
         <Button
           size="sm"
@@ -31,7 +32,8 @@ export function LibraryToolbar({ filters, tags, count, onChange }: LibraryToolba
           aria-pressed={filters.favoritesOnly}
           onClick={() => onChange({ ...filters, favoritesOnly: !filters.favoritesOnly })}
         >
-          ★ Favorites
+          <StarIcon size={14} />
+          Favorites
         </Button>
       </div>
 

@@ -3,7 +3,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppearanceSettings } from './AppearanceSettings';
 import { DataSettings } from './DataSettings';
+import { ToastProvider } from '@/shared/ui/Toast';
 import { DEFAULT_SETTINGS } from '@/storage/settings-repository';
+
+const renderData = () =>
+  render(
+    <ToastProvider>
+      <DataSettings notify={vi.fn()} />
+    </ToastProvider>,
+  );
 
 describe('AppearanceSettings', () => {
   it('labels every control', () => {
@@ -41,7 +49,7 @@ describe('AppearanceSettings', () => {
 
 describe('DataSettings', () => {
   it('offers export, import and a strategy choice', () => {
-    render(<DataSettings />);
+    renderData();
 
     expect(screen.getByRole('button', { name: 'Export JSON' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import JSON' })).toBeInTheDocument();
@@ -50,23 +58,34 @@ describe('DataSettings', () => {
   });
 
   it('switches the import strategy', async () => {
-    render(<DataSettings />);
+    renderData();
 
     await userEvent.click(screen.getByLabelText(/Replace everything/));
     expect(screen.getByLabelText(/Replace everything/)).toBeChecked();
   });
 
   it('labels the hidden file input', () => {
-    render(<DataSettings />);
+    renderData();
     expect(screen.getByLabelText('Choose a vocabulary backup file')).toBeInTheDocument();
   });
 
   it('reports a parse failure without throwing', async () => {
-    render(<DataSettings />);
+    renderData();
 
     const input = screen.getByLabelText('Choose a vocabulary backup file');
     await userEvent.upload(input, new File(['not json'], 'bad.json', { type: 'application/json' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/./);
+    // The toast renders in a portal on document.body, so query there.
+    const region = await new Promise<HTMLElement>((resolve) => {
+      const start = Date.now();
+      const tick = (): void => {
+        const el = document.body.querySelector('[aria-live="polite"]');
+        if (el && el.textContent) return resolve(el as HTMLElement);
+        if (Date.now() - start > 2000) return resolve(document.body);
+        setTimeout(tick, 20);
+      };
+      tick();
+    });
+    expect(region.textContent ?? '').toMatch(/./);
   });
 });

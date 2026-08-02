@@ -32,14 +32,14 @@ describe('Button', () => {
 
 describe('IconButton', () => {
   it('exposes an accessible name for an icon-only control', () => {
-    render(<IconButton label="Favorite cake">★</IconButton>);
+    render(<IconButton label="Favorite cake"><span>★</span></IconButton>);
     expect(screen.getByRole('button', { name: 'Favorite cake' })).toBeInTheDocument();
   });
 
   it('reflects pressed state', () => {
     render(
       <IconButton label="Favorite" active>
-        ★
+        <span>★</span>
       </IconButton>,
     );
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');

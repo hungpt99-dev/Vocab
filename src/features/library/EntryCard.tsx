@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { VocabularyEntry, VocabularyPatch } from '@/shared/types/vocabulary';
 import { Button } from '@/shared/ui/Button';
 import { IconButton } from '@/shared/ui/IconButton';
 import { Spinner } from '@/shared/ui/Spinner';
 import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
+import { Badge } from '@/shared/ui/Badge';
+import { Dialog } from '@/shared/ui/Dialog';
+import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from './ExplanationView';
-import { zIndex } from '@/shared/styles/tokens';
 
 export interface EntryCardProps {
   entry: VocabularyEntry;
@@ -39,6 +40,11 @@ export function EntryCard({
     if (!draft.word.trim()) return;
     await onUpdate(entry.id, { word: draft.word.trim(), note: draft.note.trim(), tags: draft.tags });
     setEditing(false);
+  };
+
+  const confirmDelete = async (): Promise<void> => {
+    setConfirming(false);
+    await onDelete(entry.id);
   };
 
   return (
@@ -73,7 +79,7 @@ export function EntryCard({
                 {entry.word}
               </p>
               {entry.sentence && (
-                <p className="line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
                   “{entry.sentence}”
                 </p>
               )}
@@ -81,31 +87,28 @@ export function EntryCard({
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{entry.note}</p>
               )}
             </div>
-            <div className="flex shrink-0 items-center">
+            <div className="flex shrink-0 items-center gap-0.5">
               <IconButton
                 label={entry.favorite ? `Unfavorite ${entry.word}` : `Favorite ${entry.word}`}
                 active={entry.favorite}
                 onClick={() => void onToggleFavorite(entry.id)}
               >
-                {entry.favorite ? '★' : '☆'}
+                {entry.favorite ? <StarIcon size={16} /> : <StarOutlineIcon size={16} />}
               </IconButton>
               <IconButton label={`Edit ${entry.word}`} onClick={startEditing}>
-                ✎
+                <PencilIcon size={16} />
               </IconButton>
               <IconButton label={`Delete ${entry.word}`} onClick={() => setConfirming(true)}>
-                🗑
+                <TrashIcon size={16} />
               </IconButton>
             </div>
           </div>
 
           {entry.tags.length > 0 && (
-            <ul className="mt-1.5 flex flex-wrap gap-1">
+            <ul className="mt-2 flex flex-wrap gap-1">
               {entry.tags.map((tag) => (
-                <li
-                  key={tag}
-                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  {tag}
+                <li key={tag}>
+                  <Badge>{tag}</Badge>
                 </li>
               ))}
             </ul>
@@ -128,42 +131,24 @@ export function EntryCard({
                 href={entry.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="truncate text-xs text-brand-600 hover:underline dark:text-brand-400"
+                className="truncate text-xs text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1 dark:text-brand-400"
               >
                 Source
               </a>
             )}
           </div>
 
-          {confirming &&
-            createPortal(
-              <div
-                className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
-                style={{ zIndex: zIndex.modal }}
-                onClick={() => setConfirming(false)}
-              >
-                <div
-                  role="alertdialog"
-                  aria-modal="true"
-                  aria-label={`Delete ${entry.word}?`}
-                  className="w-full max-w-xs rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <p className="text-sm text-slate-800 dark:text-slate-100">
-                    Delete “{entry.word}” permanently?
-                  </p>
-                  <div className="mt-3 flex justify-end gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setConfirming(false)}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => void onDelete(entry.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>,
-              document.body,
-            )}
+          <Dialog
+            open={confirming}
+            title={`Delete “${entry.word}”?`}
+            onClose={() => setConfirming(false)}
+            actions={[
+              { label: 'Cancel', onClick: () => setConfirming(false) },
+              { label: 'Delete', variant: 'danger', onClick: () => void confirmDelete() },
+            ]}
+          >
+            This word will be removed from your local vocabulary. You can re-save it later.
+          </Dialog>
         </>
       )}
     </div>

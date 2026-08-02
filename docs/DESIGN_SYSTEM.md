@@ -155,11 +155,35 @@ design targets a fixed comfortable width with a hard floor at 320 px.
 
 ## Icons
 
-Inline SVG, sized in `em` so they scale with text. No icon font and no icon package — a dependency
-would outweigh the handful of glyphs used.
+All product icons come from **`lucide-react`** (consistent stroke, correct sizes, properly
+aligned). Emoji, unicode glyphs and ASCII are never used as icons. `src/shared/ui/Icons.tsx`
+re-exports the small set the app uses (favorite, edit, delete, search, settings, star,
+download/upload, plus dialog/toast/empty-state glyphs).
 
-Every icon-only control must use `IconButton`, which **requires** a `label` prop. This is the
-mechanism that keeps icon buttons from shipping without an accessible name.
+Why a package rather than hand-rolled inline SVG: the set has grown past a handful of glyphs and
+Lucide guarantees a single visual language. The bundle cost is negligible (tree-shaken per icon).
+
+**Resilience note.** Browser extensions can render inside a sandbox where the bundled web font
+fails to load, leaving Lucide's SVG glyphs blank. Each icon therefore probes once for a healthy
+font and, only if it is missing, falls back to a monochrome unicode glyph so controls stay visible
+and labelled. In normal browsers the real Lucide icons render; the fallback is purely defensive.
+
+Every icon-only control uses `IconButton`, which **requires** a `label` prop — the mechanism that
+keeps icon buttons from shipping without an accessible name.
+
+## Reusable components
+
+`src/shared/ui/` is the design system. Feature code composes these rather than inventing ad-hoc
+markup:
+
+- `Button`, `IconButton` — actions; consistent variants, sizes, focus ring.
+- `TextField`, `Select`, `TagInput` — form controls with labels, hints, inline errors.
+- `Badge` — tags and metadata chips.
+- `Checkbox` — accessible toggle (used in settings).
+- `Dialog` — focus-trapped modal (delete confirmation). Portaled to `document.body`.
+- `Toast` — `ToastProvider` + `useToast()`; replaces inline status paragraphs app-wide.
+- `EmptyState` — icon, explanation and a suggested action (never a blank page).
+- `Spinner`, `Skeleton`, `SkeletonList` — loading states; skeleton avoids blank screens.
 
 ---
 

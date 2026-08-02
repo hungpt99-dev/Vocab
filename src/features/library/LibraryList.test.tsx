@@ -38,9 +38,11 @@ const handlers = {
 };
 
 describe('LibraryList', () => {
-  it('shows a loading state', () => {
-    render(<LibraryList entries={[]} loading explainingId={null} filtered={false} {...handlers} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading your vocabulary');
+  it('shows a skeleton while loading', () => {
+    const { container } = render(
+      <LibraryList entries={[]} loading explainingId={null} filtered={false} {...handlers} />,
+    );
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
   it('shows the first-run empty state', () => {

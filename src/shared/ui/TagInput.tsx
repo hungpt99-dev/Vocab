@@ -1,5 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { normalizeTags } from '@/shared/lib/text';
+import { XIcon } from '@/shared/ui/Icons';
 
 export interface TagInputProps {
   label: string;
@@ -45,9 +46,9 @@ export function TagInput({ label, tags, onChange }: TagInputProps) {
               type="button"
               aria-label={`Remove tag ${tag}`}
               onClick={() => onChange(tags.filter((value) => value !== tag))}
-              className="rounded text-brand-600 hover:text-brand-900 dark:text-brand-300"
+              className="rounded text-brand-600 hover:text-brand-900 dark:text-brand-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:focus-visible:ring-brand-400"
             >
-              ×
+              <XIcon size={12} />
             </button>
           </span>
         ))}

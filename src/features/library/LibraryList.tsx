@@ -2,7 +2,8 @@ import { useCallback, useRef } from 'react';
 import { VariableSizeList, type ListChildComponentProps } from 'react-window';
 import type { VocabularyEntry, VocabularyPatch } from '@/shared/types/vocabulary';
 import { EmptyState } from '@/shared/ui/EmptyState';
-import { Spinner } from '@/shared/ui/Spinner';
+import { SkeletonList } from '@/shared/ui/Skeleton';
+import { BookIcon } from '@/shared/ui/Icons';
 import { EntryCard } from './EntryCard';
 
 export interface LibraryListProps {
@@ -71,18 +72,15 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
   }, []);
 
   if (loading) {
-    return (
-      <div className="p-4">
-        <Spinner label="Loading your vocabulary…" />
-      </div>
-    );
+    return <SkeletonList rows={4} />;
   }
 
   if (entries.length === 0) {
     return filtered ? (
-      <EmptyState title="No matches" description="Try a different search term or clear your filters." />
+      <EmptyState icon={<BookIcon size={20} />} title="No matches" description="Try a different search term or clear your filters." />
     ) : (
       <EmptyState
+        icon={<BookIcon size={20} />}
         title="No words yet"
         description="Select text on any page and use the context menu, Ctrl+Shift+S, or the form above."
       />

@@ -6,18 +6,23 @@ import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { Button } from '@/shared/ui/Button';
+import { SettingsIcon } from '@/shared/ui/Icons';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { SkeletonList } from '@/shared/ui/Skeleton';
+import { ToastProvider, useToast } from '@/shared/ui/Toast';
+import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
 
-export function App() {
+function LibraryScreen() {
   const [selection, setSelection] = useState<SelectionPayload | null>(null);
   const [filters, setFilters] = useState<LibraryFilters>(EMPTY_FILTERS);
   const [saving, setSaving] = useState(false);
   const [explainingId, setExplainingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
+  const { notify } = useToast();
 
   const debouncedSearch = useDebouncedValue(filters.search, 250);
   const query = useMemo(
@@ -55,24 +60,20 @@ export function App() {
           sourceUrl: selection?.sourceUrl ?? '',
           sourceTitle: selection?.sourceTitle ?? '',
         });
-        setStatus({ message: `Saved “${word}”.`, variant: 'success' });
+        notify(`Saved “${word}”.`, 'success');
         await reload();
       } catch (cause) {
-        setStatus({
-          message: cause instanceof Error ? cause.message : 'Could not save that word.',
-          variant: 'error',
-        });
+        notify(cause instanceof Error ? cause.message : 'Could not save that word.', 'error');
       } finally {
         setSaving(false);
       }
     },
-    [reload, selection],
+    [reload, selection, notify],
   );
 
   const handleExplain = useCallback(
     async (entry: VocabularyEntry) => {
       setExplainingId(entry.id);
-      setStatus(null);
       try {
         const explanation = await sendMessage({
           type: 'explain',
@@ -80,56 +81,74 @@ export function App() {
         });
         await update(entry.id, { explanation });
       } catch (cause) {
-        setStatus({
-          message: cause instanceof Error ? cause.message : 'The AI request failed.',
-          variant: 'error',
-        });
+        notify(cause instanceof Error ? cause.message : 'The AI request failed.', 'error');
       } finally {
         setExplainingId(null);
       }
     },
-    [update],
+    [update, notify],
   );
 
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
 
   return (
-    <div className="flex min-h-[420px] w-full min-w-[320px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-        <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
-        <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-          Settings
-        </Button>
-      </header>
-
+    <>
       <SaveForm selection={selection} saving={saving} onSave={handleSave} />
 
-      {(status ?? error) && (
-        <p
-          role="status"
-          aria-live="polite"
-          className={`px-3 py-1.5 text-xs ${
-            status?.variant === 'error' || error
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-green-700 dark:text-green-400'
-          }`}
-        >
-          {status?.message ?? error}
+      {error && (
+        <p role="alert" className={`px-3 py-1.5 text-xs ${tints.dangerText}`}>
+          {error}
         </p>
       )}
 
       <LibraryToolbar filters={filters} tags={tags} count={entries.length} onChange={setFilters} />
 
-      <LibraryList
-        entries={entries}
-        loading={loading}
-        explainingId={explainingId}
-        filtered={isFiltered}
-        onUpdate={update}
-        onDelete={remove}
-        onToggleFavorite={toggleFavorite}
-        onExplain={handleExplain}
-      />
-    </div>
+      {loading ? (
+        <SkeletonList rows={4} />
+      ) : entries.length === 0 ? (
+        <EmptyState
+          icon={<SettingsIcon size={20} />}
+          title={isFiltered ? 'No matches' : 'No words yet'}
+          description={
+            isFiltered
+              ? 'Try a different search term or clear your filters.'
+              : 'Select text on any page and use the context menu, Ctrl+Shift+S, or the form above.'
+          }
+        />
+      ) : (
+        <LibraryList
+          entries={entries}
+          loading={loading}
+          explainingId={explainingId}
+          filtered={isFiltered}
+          onUpdate={update}
+          onDelete={remove}
+          onToggleFavorite={toggleFavorite}
+          onExplain={handleExplain}
+        />
+      )}
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <div className="flex min-h-[420px] w-full min-w-[320px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+        <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-white">
+              <SettingsIcon size={14} />
+            </span>
+            <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
+            Settings
+          </Button>
+        </header>
+
+        <LibraryScreen />
+      </div>
+    </ToastProvider>
   );
 }

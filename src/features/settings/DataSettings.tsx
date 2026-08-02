@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/shared/ui/Button';
+import { DownloadIcon, UploadIcon } from '@/shared/ui/Icons';
 import { backupFilename, createBackup, parseBackup, restoreBackup } from './backup';
 
 /** Export and import the local vocabulary database as JSON. */
-export function DataSettings({ onChanged }: { onChanged?: () => void }) {
+export function DataSettings({ notify }: { notify: (message: string, variant?: 'success' | 'error' | 'info') => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
-  const [status, setStatus] = useState<{ message: string; ok: boolean } | null>(null);
 
   const exportData = async (): Promise<void> => {
     try {
@@ -18,9 +18,9 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
       link.download = backupFilename();
       link.click();
       URL.revokeObjectURL(url);
-      setStatus({ message: `Exported ${backup.entries.length} words.`, ok: true });
+      notify(`Exported ${backup.entries.length} words.`, 'success');
     } catch (cause) {
-      setStatus({ message: cause instanceof Error ? cause.message : 'Export failed.', ok: false });
+      notify(cause instanceof Error ? cause.message : 'Export failed.', 'error');
     }
   };
 
@@ -28,10 +28,9 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
     try {
       const backup = parseBackup(JSON.parse(await file.text()));
       const { imported, skipped } = await restoreBackup(backup, mode);
-      setStatus({ message: `Imported ${imported} words (${skipped} skipped).`, ok: true });
-      onChanged?.();
+      notify(`Imported ${imported} words (${skipped} skipped).`, 'success');
     } catch (cause) {
-      setStatus({ message: cause instanceof Error ? cause.message : 'Import failed.', ok: false });
+      notify(cause instanceof Error ? cause.message : 'Import failed.', 'error');
     } finally {
       if (inputRef.current) inputRef.current.value = '';
     }
@@ -39,7 +38,7 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <section aria-labelledby="data-heading" className="flex flex-col gap-3">
-      <h2 id="data-heading" className="text-sm font-semibold">
+      <h2 id="data-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
         Your data
       </h2>
       <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -49,13 +48,14 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
       <fieldset className="flex items-center gap-4 text-sm">
         <legend className="sr-only">Import strategy</legend>
         {(['merge', 'replace'] as const).map((value) => (
-          <label key={value} className="flex items-center gap-1.5">
+          <label key={value} className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
             <input
               type="radio"
               name="import-mode"
               value={value}
               checked={mode === value}
               onChange={() => setMode(value)}
+              className="h-4 w-4 text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900"
             />
             {value === 'merge' ? 'Merge with existing' : 'Replace everything'}
           </label>
@@ -64,9 +64,11 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
 
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={() => void exportData()}>
+          <DownloadIcon size={14} />
           Export JSON
         </Button>
         <Button variant="secondary" onClick={() => inputRef.current?.click()}>
+          <UploadIcon size={14} />
           Import JSON
         </Button>
         <input
@@ -81,15 +83,6 @@ export function DataSettings({ onChanged }: { onChanged?: () => void }) {
           }}
         />
       </div>
-
-      {status && (
-        <p
-          role="status"
-          className={`text-xs ${status.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-        >
-          {status.message}
-        </p>
-      )}
     </section>
   );
 }

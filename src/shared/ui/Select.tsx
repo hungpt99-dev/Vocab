@@ -21,7 +21,7 @@ export function Select({ label, options, hint, className = '', ...rest }: Select
       <select
         id={id}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className={`h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 ${className}`}
+        className={`h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 ${className}`}
         {...rest}
       >
         {options.map((option) => (

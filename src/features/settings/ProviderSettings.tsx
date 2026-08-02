@@ -16,29 +16,25 @@ const PROVIDER_OPTIONS = listProviders().map((provider) => ({
 export interface ProviderSettingsProps {
   settings: Settings;
   onChange: (patch: Partial<Settings>) => Promise<void>;
+  notify: (message: string, variant?: 'success' | 'error' | 'info') => void;
 }
 
 function isProviderId(value: string): value is AiProviderId {
   return (AI_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
-export function ProviderSettings({ settings, onChange }: ProviderSettingsProps) {
+export function ProviderSettings({ settings, onChange, notify }: ProviderSettingsProps) {
   const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ message: string; ok: boolean } | null>(null);
 
   const provider = getProvider(settings.provider);
 
   const test = async (): Promise<void> => {
     setTesting(true);
-    setResult(null);
     try {
       await new ExplainService().explainWith(settings, { word: 'test' });
-      setResult({ message: `Connected to ${provider.label}.`, ok: true });
+      notify(`Connected to ${provider.label}.`, 'success');
     } catch (cause) {
-      setResult({
-        message: cause instanceof Error ? cause.message : 'Connection failed.',
-        ok: false,
-      });
+      notify(cause instanceof Error ? cause.message : 'Connection failed.', 'error');
     } finally {
       setTesting(false);
     }
@@ -46,7 +42,7 @@ export function ProviderSettings({ settings, onChange }: ProviderSettingsProps) 
 
   return (
     <section aria-labelledby="provider-heading" className="flex flex-col gap-3">
-      <h2 id="provider-heading" className="text-sm font-semibold">
+      <h2 id="provider-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">
         AI provider
       </h2>
 
@@ -91,14 +87,6 @@ export function ProviderSettings({ settings, onChange }: ProviderSettingsProps) 
           Test connection
         </Button>
         {testing && <Spinner label="Testing…" />}
-        {result && (
-          <p
-            role="status"
-            className={`text-xs ${result.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-          >
-            {result.message}
-          </p>
-        )}
       </div>
     </section>
   );

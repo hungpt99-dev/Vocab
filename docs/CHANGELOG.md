@@ -20,6 +20,12 @@ All notable changes to this project are documented here. The format is based on
 - CI workflow running typecheck, lint, unit tests, build and Playwright E2E in parallel jobs.
 
 ### Changed
+- **UI/UX polish pass** to meet the production UI standard:
+  - Added `lucide-react` as the icon library; replaced every emoji/unicode/text glyph (★ ☆ ✎ 🗑 ×) with real Lucide icons (favorite, edit, delete, search, settings, download/upload, star).
+  - Added a reusable design system: `Dialog` (focus-trapped modal, used for delete confirmation), `Toast` (provider + `useToast` hook, replaces all inline status paragraphs), `Badge` (tags), `Checkbox` (settings), `Skeleton`/`SkeletonList` (loading state), and an upgraded `EmptyState` with icon + CTA.
+  - Consistent `focus-visible` ring (brand token) on every interactive control — buttons, icon buttons, inputs, selects, checkboxes, links.
+  - Semantic status colours centralized as `tints`/`statusSurface` token maps; raw `red`/`green`/`amber` literals removed from components.
+  - Brand mark (gear in a tinted tile) added to the popup and options headers for visual consistency.
 - Library list is now virtualized (`react-window`) so large vocabularies render only visible cards; rows re-measure on expand/edit via ResizeObserver.
 - The delete confirmation is now a portaled modal (`createPortal`) rendered above the UI, so it is never trapped inside a virtualized row.
 - Content script styling now reads from the shared token module instead of hardcoded hex values; no visible change to end users.

@@ -37,10 +37,16 @@ export const slate = {
   900: '#0f172a',
 } as const;
 
-/** Semantic status colours. */
+/** Semantic status colours, consumed via the `tint`/`text` helpers in tokens. */
 export const status = {
   success: '#15803d',
+  successBg: '#dcfce7',
+  successBgDark: '#052e16',
   danger: '#b91c1c',
+  dangerBg: '#fee2e2',
+  dangerBgDark: '#450a0a',
+  warning: '#b45309',
+  warningBg: '#fef3c7',
 } as const;
 
 /** Default highlight colour, overridable by the user in Settings. */
@@ -57,6 +63,23 @@ export const color = {
   overlaySurfaceAlt: slate[800],
   overlayText: slate[50],
   overlayMuted: slate[400],
+} as const;
+
+/** Tailwind utility strings for semantic status colours (light + dark). */
+export const tints = {
+  dangerText: 'text-red-600 dark:text-red-400',
+  dangerBorder: 'border-red-500',
+  successText: 'text-green-700 dark:text-green-400',
+  warningText: 'text-amber-600 dark:text-amber-400',
+} as const;
+
+/** Toast/alert surface palettes (border, background, text) per status. */
+export const statusSurface = {
+  success:
+    'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200',
+  error:
+    'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200',
+  info: 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
 } as const;
 
 export const radius = {
