@@ -1,12 +1,22 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
+import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import {
+  SMART_ASSIST_ACTIONS,
+  SelectionToolbar,
+  SmartAssistMenu,
+  readToolbarSelection,
+  type SmartAssistActionId,
+  type ToolbarActionId,
+  type ToolbarState,
+} from './toolbar';
+import { ExplainPanel } from './explain-panel';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -14,6 +24,8 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const assistMenu = new SmartAssistMenu();
+const explainPanel = new ExplainPanel();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -68,8 +80,13 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
-    void handleToolbarAction(detail.action, detail.text);
+    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string; state?: ToolbarState }>).detail;
+    void handleToolbarAction(detail.action, detail.text, detail.state);
+  }) as EventListener);
+
+  document.addEventListener('avs-assist-action', ((event: Event) => {
+    const detail = (event as CustomEvent<{ action: SmartAssistActionId; state: ToolbarState }>).detail;
+    void handleAssistAction(detail.action, detail.state);
   }) as EventListener);
 }
 
@@ -82,7 +99,11 @@ function toolbarElement(): HTMLElement | null {
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
+async function handleToolbarAction(
+  action: ToolbarActionId,
+  text: string,
+  state?: ToolbarState,
+): Promise<void> {
   switch (action) {
     case 'copy': {
       try {
@@ -94,11 +115,65 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'more': {
+      if (state) assistMenu.toggle(state);
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / translate / save are wired in later issues (VOC-44..48).
       // For now surface what was requested so the toolbar is demonstrably live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
+  }
+}
+
+/**
+ * Route a smart-assistance action. The five AI analyses go through the message
+ * bus to the ExplainService (provider-agnostic); "Save difficult words" asks
+ * the background to extract and persist the difficult words in the repository.
+ */
+async function handleAssistAction(action: SmartAssistActionId, state: ToolbarState): Promise<void> {
+  toolbar.hide();
+  if (action === 'save-difficult-words') {
+    await saveDifficultWords(state);
+    return;
+  }
+  const assistAction = SMART_ASSIST_ACTIONS.find((candidate) => candidate.id === action);
+  if (!assistAction?.kind) return;
+  await runExplain(assistAction.label, assistAction.kind, state);
+}
+
+async function runExplain(label: string, kind: ExplainKind, state: ToolbarState): Promise<void> {
+  try {
+    const explanation = await sendMessage({
+      type: 'explain',
+      payload: { word: state.text, context: state.sentence || undefined, kind },
+    });
+    explainPanel.show(label, state, explanation);
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : 'The AI request failed.', 'error');
+  }
+}
+
+async function saveDifficultWords(state: ToolbarState): Promise<void> {
+  try {
+    const entries = await sendMessage({
+      type: 'save-difficult-words',
+      payload: {
+        word: state.text,
+        context: state.sentence || undefined,
+        sourceUrl: state.sourceUrl,
+        sourceTitle: state.sourceTitle,
+      },
+    });
+    showToast(
+      entries.length === 0
+        ? 'No difficult words found'
+        : `Saved ${entries.length} word${entries.length === 1 ? '' : 's'}`,
+      'success',
+    );
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : 'Could not save the words.', 'error');
   }
 }
 
@@ -173,7 +248,9 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.classList.contains('avs-assist-menu') ||
+    element.classList.contains('avs-panel')
   );
 }
 

@@ -106,7 +106,7 @@ export class ExplainService {
   }
 
   private cacheKey(provider: SavedProvider, request: ExplainRequest): string {
-    return `${provider.type}|${provider.model}|${request.word}|${request.context ?? ''}|${request.language ?? ''}`;
+    return `${provider.type}|${provider.model}|${request.word}|${request.context ?? ''}|${request.language ?? ''}|${request.kind ?? 'word'}`;
   }
 
   private readCache(provider: SavedProvider, request: ExplainRequest): Explanation | null {

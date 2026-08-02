@@ -109,9 +109,116 @@ export function injectStyles(doc: Document = document): void {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;
     }
+    .avs-assist-menu {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      display: flex;
+      flex-direction: column;
+      min-width: 200px;
+      padding: ${spacing.xs};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-assist-menu[hidden] { display: none; }
+    .avs-assist-item {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.sm};
+      width: 100%;
+      padding: ${spacing.sm} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .avs-assist-item:hover,
+    .avs-assist-item:focus-visible {
+      background: ${color.overlaySurfaceAlt};
+      outline: none;
+    }
+    .avs-assist-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      color: ${color.overlayMuted};
+    }
+    .avs-panel {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      max-width: ${layout.overlayMaxWidth};
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-panel[hidden] { display: none; }
+    .avs-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${spacing.md};
+      margin-bottom: ${spacing.xs};
+    }
+    .avs-panel-title { font-weight: 600; }
+    .avs-panel-close {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayMuted};
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .avs-panel-close:hover,
+    .avs-panel-close:focus-visible {
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      outline: none;
+    }
+    .avs-panel-source {
+      margin: 0 0 ${spacing.sm};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      font-style: italic;
+      overflow-wrap: anywhere;
+    }
+    .avs-panel-row { margin-top: ${spacing.sm}; }
+    .avs-panel-label {
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-panel-list {
+      margin: ${spacing.xs} 0 0;
+      padding-left: ${spacing.lg};
+    }
+    .avs-panel-list li { margin-top: ${spacing.xs}; }
+    .avs-panel-footer {
+      margin: ${spacing.md} 0 0;
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+    }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-assist-menu { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-panel { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;

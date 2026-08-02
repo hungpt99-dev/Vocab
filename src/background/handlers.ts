@@ -1,5 +1,6 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
-import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
+import type { DifficultWordsPayload, HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
@@ -82,14 +83,56 @@ export async function explainWord(
   deps: BackgroundDeps,
   word: string,
   context?: string,
+  kind?: ExplainKind,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context });
+  const explanation = await deps.explain.explain({ word, context, kind });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
     await broadcast({ type: 'vocabulary-changed' });
   }
   return explanation;
+}
+
+/** Split a "term: brief meaning" item into its word and meaning halves. */
+export function splitVocabularyTerm(item: string): { word: string; meaning: string } {
+  const [word = '', ...rest] = item.split(/\s*[—–:]\s*/u);
+  return { word: word.trim(), meaning: rest.join(': ').trim() };
+}
+
+/**
+ * Extract the difficult words from a selection via the AI, then persist each
+ * as a vocabulary entry. Returns the entries that were saved (new or merged).
+ */
+export async function saveDifficultWords(
+  deps: BackgroundDeps,
+  input: DifficultWordsPayload,
+): Promise<VocabularyEntry[]> {
+  const explanation = await deps.explain.explain({
+    word: input.word,
+    context: input.context,
+    kind: 'vocabulary',
+  });
+
+  const entries: VocabularyEntry[] = [];
+  for (const raw of explanation.relatedWords) {
+    const { word, meaning } = splitVocabularyTerm(raw);
+    if (!word.trim()) continue;
+    entries.push(
+      await deps.vocabulary.save({
+        word,
+        sentence: input.context,
+        sourceUrl: input.sourceUrl,
+        sourceTitle: input.sourceTitle,
+        note: meaning,
+      }),
+    );
+  }
+
+  if (entries.length > 0) {
+    await broadcast({ type: 'vocabulary-changed' });
+  }
+  return entries;
 }
 
 /** Build the handler map used by the service worker's message router. */
@@ -108,7 +151,9 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       return entry;
     },
     'get-highlight-data': () => buildHighlightData(deps),
-    explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    explain: (message) =>
+      explainWord(deps, message.payload.word, message.payload.context, message.payload.kind),
+    'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

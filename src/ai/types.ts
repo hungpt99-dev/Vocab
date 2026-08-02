@@ -1,3 +1,4 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation } from '@/shared/types/vocabulary';
 import type { AiProviderId } from '@/shared/types/settings';
 
@@ -7,6 +8,8 @@ export interface ExplainRequest {
   context?: string;
   /** Target language for the explanation. */
   language?: string;
+  /** Which analysis to produce. Defaults to 'word'. */
+  kind?: ExplainKind;
 }
 
 export interface ProviderConfig {

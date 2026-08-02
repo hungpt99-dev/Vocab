@@ -1,3 +1,4 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
 
 /** Payload the content script reports about the current selection. */
@@ -8,11 +9,20 @@ export interface SelectionPayload {
   sourceTitle: string;
 }
 
+/** Payload for saving the difficult words found in a selection. */
+export interface DifficultWordsPayload {
+  word: string;
+  context?: string;
+  sourceUrl: string;
+  sourceTitle: string;
+}
+
 export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'explain'; payload: { word: string; context?: string; kind?: ExplainKind } }
+  | { type: 'save-difficult-words'; payload: DifficultWordsPayload }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
@@ -34,6 +44,7 @@ export interface ResponseMap {
   'get-selection': SelectionPayload | null;
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
+  'save-difficult-words': VocabularyEntry[];
   'get-highlight-data': HighlightData;
   'vocabulary-changed': void;
   'settings-changed': void;
