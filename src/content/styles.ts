@@ -1,10 +1,28 @@
 import { HIGHLIGHT_CLASS } from './highlighter';
+import {
+  DEFAULT_HIGHLIGHT_COLOR,
+  color,
+  elevation,
+  layout,
+  motion,
+  radius,
+  spacing,
+  typography,
+  zIndex,
+} from '@/shared/styles/tokens';
 
 const STYLE_ID = 'avs-styles';
 
 export const HIGHLIGHT_COLOR_VAR = '--avs-highlight-color';
 
-/** Inject (once) the stylesheet used by highlights, hover card and toasts. */
+/**
+ * Inject (once) the stylesheet used by highlights, hover card and toasts.
+ *
+ * This is a hand-built CSS string rather than Tailwind: the content script runs
+ * inside arbitrary third-party pages, where Tailwind's utilities do not exist
+ * and shipping its preflight would restyle the host page. Every value below
+ * comes from the shared design tokens so the two styling paths cannot drift.
+ */
 export function injectStyles(doc: Document = document): void {
   if (doc.getElementById(STYLE_ID)) return;
 
@@ -12,50 +30,55 @@ export function injectStyles(doc: Document = document): void {
   style.id = STYLE_ID;
   style.textContent = `
     .${HIGHLIGHT_CLASS} {
-      background-color: var(${HIGHLIGHT_COLOR_VAR}, #fde68a);
+      background-color: var(${HIGHLIGHT_COLOR_VAR}, ${DEFAULT_HIGHLIGHT_COLOR});
       color: inherit;
-      border-radius: 3px;
+      border-radius: ${radius.sm};
       padding: 0 1px;
       cursor: help;
       box-decoration-break: clone;
     }
     .${HIGHLIGHT_CLASS}:focus-visible {
-      outline: 2px solid #4f46e5;
+      outline: 2px solid ${color.focusRing};
       outline-offset: 1px;
     }
     .avs-card {
       position: fixed;
-      z-index: 2147483647;
-      max-width: 320px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: #0f172a;
-      color: #f8fafc;
-      font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+      z-index: ${zIndex.overlay};
+      max-width: ${layout.overlayMaxWidth};
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
       pointer-events: none;
     }
     .avs-card[hidden] { display: none; }
-    .avs-card-word { font-weight: 600; margin-bottom: 4px; }
-    .avs-card-row { margin-top: 4px; }
-    .avs-card-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .avs-card-word { font-weight: 600; margin-bottom: ${spacing.xs}; }
+    .avs-card-row { margin-top: ${spacing.xs}; }
+    .avs-card-label {
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
     .avs-toast {
       position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 2147483647;
-      max-width: 320px;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
-      color: #f8fafc;
-      background: #1e293b;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+      right: ${spacing.xl};
+      bottom: ${spacing.xl};
+      z-index: ${zIndex.overlay};
+      max-width: ${layout.overlayMaxWidth};
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      color: ${color.overlayText};
+      background: ${color.overlaySurfaceAlt};
+      box-shadow: ${elevation.overlay};
     }
-    .avs-toast[data-variant='success'] { background: #15803d; }
-    .avs-toast[data-variant='error'] { background: #b91c1c; }
+    .avs-toast[data-variant='success'] { background: ${color.status.success}; }
+    .avs-toast[data-variant='error'] { background: ${color.status.danger}; }
     @media (prefers-reduced-motion: no-preference) {
-      .avs-toast { animation: avs-fade-in 150ms ease-out; }
+      .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;
@@ -63,6 +86,6 @@ export function injectStyles(doc: Document = document): void {
 }
 
 /** Apply the user's highlight colour as a CSS custom property. */
-export function applyHighlightColor(color: string, doc: Document = document): void {
-  doc.documentElement.style.setProperty(HIGHLIGHT_COLOR_VAR, color);
+export function applyHighlightColor(value: string, doc: Document = document): void {
+  doc.documentElement.style.setProperty(HIGHLIGHT_COLOR_VAR, value);
 }

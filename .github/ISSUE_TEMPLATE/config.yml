@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/hungpt99-dev/Vocab/tree/main/docs
+    about: Architecture, standards and guides live in the docs directory.

@@ -1,4 +1,5 @@
 import type { Settings, SettingsPatch } from '@/shared/types/settings';
+import { DEFAULT_HIGHLIGHT_COLOR } from '@/shared/styles/tokens';
 
 export const SETTINGS_KEY = 'avs:settings';
 
@@ -8,7 +9,7 @@ export const DEFAULT_SETTINGS: Settings = {
   model: '',
   baseUrl: '',
   highlightEnabled: true,
-  highlightColor: '#fde68a',
+  highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
 };
 

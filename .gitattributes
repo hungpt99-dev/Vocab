@@ -1,0 +1,23 @@
+# Normalise line endings so Windows checkouts do not produce noisy diffs.
+* text=auto eol=lf
+
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+
+# Binary assets must never be normalised.
+*.png   binary
+*.jpg   binary
+*.webp  binary
+*.zip   binary
+*.woff2 binary
+
+# Generated files: collapse in diffs and exclude from language statistics.
+package-lock.json  linguist-generated=true -diff
+dist/**            linguist-generated=true
+docs/**            linguist-documentation=true
