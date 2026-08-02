@@ -97,3 +97,35 @@ test('saving through the worker shows a toast on the page', async ({
   await expect(toast).toHaveText('Saved "probe".');
   await expect(toast).toHaveAttribute('role', 'status');
 });
+
+test('saves a word straight from the page with the floating toolbar', async ({
+  page,
+  samplePageUrl,
+}) => {
+  await page.goto(samplePageUrl);
+
+  // Select "serendipity" and surface the floating selection toolbar.
+  await page.evaluate(() => {
+    const paragraph = document.getElementById('para')!;
+    const text = paragraph.firstChild as Text;
+    const start = text.data.indexOf('serendipity');
+    const range = document.createRange();
+    range.setStart(text, start);
+    range.setEnd(text, start + 'serendipity'.length);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+
+  const saveButton = page.locator('.avs-toolbar [data-action="save"]');
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
+
+  await expect(page.locator('#avs-toast')).toHaveText('Saved "serendipity"');
+
+  // The freshly saved word is highlighted on the page immediately.
+  const highlights = page.locator('mark.avs-highlight');
+  await expect(highlights.first()).toBeVisible({ timeout: 10_000 });
+  await expect(highlights).toHaveCount(2);
+});

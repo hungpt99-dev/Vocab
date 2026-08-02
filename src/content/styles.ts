@@ -79,6 +79,24 @@ export function injectStyles(doc: Document = document): void {
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
+    .avs-card-explain {
+      display: block;
+      margin-top: ${spacing.sm};
+      padding: ${spacing.xs} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .avs-card-explain:hover { background: ${color.overlaySurface}; }
+    .avs-card-explain:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-card-explain[disabled] { opacity: 0.6; cursor: progress; }
     .avs-toast {
       position: fixed;
       right: ${spacing.xl};

@@ -127,6 +127,17 @@ describe('buildHighlightData', () => {
     await deps.vocabulary.update(entry.id, { explanation });
     expect((await buildHighlightData(deps)).entries[0]?.meaning).toBe('A fortunate accident.');
   });
+
+  it('includes the pronunciation when an explanation is cached', async () => {
+    const entry = await deps.vocabulary.save({ word: 'serendipity' });
+    await deps.vocabulary.update(entry.id, { explanation: { ...explanation, pronunciation: '/ˌser.ənˈdɪp.ə.ti/' } });
+    expect((await buildHighlightData(deps)).entries[0]?.pronunciation).toBe('/ˌser.ənˈdɪp.ə.ti/');
+  });
+
+  it('defaults the pronunciation to empty when absent', async () => {
+    await deps.vocabulary.save({ word: 'gamma' });
+    expect((await buildHighlightData(deps)).entries[0]?.pronunciation).toBe('');
+  });
 });
 
 describe('explainWord', () => {

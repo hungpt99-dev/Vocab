@@ -14,6 +14,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   single tab stop roving tabindex.
 - **Keyboard-only selection.** The selection toolbar now also appears when text is selected with the
   keyboard (Shift + arrows), not only with the mouse.
+- **Vocabulary integration in reading mode.** Saved words are highlighted across the whole page —
+  including bilingual pages where original and translated text sit side by side in two columns.
+  Hovering (or keyboard-focusing) a highlight now also shows the IPA **pronunciation** when the entry
+  has an explanation, plus an **AI explain** shortcut on the card that requests a fresh explanation
+  in place. The selection toolbar's **Save to Vocabulary** button is now live: selecting any word and
+  clicking it saves the word straight from the page and highlights it immediately.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

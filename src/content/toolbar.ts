@@ -1,5 +1,6 @@
 import { isPhrase } from '@/shared/lib/text';
 import type { ExplainKind } from '@/shared/types/ai';
+import type { SelectionPayload } from '@/shared/messaging/contract';
 import { readSelection } from './selection';
 import { computePosition } from './hover-card';
 
@@ -24,6 +25,8 @@ export interface ToolbarState {
   unit: SelectionUnit;
   /** Bounding rect of the selection range, viewport-relative. */
   rect: { top: number; bottom: number; left: number; width: number };
+  /** Selection metadata captured when the toolbar opened, for saving. */
+  selection?: SelectionPayload;
 }
 
 /* Lucide icon paths (24x24, stroke-based) inlined as SVG so the toolbar needs
@@ -128,6 +131,7 @@ export function readToolbarSelection(doc: Document = document): ToolbarState | n
     sourceTitle: payload?.sourceTitle ?? '',
     unit: classifySelection(text),
     rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+    selection: readSelection(doc) ?? undefined,
   };
 }
 

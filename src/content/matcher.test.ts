@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 
 function entry(word: string, id = word): HighlightEntry {
-  return { id, word, wordKey: word.toLowerCase(), note: '', createdAt: 1, meaning: '' };
+  return { id, word, wordKey: word.toLowerCase(), note: '', createdAt: 1, meaning: '', pronunciation: '' };
 }
 
 describe('VocabularyMatcher', () => {

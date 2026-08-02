@@ -36,6 +36,7 @@ export interface HighlightData {
   color: string;
   entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt'> & {
     meaning: string;
+    pronunciation: string;
   }>;
 }
 

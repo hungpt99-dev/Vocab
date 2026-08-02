@@ -9,7 +9,7 @@ import {
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 
 function entry(word: string): HighlightEntry {
-  return { id: word, word, wordKey: word.toLowerCase(), note: 'n', createdAt: 1, meaning: 'm' };
+  return { id: word, word, wordKey: word.toLowerCase(), note: 'n', createdAt: 1, meaning: 'm', pronunciation: '' };
 }
 
 const matcher = new VocabularyMatcher([entry('cake'), entry('piece of cake')]);
@@ -98,6 +98,23 @@ describe('highlightRoot', () => {
   it('does nothing with an empty matcher', () => {
     document.body.innerHTML = '<p>cake</p>';
     expect(highlightRoot(document.body, new VocabularyMatcher([]))).toBe(0);
+  });
+
+  it('highlights saved vocabulary in both columns of a reading layout', () => {
+    document.body.innerHTML = `
+      <div class="columns">
+        <section class="original"><p>Reading in a foreign language is hard work.</p></section>
+        <section class="translation"><p>Reading is the best way to grow.</p></section>
+      </div>`;
+
+    const reading = new VocabularyMatcher([entry('reading')]);
+    const count = highlightRoot(document.body, reading);
+
+    expect(count).toBe(2);
+    expect(document.querySelector('.original')!.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
+    expect(document.querySelector('.translation')!.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
+    expect(document.querySelector('.original')!.textContent).toContain('Reading');
+    expect(document.querySelector('.translation')!.textContent).toContain('Reading');
   });
 });
 
