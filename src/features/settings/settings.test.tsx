@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppearanceSettings } from './AppearanceSettings';
 import { DataSettings } from './DataSettings';
@@ -44,6 +44,46 @@ describe('AppearanceSettings', () => {
     );
     expect(screen.getByLabelText('Highlight colour')).toHaveValue('#ff0000');
     expect(screen.getByText('#ff0000')).toBeInTheDocument();
+  });
+
+  it('labels every reading experience control', () => {
+    render(<AppearanceSettings settings={DEFAULT_SETTINGS} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText(/Show the original word/)).toBeChecked();
+    expect(screen.getByLabelText(/Show the translation/)).toBeChecked();
+    expect(screen.getByLabelText(/Translation width/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Font size/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Spacing/)).toBeInTheDocument();
+  });
+
+  it('hides the original word via the reading toggle', async () => {
+    const onChange = vi.fn(async () => undefined);
+    render(<AppearanceSettings settings={DEFAULT_SETTINGS} onChange={onChange} />);
+
+    await userEvent.click(screen.getByLabelText(/Show the original word/));
+    expect(onChange).toHaveBeenCalledWith({
+      readingExperience: { ...DEFAULT_SETTINGS.readingExperience, showOriginal: false },
+    });
+  });
+
+  it('hides the translation via the reading toggle', async () => {
+    const onChange = vi.fn(async () => undefined);
+    render(<AppearanceSettings settings={DEFAULT_SETTINGS} onChange={onChange} />);
+
+    await userEvent.click(screen.getByLabelText(/Show the translation/));
+    expect(onChange).toHaveBeenCalledWith({
+      readingExperience: { ...DEFAULT_SETTINGS.readingExperience, showTranslation: false },
+    });
+  });
+
+  it('changes the translation width via the slider', async () => {
+    const onChange = vi.fn(async () => undefined);
+    render(<AppearanceSettings settings={DEFAULT_SETTINGS} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText(/Translation width/), { target: { value: '360' } });
+    expect(onChange).toHaveBeenCalledWith({
+      readingExperience: { ...DEFAULT_SETTINGS.readingExperience, width: 360 },
+    });
   });
 });
 

@@ -122,6 +122,21 @@ describe('buildHighlightData', () => {
     expect(data.entries[0]).toMatchObject({ word: 'Alpha', wordKey: 'alpha', note: 'first', meaning: '' });
   });
 
+  it('carries the reading experience preferences', async () => {
+    await deps.settings.update({
+      readingExperience: { showOriginal: false, showTranslation: true, width: 400, fontSize: 15, spacing: 1.8 },
+    });
+
+    const data = await buildHighlightData(deps);
+    expect(data.readingExperience).toEqual({
+      showOriginal: false,
+      showTranslation: true,
+      width: 400,
+      fontSize: 15,
+      spacing: 1.8,
+    });
+  });
+
   it('includes the cached meaning when present', async () => {
     const entry = await deps.vocabulary.save({ word: 'beta' });
     await deps.vocabulary.update(entry.id, { explanation });

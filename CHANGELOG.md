@@ -20,6 +20,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   has an explanation, plus an **AI explain** shortcut on the card that requests a fresh explanation
   in place. The selection toolbar's **Save to Vocabulary** button is now live: selecting any word and
   clicking it saves the word straight from the page and highlights it immediately.
+- **Reading experience controls.** The hover card over a saved word can hide the original word and/or the
+  translation, and its width, font size and spacing are adjustable. Settings apply live to open pages via
+  CSS custom properties, so the overlay reflows instantly.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.
