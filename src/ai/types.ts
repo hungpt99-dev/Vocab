@@ -6,6 +6,10 @@ export interface ExplainRequest {
   word: string;
   /** Sentence the word appeared in, used to disambiguate the sense. */
   context?: string;
+  /** Page title where the word was encountered, for topical context. */
+  pageTitle?: string;
+  /** Short excerpt of text preceding the word on the page, for topical context. */
+  precedingText?: string;
   /** Target language for the explanation. */
   language?: string;
   /** Which analysis to produce. Defaults to 'word'. */

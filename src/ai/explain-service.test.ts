@@ -91,4 +91,29 @@ describe('ExplainService', () => {
     const explanation = await new ExplainService(settings).explain({ word: 'x' });
     expect(explanation.provider).toBe('anthropic');
   });
+
+  it('keeps page context in the cache key so distinct contexts are not shared', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [{ id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'k', baseUrl: '', model: '', enabled: true }],
+      activeProviderId: 'p1',
+    });
+    const fetchMock = vi.fn(async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: payload } }], model: 'gpt-4o-mini' }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const service = new ExplainService(settings);
+    await service.explain({ word: 'x', pageTitle: 'Page A', precedingText: 'first' });
+    await service.explain({ word: 'x', pageTitle: 'Page A', precedingText: 'first' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await service.explain({ word: 'x', pageTitle: 'Page A', precedingText: 'second' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

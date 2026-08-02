@@ -50,6 +50,8 @@ export async function saveSelection(
       const explanation = await deps.explain.explainWith(settings, {
         word: entry.word,
         context: entry.sentence,
+        pageTitle: selection.sourceTitle,
+        precedingText: selection.precedingText,
       });
       return await deps.vocabulary.update(entry.id, { explanation });
     } catch {
@@ -86,8 +88,10 @@ export async function explainWord(
   word: string,
   context?: string,
   kind?: ExplainKind,
+  pageTitle?: string,
+  precedingText?: string,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context, kind });
+  const explanation = await deps.explain.explain({ word, context, kind, pageTitle, precedingText });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
@@ -154,7 +158,14 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'get-highlight-data': () => buildHighlightData(deps),
     explain: (message) =>
-      explainWord(deps, message.payload.word, message.payload.context, message.payload.kind),
+      explainWord(
+        deps,
+        message.payload.word,
+        message.payload.context,
+        message.payload.kind,
+        message.payload.pageTitle,
+        message.payload.precedingText,
+      ),
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,

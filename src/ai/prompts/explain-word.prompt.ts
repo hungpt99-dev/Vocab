@@ -83,12 +83,16 @@ export function buildExplainSystemPrompt(kind: ExplainKind = 'word'): string {
 export function buildExplainWordUserPrompt({
   word,
   context,
+  pageTitle,
+  precedingText,
   language = 'English',
   kind = 'word',
 }: ExplainRequest): string {
   const label = kind === 'word' ? 'Word or phrase' : 'Text';
   const lines = [`${label}: "${word}"`];
   if (context) lines.push(`It appeared in this context: "${context}"`);
+  if (pageTitle) lines.push(`Page title: "${pageTitle}"`);
+  if (precedingText) lines.push(`Preceding text on the page: "${precedingText}"`);
   lines.push(kind === 'word' ? `Explain it in ${language}.` : `Use ${language} for the explanation.`);
   lines.push('Respond with JSON only.');
   return lines.join('\n');

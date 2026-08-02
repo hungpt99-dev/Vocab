@@ -49,6 +49,7 @@ async function handleCapture(
     await saveSelection(defaultDeps, {
       word,
       sentence: fromPage?.sentence ?? '',
+      precedingText: fromPage?.precedingText ?? '',
       sourceUrl: fromPage?.sourceUrl || pageUrl,
       sourceTitle: fromPage?.sourceTitle || pageTitle,
     });
