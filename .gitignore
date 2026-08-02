@@ -6,3 +6,11 @@ test-results/
 *.zip
 .DS_Store
 .linear/env.sh
+
+# Stray compiler output (source of truth is .ts/.tsx)
+src/**/*.js
+scripts/**/*.js
+vite.config.js
+vite.content.config.js
+vitest.config.js
+playwright.config.js
