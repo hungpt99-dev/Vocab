@@ -1,0 +1,159 @@
+{
+  "project": {
+    "id": "f4f8f532-de40-4994-8eda-55d685be2318",
+    "name": "AI Vocabulary Saver"
+  },
+  "milestones": {
+    "M1": "c29d22ff-8ffe-48ee-be47-c47626151403",
+    "M2": "b2010342-d12a-46c8-8e04-029c0e52ca83",
+    "M3": "06a47015-54d8-499f-a229-f55ffbfb56eb",
+    "M4": "d5ea36f6-35bb-4b8e-9a13-5b77ee02a513",
+    "M5": "75e52ec4-6024-47aa-ba94-6e075fa46cb3"
+  },
+  "issues": [
+    [
+      "VOC-5",
+      "EPIC: Foundation & Tooling"
+    ],
+    [
+      "VOC-6",
+      "Scaffold Vite + React + TypeScript project"
+    ],
+    [
+      "VOC-7",
+      "Configure TailwindCSS design system"
+    ],
+    [
+      "VOC-8",
+      "Set up ESLint, Prettier and type-check scripts"
+    ],
+    [
+      "VOC-9",
+      "Set up Vitest with jsdom and coverage"
+    ],
+    [
+      "VOC-10",
+      "Chrome MV3 manifest and multi-entry build"
+    ],
+    [
+      "VOC-11",
+      "EPIC: Storage Layer"
+    ],
+    [
+      "VOC-12",
+      "Define domain models and Dexie schema"
+    ],
+    [
+      "VOC-13",
+      "Implement VocabularyRepository CRUD + search"
+    ],
+    [
+      "VOC-14",
+      "Implement SettingsRepository with defaults"
+    ],
+    [
+      "VOC-15",
+      "EPIC: Word Capture"
+    ],
+    [
+      "VOC-16",
+      "Background service worker and message bus"
+    ],
+    [
+      "VOC-17",
+      "Context-menu capture of selected text"
+    ],
+    [
+      "VOC-18",
+      "Keyboard shortcut capture"
+    ],
+    [
+      "VOC-19",
+      "Popup save button for current selection"
+    ],
+    [
+      "VOC-20",
+      "EPIC: Vocabulary Library"
+    ],
+    [
+      "VOC-21",
+      "Library list with search and filters"
+    ],
+    [
+      "VOC-22",
+      "Edit, delete and favourite entries"
+    ],
+    [
+      "VOC-23",
+      "Tag management"
+    ],
+    [
+      "VOC-24",
+      "EPIC: On-page Highlighting"
+    ],
+    [
+      "VOC-25",
+      "Content script DOM scanner and highlighter"
+    ],
+    [
+      "VOC-26",
+      "Hover card with meaning, note and saved date"
+    ],
+    [
+      "VOC-27",
+      "Highlight colour and enable/disable respected live"
+    ],
+    [
+      "VOC-28",
+      "EPIC: AI Explain"
+    ],
+    [
+      "VOC-29",
+      "Provider-agnostic AI client abstraction"
+    ],
+    [
+      "VOC-30",
+      "OpenAI-compatible adapters (OpenAI, OpenRouter, LM Studio, Ollama)"
+    ],
+    [
+      "VOC-31",
+      "Gemini and Anthropic adapters"
+    ],
+    [
+      "VOC-32",
+      "Explanation schema and rendering"
+    ],
+    [
+      "VOC-33",
+      "EPIC: Settings, Import & Export"
+    ],
+    [
+      "VOC-34",
+      "Options page for provider, key and appearance"
+    ],
+    [
+      "VOC-35",
+      "Export and import vocabulary as JSON"
+    ],
+    [
+      "VOC-36",
+      "EPIC: Quality, E2E and Release"
+    ],
+    [
+      "VOC-37",
+      "Playwright E2E suite against the built extension"
+    ],
+    [
+      "VOC-38",
+      "Accessibility and responsive popup pass"
+    ],
+    [
+      "VOC-39",
+      "Documentation set"
+    ],
+    [
+      "VOC-40",
+      "Production build and release candidate"
+    ]
+  ]
+}

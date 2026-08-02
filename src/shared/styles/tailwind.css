@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply font-sans antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-1 ring-offset-white dark:ring-offset-slate-900;
+  }
+}
+
+@layer components {
+  .avs-scroll {
+    scrollbar-width: thin;
+  }
+}
