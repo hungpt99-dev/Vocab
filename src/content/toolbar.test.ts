@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SelectionPayload } from '@/shared/messaging/contract';
 import {
   classifySelection,
   computeToolbarPosition,
   readToolbarSelection,
   SelectionToolbar,
 } from './toolbar';
+
+function payload(word: string): SelectionPayload {
+  return {
+    word,
+    sentence: `A sentence about ${word}.`,
+    sourceUrl: 'https://example.com',
+    sourceTitle: 'Example',
+    sourceLanguage: 'English',
+  };
+}
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -44,7 +55,7 @@ describe('readToolbarSelection', () => {
     expect(readToolbarSelection()).toBeNull();
   });
 
-  it('returns text, unit and rect for a real selection', () => {
+  it('returns text, unit, rect and payload for a real selection', () => {
     const range = {
       getBoundingClientRect: () => ({ width: 50, height: 14, top: 100, bottom: 114, left: 20 }),
     };
@@ -52,11 +63,16 @@ describe('readToolbarSelection', () => {
       isCollapsed: false,
       rangeCount: 1,
       toString: () => 'serendipity',
+      anchorNode: null,
       getRangeAt: () => range,
     } as unknown as Selection);
 
     const result = readToolbarSelection();
-    expect(result).toMatchObject({ text: 'serendipity', unit: 'word', rect: { top: 100, left: 20, width: 50 } });
+    expect(result).toMatchObject({
+      unit: 'word',
+      rect: { top: 100, left: 20, width: 50 },
+      payload: { word: 'serendipity', sourceLanguage: 'English' },
+    });
   });
 });
 
@@ -90,7 +106,7 @@ describe('SelectionToolbar', () => {
   it('renders five action buttons with aria-labels and emits an action event', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+    toolbarUi.show({ unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 }, payload: payload('hello') });
 
     const element = document.getElementById('avs-toolbar')!;
     expect(element.hidden).toBe(false);
@@ -102,7 +118,7 @@ describe('SelectionToolbar', () => {
     element.querySelector<HTMLButtonElement>('[data-action="copy"]')!.click();
 
     expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { action: 'copy', text: 'hello' } }),
+      expect.objectContaining({ detail: { action: 'copy', payload: expect.objectContaining({ word: 'hello' }) } }),
     );
     toolbarUi.destroy();
   });
@@ -110,7 +126,7 @@ describe('SelectionToolbar', () => {
   it('hides and detaches scroll handling', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hi', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 20 } });
+    toolbarUi.show({ unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 20 }, payload: payload('hi') });
     expect(toolbarUi.isVisible).toBe(true);
 
     toolbarUi.hide();
@@ -122,8 +138,8 @@ describe('SelectionToolbar', () => {
   it('reuses a single toolbar element across shows', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'a', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 10 } });
-    toolbarUi.show({ text: 'b', unit: 'phrase', rect: { top: 200, bottom: 214, left: 40, width: 30 } });
+    toolbarUi.show({ unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 10 }, payload: payload('a') });
+    toolbarUi.show({ unit: 'phrase', rect: { top: 200, bottom: 214, left: 40, width: 30 }, payload: payload('b') });
     expect(document.querySelectorAll('.avs-toolbar')).toHaveLength(1);
     toolbarUi.destroy();
   });

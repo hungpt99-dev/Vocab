@@ -1,4 +1,6 @@
 import { isPhrase } from '@/shared/lib/text';
+import type { SelectionPayload } from '@/shared/messaging/contract';
+import { buildSelectionPayload } from './selection';
 
 const TOOLBAR_ID = 'avs-toolbar';
 const OFFSET = 8;
@@ -10,12 +12,18 @@ const OFFSET = 8;
 export type SelectionUnit = 'word' | 'phrase' | 'sentence' | 'paragraph';
 
 export interface ToolbarState {
-  /** Non-collapsed selected text, whitespace-collapsed. */
-  text: string;
   /** Detected selection unit. */
   unit: SelectionUnit;
   /** Bounding rect of the selection range, viewport-relative. */
   rect: { top: number; bottom: number; left: number; width: number };
+  /** Full capture payload, kept so save keeps the surrounding context even after the selection is cleared. */
+  payload: SelectionPayload;
+}
+
+/** Detail dispatched on the `avs-toolbar-action` event. */
+export interface ToolbarActionDetail {
+  action: ToolbarActionId;
+  payload: SelectionPayload;
 }
 
 /* Lucide icon paths (24x24, stroke-based) inlined as SVG so the toolbar needs
@@ -75,9 +83,9 @@ export function readToolbarSelection(doc: Document = document): ToolbarState | n
   if (rect.width === 0 && rect.height === 0) return null;
 
   return {
-    text,
     unit: classifySelection(text),
     rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+    payload: buildSelectionPayload(text, selection.anchorNode ?? null, doc),
   };
 }
 
@@ -132,7 +140,7 @@ export class SelectionToolbar {
         if (this.state) {
           document.dispatchEvent(
             new CustomEvent('avs-toolbar-action', {
-              detail: { action: action.id, text: this.state.text },
+              detail: { action: action.id, payload: this.state.payload } satisfies ToolbarActionDetail,
             }),
           );
         }

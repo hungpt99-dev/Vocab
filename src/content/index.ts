@@ -1,12 +1,12 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
-import type { HighlightData } from '@/shared/messaging/contract';
+import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import { SelectionToolbar, readToolbarSelection, type ToolbarActionDetail, type ToolbarActionId } from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -68,8 +68,8 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
-    void handleToolbarAction(detail.action, detail.text);
+    const detail = (event as CustomEvent<ToolbarActionDetail>).detail;
+    void handleToolbarAction(detail.action, detail.payload);
   }) as EventListener);
 }
 
@@ -82,11 +82,11 @@ function toolbarElement(): HTMLElement | null {
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
+async function handleToolbarAction(action: ToolbarActionId, payload: SelectionPayload): Promise<void> {
   switch (action) {
     case 'copy': {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(payload.word);
         showToast('Copied to clipboard', 'success');
       } catch {
         showToast('Could not copy', 'error');
@@ -94,10 +94,23 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'save': {
+      toolbar.hide();
+      try {
+        await sendMessage({ type: 'save-selection', payload });
+        showToast(`Saved "${payload.word}" to your vocabulary.`, 'success');
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Could not save that word.', 'error');
+      }
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / translate / more are wired in later issues (VOC-44..47).
       // For now surface what was requested so the toolbar is demonstrably live.
-      showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
+      showToast(
+        `${action}: ${payload.word.slice(0, 24)}${payload.word.length > 24 ? '…' : ''}`,
+        'success',
+      );
       toolbar.hide();
   }
 }

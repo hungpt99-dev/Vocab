@@ -41,6 +41,7 @@ export async function saveSelection(
     sentence: selection.sentence,
     sourceUrl: selection.sourceUrl,
     sourceTitle: selection.sourceTitle,
+    sourceLanguage: selection.sourceLanguage,
   });
 
   const settings = await deps.settings.get();
@@ -104,6 +105,11 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       const selection = await readActiveSelection();
       if (!selection?.word.trim()) return null;
       const entry = await saveSelection(deps, selection);
+      await broadcast({ type: 'vocabulary-changed' });
+      return entry;
+    },
+    'save-selection': async (message) => {
+      const entry = await saveSelection(deps, message.payload);
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },

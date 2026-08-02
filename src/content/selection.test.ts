@@ -24,8 +24,17 @@ describe('readSelection', () => {
       word: 'Serendipity',
       sentence: 'Serendipity struck me today!',
       sourceTitle: 'Test Page',
+      sourceLanguage: 'English',
     });
     expect(result?.sourceUrl).toContain('http');
+  });
+
+  it('detects a non-Latin source language', () => {
+    document.body.innerHTML = '<p>纯粹巧合。</p>';
+    const paragraph = document.querySelector('p')!;
+    stubSelection('纯粹', paragraph.firstChild);
+
+    expect(readSelection()?.sourceLanguage).toBe('Chinese');
   });
 
   it('returns null when nothing is selected', () => {

@@ -8,6 +8,7 @@ const selection = {
   sentence: 'Pure serendipity struck.',
   sourceUrl: 'https://example.com',
   sourceTitle: 'Example',
+  sourceLanguage: 'English',
 };
 
 describe('SaveForm', () => {

@@ -7,6 +7,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Selection toolbar save.** The floating selection toolbar's **Save to Vocabulary** action now
+  persists the selection together with its surrounding sentence, source URL, source title and
+  detected source language, reusing the existing `saveSelection` flow. The captured
+  `sourceLanguage` is also recorded for the context-menu, keyboard-shortcut and popup save paths.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

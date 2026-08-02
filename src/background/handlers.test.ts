@@ -54,7 +54,7 @@ describe('readActiveSelection', () => {
   it('asks the active tab for its selection', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'cake', sentence: 'I like cake.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: { word: 'cake', sentence: 'I like cake.', sourceUrl: 'https://x', sourceTitle: 'X', sourceLanguage: 'English' },
     });
 
     expect(await readActiveSelection()).toMatchObject({ word: 'cake' });
@@ -77,12 +77,14 @@ describe('saveSelection', () => {
     sentence: 'Pure serendipity.',
     sourceUrl: 'https://example.com',
     sourceTitle: 'Example',
+    sourceLanguage: 'English',
   };
 
   it('persists the selection', async () => {
     const entry = await saveSelection(deps, selection);
     expect(entry.word).toBe('serendipity');
     expect(entry.sourceUrl).toBe('https://example.com');
+    expect(entry.sourceLanguage).toBe('English');
     expect(await deps.vocabulary.count()).toBe(1);
   });
 
@@ -157,7 +159,7 @@ describe('createHandlers', () => {
   });
 
   it('returns null when saving with no active selection', async () => {
-    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: { word: '  ', sentence: '', sourceUrl: '', sourceTitle: '' } });
+    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: { word: '  ', sentence: '', sourceUrl: '', sourceTitle: '', sourceLanguage: '' } });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
     expect(result).toEqual({ ok: true, data: null });
   });
@@ -165,12 +167,34 @@ describe('createHandlers', () => {
   it('saves the current selection when one exists', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'ephemeral', sentence: 'It is ephemeral.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: { word: 'ephemeral', sentence: 'It is ephemeral.', sourceUrl: 'https://x', sourceTitle: 'X', sourceLanguage: 'English' },
     });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
 
     expect(result.ok).toBe(true);
     expect((await deps.vocabulary.findByWord('ephemeral'))?.sentence).toBe('It is ephemeral.');
+  });
+
+  it('handles save-selection with its captured payload', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      {
+        type: 'save-selection',
+        payload: {
+          word: 'truculent',
+          sentence: 'He was truculent.',
+          sourceUrl: 'https://example.com',
+          sourceTitle: 'Example',
+          sourceLanguage: 'English',
+        },
+      },
+      sender,
+    );
+
+    expect(result.ok).toBe(true);
+    const entry = await deps.vocabulary.findByWord('truculent');
+    expect(entry?.sourceUrl).toBe('https://example.com');
+    expect(entry?.sourceLanguage).toBe('English');
   });
 
   it('handles get-highlight-data', async () => {

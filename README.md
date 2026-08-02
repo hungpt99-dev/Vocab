@@ -50,7 +50,7 @@ explains your words — stays under your control.
 
 | Feature | Details |
 | --- | --- |
-| **Save a selection** | Right-click menu, popup form, or `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS) |
+| **Save a selection** | Right-click menu, popup form, `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS), or the floating toolbar on selected text |
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
 | **On-page highlighting** | Saved words highlighted everywhere; hover or keyboard-focus shows meaning, note and saved date |
@@ -181,8 +181,9 @@ Adding a provider is usually a one-object change: see
 
 ## Usage
 
-**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, or
-open the popup (the selection is prefilled) and click **Save to vocabulary**.
+**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, use
+the **Save to Vocabulary** button on the floating selection toolbar, or open the popup (the selection
+is prefilled) and click **Save to vocabulary**.
 
 **Browse your library.** The popup lists entries newest first. Search matches words, notes, sentences
 and tags. Filter by favourites or tag.
