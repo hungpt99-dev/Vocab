@@ -29,6 +29,20 @@ export function injectStyles(doc: Document = document): void {
   const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
+    :root {
+      --avs-overlay-surface: ${color.overlaySurface};
+      --avs-overlay-surface-alt: ${color.overlaySurfaceAlt};
+      --avs-overlay-text: ${color.overlayText};
+      --avs-overlay-muted: ${color.overlayMuted};
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --avs-overlay-surface: ${color.overlaySurfaceLight};
+        --avs-overlay-surface-alt: ${color.overlaySurfaceAltLight};
+        --avs-overlay-text: ${color.overlayTextLight};
+        --avs-overlay-muted: ${color.overlayMutedLight};
+      }
+    }
     .${HIGHLIGHT_CLASS} {
       background-color: var(${HIGHLIGHT_COLOR_VAR}, ${DEFAULT_HIGHLIGHT_COLOR});
       color: inherit;
@@ -44,11 +58,14 @@ export function injectStyles(doc: Document = document): void {
     .avs-card {
       position: fixed;
       z-index: ${zIndex.overlay};
+      box-sizing: border-box;
       max-width: ${layout.overlayMaxWidth};
+      max-height: min(320px, 70vh);
+      overflow-y: auto;
       padding: ${spacing.md} ${spacing.lg};
       border-radius: ${radius.md};
-      background: ${color.overlaySurface};
-      color: ${color.overlayText};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
       font: ${typography.overlayBody} ${typography.systemStack};
       box-shadow: ${elevation.overlay};
       pointer-events: none;
@@ -57,7 +74,7 @@ export function injectStyles(doc: Document = document): void {
     .avs-card-word { font-weight: 600; margin-bottom: ${spacing.xs}; }
     .avs-card-row { margin-top: ${spacing.xs}; }
     .avs-card-label {
-      color: ${color.overlayMuted};
+      color: var(--avs-overlay-muted);
       font-size: ${typography.overlayLabel};
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -67,13 +84,17 @@ export function injectStyles(doc: Document = document): void {
       right: ${spacing.xl};
       bottom: ${spacing.xl};
       z-index: ${zIndex.overlay};
+      box-sizing: border-box;
       max-width: ${layout.overlayMaxWidth};
       padding: ${spacing.md} ${spacing.lg};
       border-radius: ${radius.md};
       font: ${typography.overlayCompact} ${typography.systemStack};
-      color: ${color.overlayText};
-      background: ${color.overlaySurfaceAlt};
+      color: var(--avs-overlay-text);
+      background: var(--avs-overlay-surface-alt);
       box-shadow: ${elevation.overlay};
+    }
+    @media (max-width: 480px) {
+      .avs-toast { right: ${spacing.sm}; bottom: ${spacing.sm}; left: ${spacing.sm}; }
     }
     .avs-toast[data-variant='success'] { background: ${color.status.success}; }
     .avs-toast[data-variant='error'] { background: ${color.status.danger}; }
@@ -82,11 +103,14 @@ export function injectStyles(doc: Document = document): void {
       z-index: ${zIndex.overlay};
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: ${spacing.xs};
+      box-sizing: border-box;
+      max-width: calc(100vw - ${spacing.sm} * 2);
       padding: ${spacing.xs} ${spacing.sm};
       border-radius: ${radius.md};
-      background: ${color.overlaySurface};
-      color: ${color.overlayText};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
       box-shadow: ${elevation.overlay};
       font: ${typography.overlayCompact} ${typography.systemStack};
     }
@@ -101,10 +125,10 @@ export function injectStyles(doc: Document = document): void {
       border: 0;
       border-radius: ${radius.sm};
       background: transparent;
-      color: ${color.overlayText};
+      color: var(--avs-overlay-text);
       cursor: pointer;
     }
-    .avs-toolbar-btn:hover { background: ${color.overlaySurfaceAlt}; }
+    .avs-toolbar-btn:hover { background: var(--avs-overlay-surface-alt); }
     .avs-toolbar-btn:focus-visible {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;

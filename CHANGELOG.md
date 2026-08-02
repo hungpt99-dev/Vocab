@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Reading-mode accessibility.** In-page overlays (selection toolbar, hover card, toast) now follow the
+  OS light/dark theme via `prefers-color-scheme`, constrain themselves to narrow viewports (toolbar
+  wraps, toast goes edge-to-edge on small screens, the card scrolls when tall), and the selection
+  toolbar implements the ARIA `toolbar` keyboard pattern — arrow keys move focus, Home/End jump, and a
+  single tab stop roving tabindex.
+- **Keyboard-only selection.** The selection toolbar now also appears when text is selected with the
+  keyboard (Shift + arrows), not only with the mouse.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

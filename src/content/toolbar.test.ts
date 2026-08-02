@@ -128,3 +128,69 @@ describe('SelectionToolbar', () => {
     toolbarUi.destroy();
   });
 });
+
+describe('SelectionToolbar keyboard navigation', () => {
+  const showToolbar = (): { toolbarUi: SelectionToolbar; buttons: HTMLButtonElement[] } => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('.avs-toolbar-btn')];
+    return { toolbarUi, buttons };
+  };
+
+  const press = (button: HTMLButtonElement, key: string): void => {
+    button.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  };
+
+  it('exposes a single tab stop (roving tabindex) and a horizontal toolbar', () => {
+    const { toolbarUi, buttons } = showToolbar();
+    const toolbar = document.getElementById('avs-toolbar')!;
+    expect(toolbar.getAttribute('aria-orientation')).toBe('horizontal');
+    expect(buttons.filter((button) => button.tabIndex === 0)).toHaveLength(1);
+    expect(buttons[0]!.tabIndex).toBe(0);
+    toolbarUi.destroy();
+  });
+
+  it('moves focus right on ArrowRight, wrapping to the first action', () => {
+    const { toolbarUi, buttons } = showToolbar();
+    const last = buttons[buttons.length - 1]!;
+    last.focus();
+    press(last, 'ArrowRight');
+    expect(document.activeElement).toBe(buttons[0]);
+    expect(buttons[0]!.tabIndex).toBe(0);
+    expect(last.tabIndex).toBe(-1);
+    toolbarUi.destroy();
+  });
+
+  it('moves focus left on ArrowLeft, wrapping to the last action', () => {
+    const { toolbarUi, buttons } = showToolbar();
+    const first = buttons[0]!;
+    first.focus();
+    press(first, 'ArrowLeft');
+    expect(document.activeElement).toBe(buttons[buttons.length - 1]);
+    expect(buttons[buttons.length - 1]!.tabIndex).toBe(0);
+    toolbarUi.destroy();
+  });
+
+  it('jumps to the first and last action with Home and End', () => {
+    const { toolbarUi, buttons } = showToolbar();
+    const middle = buttons[2]!;
+    middle.focus();
+    press(middle, 'Home');
+    expect(document.activeElement).toBe(buttons[0]);
+    press(middle, 'End');
+    expect(document.activeElement).toBe(buttons[buttons.length - 1]);
+    toolbarUi.destroy();
+  });
+
+  it('ignores non-navigation keys on the toolbar', () => {
+    const { toolbarUi, buttons } = showToolbar();
+    const first = buttons[0]!;
+    first.focus();
+    press(first, 'Enter');
+    expect(document.activeElement).toBe(first);
+    toolbarUi.destroy();
+  });
+});

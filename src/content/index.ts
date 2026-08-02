@@ -41,6 +41,10 @@ async function bootstrap(): Promise<void> {
  * hide it on outside click, Escape, or when the selection is cleared. Toolbar
  * actions are forwarded to the message bus via `handleToolbarAction`.
  */
+/** True after a keyboard-driven selection (Shift+arrows etc.), so the toolbar
+ * is surfaced for keyboard-only users even though no `mouseup` ever fires. */
+let selectionViaKeyboard = false;
+
 function attachSelectionToolbar(): void {
   document.addEventListener('mouseup', () => {
     // Defer: the selection is finalised after the mouseup event completes.
@@ -54,16 +58,33 @@ function attachSelectionToolbar(): void {
     const selection = document.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim()) {
       toolbar.hide();
+      return;
+    }
+    if (selectionViaKeyboard && !toolbar.isVisible) {
+      const state = readToolbarSelection();
+      if (state) toolbar.show(state);
     }
   });
 
   document.addEventListener('mousedown', (event) => {
+    selectionViaKeyboard = false;
     if (event.target instanceof Node && !toolbarElementContains(event.target)) {
       toolbar.hide();
     }
   });
 
   document.addEventListener('keydown', (event) => {
+    if (
+      event.shiftKey &&
+      (event.key === 'ArrowLeft' ||
+        event.key === 'ArrowRight' ||
+        event.key === 'ArrowUp' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'Home' ||
+        event.key === 'End')
+    ) {
+      selectionViaKeyboard = true;
+    }
     if (event.key === 'Escape') toolbar.hide();
   });
 

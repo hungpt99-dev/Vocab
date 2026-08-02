@@ -32,6 +32,7 @@ export const brand = {
 /** Neutral slate ramp used for surfaces and text. */
 export const slate = {
   50: '#f8fafc',
+  200: '#e2e8f0',
   400: '#94a3b8',
   800: '#1e293b',
   900: '#0f172a',
@@ -63,6 +64,11 @@ export const color = {
   overlaySurfaceAlt: slate[800],
   overlayText: slate[50],
   overlayMuted: slate[400],
+  /** Light-theme counterparts, applied when the host prefers a light scheme. */
+  overlaySurfaceLight: slate[50],
+  overlaySurfaceAltLight: slate[200],
+  overlayTextLight: slate[800],
+  overlayMutedLight: slate[400],
 } as const;
 
 /** Tailwind utility strings for semantic status colours (light + dark). */

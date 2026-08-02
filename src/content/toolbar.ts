@@ -105,6 +105,7 @@ export function computeToolbarPosition(
  */
 export class SelectionToolbar {
   private element: HTMLElement | null = null;
+  private buttons: HTMLButtonElement[] = [];
   private state: ToolbarState | null = null;
   private scrollHandler = (): void => this.reposition();
 
@@ -115,6 +116,7 @@ export class SelectionToolbar {
     toolbar.id = TOOLBAR_ID;
     toolbar.className = 'avs-toolbar';
     toolbar.setAttribute('role', 'toolbar');
+    toolbar.setAttribute('aria-orientation', 'horizontal');
     toolbar.setAttribute('aria-label', 'Text selection actions');
     toolbar.hidden = true;
 
@@ -125,6 +127,8 @@ export class SelectionToolbar {
       button.dataset.action = action.id;
       button.setAttribute('aria-label', action.label);
       button.title = action.label;
+      // Roving tabindex: only the active button is reachable by Tab.
+      button.tabIndex = this.buttons.length === 0 ? 0 : -1;
       button.innerHTML = action.icon;
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -137,17 +141,47 @@ export class SelectionToolbar {
           );
         }
       });
+      this.buttons.push(button);
       toolbar.append(button);
     }
 
+    toolbar.addEventListener('keydown', (event) => this.handleKeydown(event));
     document.body.append(toolbar);
     this.element = toolbar;
     return toolbar;
   }
 
+  /** ARIA toolbar keyboard interaction: arrows move focus, Home/End jump. */
+  private handleKeydown(event: KeyboardEvent): void {
+    const current = event.target;
+    if (!(current instanceof HTMLButtonElement) || !this.buttons.includes(current)) return;
+
+    let next: HTMLButtonElement | undefined;
+    const index = this.buttons.indexOf(current);
+    if (event.key === 'ArrowRight') {
+      next = this.buttons[index + 1] ?? this.buttons[0];
+    } else if (event.key === 'ArrowLeft') {
+      next = this.buttons[index - 1] ?? this.buttons[this.buttons.length - 1];
+    } else if (event.key === 'Home') {
+      next = this.buttons[0];
+    } else if (event.key === 'End') {
+      next = this.buttons[this.buttons.length - 1];
+    }
+    if (!next || next === current) return;
+
+    event.preventDefault();
+    for (const button of this.buttons) button.tabIndex = -1;
+    next.tabIndex = 0;
+    next.focus();
+  }
+
   show(state: ToolbarState): void {
     this.state = state;
     const toolbar = this.ensureElement();
+    // Reset the roving tabindex to the first action on each opening.
+    this.buttons.forEach((button, index) => {
+      button.tabIndex = index === 0 ? 0 : -1;
+    });
     toolbar.hidden = false;
     this.reposition();
     window.addEventListener('scroll', this.scrollHandler, true);
