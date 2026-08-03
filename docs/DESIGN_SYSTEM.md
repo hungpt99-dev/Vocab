@@ -171,6 +171,12 @@ download/upload, plus dialog/toast/empty-state glyphs).
 Why a package rather than hand-rolled inline SVG: the set has grown past a handful of glyphs and
 Lucide guarantees a single visual language. The bundle cost is negligible (tree-shaken per icon).
 
+The content-script overlays (toolbar, popovers, panels) run inside third-party pages and render
+pure DOM, so they cannot import `lucide-react`. They source the same glyphs from **`lucide-static`**
+(raw SVG strings) through the single `icon()` helper in `src/content/icons.ts`, which unwraps the
+library's 24x24 SVGs and re-wraps them at the overlays' fixed size without leaking Lucide's class
+into the host page.
+
 **Resilience note.** Browser extensions can render inside a sandbox where the bundled web font
 fails to load, leaving Lucide's SVG glyphs blank. Each icon therefore probes once for a healthy
 font and, only if it is missing, falls back to a monochrome unicode glyph so controls stay visible
