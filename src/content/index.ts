@@ -1,9 +1,10 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
-import type { HighlightData } from '@/shared/messaging/contract';
+import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import { HoverCard } from './hover-card';
+import { ExplainPopover, type ExplainPopoverMode } from './explain-popover';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
@@ -14,6 +15,13 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const explainPopover = new ExplainPopover({
+  load: async (text) => {
+    const selection = readSelection();
+    return sendMessage({ type: 'explain', payload: { word: text, context: selection?.sentence } });
+  },
+  onSave: saveToolbarSelection,
+});
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -45,6 +53,7 @@ function attachSelectionToolbar(): void {
   document.addEventListener('mouseup', () => {
     // Defer: the selection is finalised after the mouseup event completes.
     setTimeout(() => {
+      if (explainPopover.isVisible) return;
       const state = readToolbarSelection();
       if (state) toolbar.show(state);
     }, 0);
@@ -58,13 +67,16 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('mousedown', (event) => {
-    if (event.target instanceof Node && !toolbarElementContains(event.target)) {
-      toolbar.hide();
-    }
+    if (!(event.target instanceof Node)) return;
+    if (!toolbarElementContains(event.target)) toolbar.hide();
+    if (!popoverElementContains(event.target)) explainPopover.hide();
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') toolbar.hide();
+    if (event.key === 'Escape') {
+      toolbar.hide();
+      explainPopover.hide();
+    }
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
@@ -74,31 +86,93 @@ function attachSelectionToolbar(): void {
 }
 
 function toolbarElementContains(node: Node): boolean {
-  return !!toolbarElement()?.contains(node);
+  return !!document.getElementById('avs-toolbar')?.contains(node);
 }
 
-function toolbarElement(): HTMLElement | null {
-  return document.getElementById('avs-toolbar');
+function popoverElementContains(node: Node): boolean {
+  return !!document.getElementById('avs-explain-popover')?.contains(node);
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
 async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
   switch (action) {
-    case 'copy': {
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard', 'success');
-      } catch {
-        showToast('Could not copy', 'error');
-      }
+    case 'copy':
       toolbar.hide();
+      await copyText(text);
+      return;
+    case 'copy-sentence': {
+      toolbar.hide();
+      const sentence = readSelection()?.sentence ?? '';
+      if (!sentence) {
+        showToast('No source sentence found', 'error');
+        return;
+      }
+      await copyText(sentence);
       return;
     }
-    default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
-      // For now surface what was requested so the toolbar is demonstrably live.
-      showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
+    case 'copy-citation':
       toolbar.hide();
+      await copyText(citationFor(text));
+      return;
+    case 'explain':
+      openPopover('explain', text);
+      return;
+    case 'translate':
+      openPopover('translate', text);
+      return;
+    case 'save':
+      toolbar.hide();
+      await saveToolbarSelection(text);
+      showToast(`Saved "${text}" to your vocabulary`, 'success');
+  }
+}
+
+function openPopover(mode: ExplainPopoverMode, text: string): void {
+  toolbar.hide();
+  const state = readToolbarSelection();
+  explainPopover.show({
+    text,
+    mode,
+    rect: state?.rect ?? { top: 0, bottom: 0, left: 0, width: 0 },
+  });
+}
+
+/** Persist the selected text to the vocabulary; rejects when saving fails. */
+async function saveToolbarSelection(text: string): Promise<void> {
+  const selection = readSelection() ?? emptySelection();
+  await sendMessage({
+    type: 'save-entry',
+    payload: {
+      word: text,
+      sentence: selection.sentence,
+      sourceUrl: selection.sourceUrl,
+      sourceTitle: selection.sourceTitle,
+    },
+  });
+}
+
+function emptySelection(): SelectionPayload {
+  return {
+    word: '',
+    sentence: '',
+    sourceUrl: document.location.href,
+    sourceTitle: document.title,
+  };
+}
+
+function citationFor(text: string): string {
+  const selection = readSelection();
+  const title = selection?.sourceTitle || document.title;
+  const url = selection?.sourceUrl || document.location.href;
+  return `"${text}" — ${title} (${url})`;
+}
+
+async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard', 'success');
+  } catch {
+    showToast('Could not copy', 'error');
   }
 }
 
@@ -173,7 +247,8 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.classList.contains('avs-popover')
   );
 }
 

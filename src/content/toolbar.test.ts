@@ -39,7 +39,9 @@ describe('readToolbarSelection', () => {
       isCollapsed: true,
       toString: () => 'word',
       rangeCount: 1,
-      getRangeAt: () => ({ getBoundingClientRect: () => ({ width: 10, height: 10, top: 0, bottom: 0, left: 0 }) }),
+      getRangeAt: () => ({
+        getBoundingClientRect: () => ({ width: 10, height: 10, top: 0, bottom: 0, left: 0 }),
+      }),
     } as unknown as Selection);
     expect(readToolbarSelection()).toBeNull();
   });
@@ -56,7 +58,11 @@ describe('readToolbarSelection', () => {
     } as unknown as Selection);
 
     const result = readToolbarSelection();
-    expect(result).toMatchObject({ text: 'serendipity', unit: 'word', rect: { top: 100, left: 20, width: 50 } });
+    expect(result).toMatchObject({
+      text: 'serendipity',
+      unit: 'word',
+      rect: { top: 100, left: 20, width: 50 },
+    });
   });
 });
 
@@ -65,23 +71,39 @@ describe('computeToolbarPosition', () => {
   const viewport = { width: 1000, height: 800 };
 
   it('places the toolbar above the selection, centered on it', () => {
-    const { top, left } = computeToolbarPosition({ top: 200, bottom: 214, left: 100, width: 100 }, toolbar, viewport);
+    const { top, left } = computeToolbarPosition(
+      { top: 200, bottom: 214, left: 100, width: 100 },
+      toolbar,
+      viewport,
+    );
     expect(top).toBe(200 - 8 - 36); // anchor.top - offset - height
     expect(left).toBe(100 + 50 - 100); // center - half width
   });
 
   it('flips below the anchor when there is no room above', () => {
-    const { top } = computeToolbarPosition({ top: 20, bottom: 34, left: 100, width: 100 }, toolbar, viewport);
+    const { top } = computeToolbarPosition(
+      { top: 20, bottom: 34, left: 100, width: 100 },
+      toolbar,
+      viewport,
+    );
     expect(top).toBe(34 + 8);
   });
 
   it('clamps to the right viewport edge', () => {
-    const { left } = computeToolbarPosition({ top: 200, bottom: 214, left: 950, width: 100 }, toolbar, viewport);
+    const { left } = computeToolbarPosition(
+      { top: 200, bottom: 214, left: 950, width: 100 },
+      toolbar,
+      viewport,
+    );
     expect(left).toBe(1000 - 200 - 8);
   });
 
   it('clamps to the left viewport edge', () => {
-    const { left } = computeToolbarPosition({ top: 200, bottom: 214, left: -100, width: 100 }, toolbar, viewport);
+    const { left } = computeToolbarPosition(
+      { top: 200, bottom: 214, left: -100, width: 100 },
+      toolbar,
+      viewport,
+    );
     expect(left).toBe(8);
   });
 });
@@ -90,7 +112,11 @@ describe('SelectionToolbar', () => {
   it('renders five action buttons with aria-labels and emits an action event', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+    toolbarUi.show({
+      text: 'hello',
+      unit: 'word',
+      rect: { top: 100, bottom: 114, left: 20, width: 50 },
+    });
 
     const element = document.getElementById('avs-toolbar')!;
     expect(element.hidden).toBe(false);
@@ -110,7 +136,11 @@ describe('SelectionToolbar', () => {
   it('hides and detaches scroll handling', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hi', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 20 } });
+    toolbarUi.show({
+      text: 'hi',
+      unit: 'word',
+      rect: { top: 100, bottom: 114, left: 20, width: 20 },
+    });
     expect(toolbarUi.isVisible).toBe(true);
 
     toolbarUi.hide();
@@ -122,9 +152,65 @@ describe('SelectionToolbar', () => {
   it('reuses a single toolbar element across shows', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'a', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 10 } });
-    toolbarUi.show({ text: 'b', unit: 'phrase', rect: { top: 200, bottom: 214, left: 40, width: 30 } });
+    toolbarUi.show({
+      text: 'a',
+      unit: 'word',
+      rect: { top: 100, bottom: 114, left: 20, width: 10 },
+    });
+    toolbarUi.show({
+      text: 'b',
+      unit: 'phrase',
+      rect: { top: 200, bottom: 214, left: 40, width: 30 },
+    });
     expect(document.querySelectorAll('.avs-toolbar')).toHaveLength(1);
+    toolbarUi.destroy();
+  });
+
+  it('toggles the More menu and emits menu-item actions', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({
+      text: 'hello',
+      unit: 'word',
+      rect: { top: 100, bottom: 114, left: 20, width: 50 },
+    });
+
+    const more = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
+    const menu = document.querySelector<HTMLElement>('.avs-toolbar-menu')!;
+    expect(menu.hidden).toBe(true);
+
+    const handler = vi.fn();
+    document.addEventListener('avs-toolbar-action', handler);
+
+    more.click();
+    expect(menu.hidden).toBe(false);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+
+    menu.querySelector<HTMLButtonElement>('[data-action="copy-citation"]')!.click();
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { action: 'copy-citation', text: 'hello' } }),
+    );
+    expect(menu.hidden).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    toolbarUi.destroy();
+  });
+
+  it('closes the More menu when the toolbar hides', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({
+      text: 'hello',
+      unit: 'word',
+      rect: { top: 100, bottom: 114, left: 20, width: 50 },
+    });
+    const more = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
+    const menu = document.querySelector<HTMLElement>('.avs-toolbar-menu')!;
+
+    more.click();
+    expect(menu.hidden).toBe(false);
+
+    toolbarUi.hide();
+    expect(menu.hidden).toBe(true);
     toolbarUi.destroy();
   });
 });

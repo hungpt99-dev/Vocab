@@ -35,7 +35,9 @@ const ICON_BOOKMARK = wrap('<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1
 const ICON_COPY = wrap(
   '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 );
-const ICON_MORE = wrap('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
+const ICON_MORE = wrap(
+  '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+);
 
 const TOOLBAR_ACTIONS = [
   { id: 'explain', label: 'Explain with AI', icon: ICON_SPARKLES },
@@ -45,7 +47,14 @@ const TOOLBAR_ACTIONS = [
   { id: 'more', label: 'More', icon: ICON_MORE },
 ] as const;
 
-export type ToolbarActionId = (typeof TOOLBAR_ACTIONS)[number]['id'];
+/** Extra actions reachable through the More menu. */
+const TOOLBAR_MENU = [
+  { id: 'copy-sentence', label: 'Copy source sentence' },
+  { id: 'copy-citation', label: 'Copy citation' },
+] as const;
+
+export type ToolbarActionId =
+  (typeof TOOLBAR_ACTIONS)[number]['id'] | (typeof TOOLBAR_MENU)[number]['id'];
 
 /**
  * Classify a selection's text into a unit. Mirrors the existing `isPhrase`
@@ -105,6 +114,8 @@ export function computeToolbarPosition(
  */
 export class SelectionToolbar {
   private element: HTMLElement | null = null;
+  private menuElement: HTMLElement | null = null;
+  private moreButton: HTMLButtonElement | null = null;
   private state: ToolbarState | null = null;
   private scrollHandler = (): void => this.reposition();
 
@@ -129,6 +140,11 @@ export class SelectionToolbar {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (action.id === 'more') {
+          this.toggleMenu();
+          return;
+        }
+        this.closeMenu();
         if (this.state) {
           document.dispatchEvent(
             new CustomEvent('avs-toolbar-action', {
@@ -137,8 +153,42 @@ export class SelectionToolbar {
           );
         }
       });
+      if (action.id === 'more') {
+        this.moreButton = button;
+        button.setAttribute('aria-haspopup', 'menu');
+        button.setAttribute('aria-expanded', 'false');
+      }
       toolbar.append(button);
     }
+
+    const menu = document.createElement('div');
+    menu.className = 'avs-toolbar-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'More text actions');
+    menu.hidden = true;
+    for (const item of TOOLBAR_MENU) {
+      const itemButton = document.createElement('button');
+      itemButton.type = 'button';
+      itemButton.className = 'avs-toolbar-menu-item';
+      itemButton.dataset.action = item.id;
+      itemButton.setAttribute('role', 'menuitem');
+      itemButton.textContent = item.label;
+      itemButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeMenu();
+        if (this.state) {
+          document.dispatchEvent(
+            new CustomEvent('avs-toolbar-action', {
+              detail: { action: item.id, text: this.state.text },
+            }),
+          );
+        }
+      });
+      menu.append(itemButton);
+    }
+    toolbar.append(menu);
+    this.menuElement = menu;
 
     document.body.append(toolbar);
     this.element = toolbar;
@@ -154,6 +204,7 @@ export class SelectionToolbar {
   }
 
   hide(): void {
+    this.closeMenu();
     if (this.element) this.element.hidden = true;
     this.state = null;
     window.removeEventListener('scroll', this.scrollHandler, true);
@@ -167,6 +218,18 @@ export class SelectionToolbar {
     this.hide();
     this.element?.remove();
     this.element = null;
+  }
+
+  private toggleMenu(): void {
+    if (!this.menuElement) return;
+    const open = this.menuElement.hidden;
+    this.menuElement.hidden = !open;
+    this.moreButton?.setAttribute('aria-expanded', String(open));
+  }
+
+  private closeMenu(): void {
+    if (this.menuElement) this.menuElement.hidden = true;
+    this.moreButton?.setAttribute('aria-expanded', 'false');
   }
 
   private reposition(): void {

@@ -109,9 +109,162 @@ export function injectStyles(doc: Document = document): void {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;
     }
+    .avs-toolbar-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + ${spacing.sm});
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.xs};
+      min-width: 160px;
+      padding: ${spacing.xs};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-toolbar-menu[hidden] { display: none; }
+    .avs-toolbar-menu-item {
+      padding: ${spacing.sm} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .avs-toolbar-menu-item:hover { background: ${color.overlaySurface}; }
+    .avs-toolbar-menu-item:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-popover {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      width: ${layout.popoverWidth};
+      max-width: calc(100vw - ${spacing.xl} * 2);
+      max-height: calc(100vh - ${spacing.xl} * 2);
+      overflow-y: auto;
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      box-shadow: ${elevation.overlay};
+      font: ${typography.overlayBody} ${typography.systemStack};
+    }
+    .avs-popover[hidden] { display: none; }
+    .avs-popover-header {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.sm};
+      padding: ${spacing.md} ${spacing.lg};
+      border-bottom: 1px solid ${color.overlaySurfaceAlt};
+    }
+    .avs-popover-mode {
+      flex-shrink: 0;
+      padding: 1px ${spacing.sm};
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-popover-word {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .avs-popover-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayMuted};
+      cursor: pointer;
+    }
+    .avs-popover-close:hover { background: ${color.overlaySurfaceAlt}; color: ${color.overlayText}; }
+    .avs-popover-close:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-popover-body { padding: ${spacing.md} ${spacing.lg}; }
+    .avs-popover-status,
+    .avs-popover-error { margin: 0; }
+    .avs-popover-error { color: ${color.overlayMuted}; }
+    .avs-popover-translation {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+    .avs-popover-section { margin-bottom: ${spacing.md}; }
+    .avs-popover-section:last-child { margin-bottom: 0; }
+    .avs-popover-label {
+      margin-bottom: ${spacing.xs};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-popover-section ul { margin: 0; padding-left: ${spacing.xl}; }
+    .avs-popover-section li { margin-top: ${spacing.xs}; }
+    .avs-popover-retry {
+      margin-top: ${spacing.md};
+      padding: ${spacing.sm} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+    }
+    .avs-popover-retry:hover { background: ${color.overlaySurface}; }
+    .avs-popover-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${spacing.sm};
+      padding: ${spacing.md} ${spacing.lg};
+      border-top: 1px solid ${color.overlaySurfaceAlt};
+    }
+    .avs-popover-meta {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+    }
+    .avs-popover-save {
+      flex-shrink: 0;
+      padding: ${spacing.sm} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+    }
+    .avs-popover-save:hover:not(:disabled) { background: ${color.overlaySurface}; }
+    .avs-popover-save:disabled { opacity: 0.6; cursor: default; }
+    .avs-popover-save:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-popover { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;

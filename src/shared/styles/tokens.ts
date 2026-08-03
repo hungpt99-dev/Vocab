@@ -123,6 +123,8 @@ export const zIndex = {
 
 export const layout = {
   overlayMaxWidth: '320px',
+  /** Width of the content-script explain/translate popover. */
+  popoverWidth: '340px',
   /** Narrowest supported popup width, asserted by an E2E test. */
   popupMinWidth: '320px',
   popupWidth: '384px',

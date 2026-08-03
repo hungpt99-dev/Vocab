@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+
+- **Smart text selection** (VOC-41): a floating, ChatGPT/DeepL-style toolbar appears on text
+  selection with **Explain**, **Translate**, **Save**, **Copy** and **More** actions; the selection is
+  classified as word/phrase/sentence/paragraph. Explain and Translate open a viewport-aware AI popover
+  (full explanation, or translation only) with a "Save to vocabulary" button; Save persists the
+  selection with its source context; More offers copying the source sentence or a citation. All AI
+  calls go through the message bus and the provider-agnostic explain service — the content script
+  never touches a provider SDK.
 - AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
 - New runtime dependency `react-window` (virtualized lists) with `@types/react-window`.
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,
@@ -20,6 +28,7 @@ All notable changes to this project are documented here. The format is based on
 - CI workflow running typecheck, lint, unit tests, build and Playwright E2E in parallel jobs.
 
 ### Changed
+
 - **UI/UX polish pass** to meet the production UI standard:
   - Added `lucide-react` as the icon library; replaced every emoji/unicode/text glyph (★ ☆ ✎ 🗑 ×) with real Lucide icons (favorite, edit, delete, search, settings, download/upload, star).
   - Added a reusable design system: `Dialog` (focus-trapped modal, used for delete confirmation), `Toast` (provider + `useToast` hook, replaces all inline status paragraphs), `Badge` (tags), `Checkbox` (settings), `Skeleton`/`SkeletonList` (loading state), and an upgraded `EmptyState` with icon + CTA.
@@ -32,6 +41,7 @@ All notable changes to this project are documented here. The format is based on
   visible change to end users.
 
 ### Fixed
+
 - AI calls now retry transient failures and are rate-limited; previously a transient 429/5xx failed immediately.
 - Content script emitted as ESM (silent highlighting failure) — now built as a standalone IIFE.
 - Settings checkbox reverted mid-interaction — now applied optimistically.
@@ -46,6 +56,7 @@ All notable changes to this project are documented here. The format is based on
 First functional release.
 
 ### Added
+
 - **Capture**: save a selected word or phrase via context menu, keyboard shortcut (`Ctrl/Cmd+Shift+S`),
   or the popup form. Stores word, phrase, sentence, source URL, title, note, tags and timestamp.
 - **Library**: debounced search, inline edit, delete, favourite and tag.
