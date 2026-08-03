@@ -22,6 +22,12 @@ export interface Explanation {
   summary?: string;
   /** Words in a sentence a learner may not know, each rendered "word: gloss". */
   difficultVocabulary?: string[];
+  /** Register (formal/informal/neutral) and typical contexts. */
+  register?: string;
+  /** Short etymology / word origin. */
+  etymology?: string;
+  /** A few related phrases or fixed expressions. */
+  relatedPhrases?: string[];
   /** Provider id that generated this explanation. */
   provider: string;
   /** Model identifier used, when reported. */

@@ -40,6 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
+  bilingualMode: true,
+  explainPromptTemplate: '',
   readingExperience: {
     showOriginal: true,
     showTranslation: true,
@@ -48,6 +50,30 @@ export const DEFAULT_SETTINGS: Settings = {
     spacing: readingTokens.spacing,
   },
 };
+
+/** Common UI languages for the bilingual target-language picker. */
+export const LANGUAGES: readonly string[] = [
+  'English',
+  'Vietnamese',
+  'Spanish',
+  'French',
+  'German',
+  'Italian',
+  'Portuguese',
+  'Russian',
+  'Chinese',
+  'Japanese',
+  'Korean',
+  'Indonesian',
+  'Thai',
+  'Arabic',
+  'Hindi',
+  'Dutch',
+  'Turkish',
+  'Polish',
+  'Ukrainian',
+  'Czech',
+];
 
 /** Promote the old single-provider fields into the new providers array. */
 function migrateLegacy(value: Partial<Settings> & Partial<LegacySettings>): Partial<Settings> {

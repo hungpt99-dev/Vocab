@@ -30,6 +30,19 @@ export function ExplanationView({ explanation }: { explanation: Explanation }) {
       <List label="Examples" items={explanation.examples} />
       <List label="Synonyms" items={explanation.synonyms} />
       <List label="Collocations" items={explanation.collocations} />
+      {explanation.etymology && (
+        <div className="mt-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-slate-400">Etymology</p>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{explanation.etymology}</p>
+        </div>
+      )}
+      {explanation.register && (
+        <div className="mt-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-slate-400">Register</p>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{explanation.register}</p>
+        </div>
+      )}
+      <List label="Related phrases" items={explanation.relatedPhrases ?? []} />
       <p className="mt-1.5 text-[10px] text-slate-400">
         {explanation.provider}
         {explanation.model ? ` · ${explanation.model}` : ''}

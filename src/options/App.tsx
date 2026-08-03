@@ -1,7 +1,8 @@
 import { useSettings } from '@/shared/hooks/useSettings';
+import { ProviderSettings } from '@/features/settings/ProviderSettings';
+import { BilingualSettings } from '@/features/settings/BilingualSettings';
 import { AppearanceSettings } from '@/features/settings/AppearanceSettings';
 import { DataSettings } from '@/features/settings/DataSettings';
-import { ProviderSettings } from '@/features/settings/ProviderSettings';
 import { Spinner } from '@/shared/ui/Spinner';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { SettingsIcon } from '@/shared/ui/Icons';
@@ -31,6 +32,7 @@ function SettingsScreen() {
       ) : (
         <>
           <ProviderSettings settings={settings} onChange={update} />
+          <BilingualSettings settings={settings} onChange={update} />
           <AppearanceSettings settings={settings} onChange={update} />
           <DataSettings notify={notify} />
         </>

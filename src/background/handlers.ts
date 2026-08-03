@@ -98,7 +98,16 @@ export async function explainWord(
   pageTitle?: string,
   precedingText?: string,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context, kind, pageTitle, precedingText });
+  const settings = await deps.settings.get();
+  const explanation = await deps.explain.explain({
+    word,
+    context,
+    kind,
+    pageTitle,
+    precedingText,
+    language: settings.targetLanguage || 'English',
+    promptTemplate: settings.explainPromptTemplate,
+  });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
@@ -121,10 +130,13 @@ export async function saveDifficultWords(
   deps: BackgroundDeps,
   input: DifficultWordsPayload,
 ): Promise<VocabularyEntry[]> {
+  const settings = await deps.settings.get();
   const explanation = await deps.explain.explain({
     word: input.word,
     context: input.context,
     kind: 'vocabulary',
+    language: settings.targetLanguage || 'English',
+    promptTemplate: settings.explainPromptTemplate,
   });
 
   const entries: VocabularyEntry[] = [];
