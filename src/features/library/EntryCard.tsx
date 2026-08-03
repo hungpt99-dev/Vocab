@@ -7,7 +7,7 @@ import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
 import { Badge } from '@/shared/ui/Badge';
 import { Dialog } from '@/shared/ui/Dialog';
-import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon } from '@/shared/ui/Icons';
+import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from './ExplanationView';
 
 export interface EntryCardProps {
@@ -124,6 +124,7 @@ export function EntryCard({
 
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" variant="secondary" disabled={explaining} onClick={() => void onExplain(entry)}>
+              <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
               {entry.explanation ? 'Refresh explanation' : 'AI explain'}
             </Button>
             {entry.sourceUrl && (

@@ -1,4 +1,4 @@
-import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload } from 'lucide-react';
+import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload, Languages } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 /**
@@ -35,5 +35,6 @@ export const AlertIcon = build(AlertCircle);
 export const CheckIcon = build(CheckCircle2);
 export const BookIcon = build(BookOpen);
 export const SparklesIcon = build(Sparkles);
+export const LanguagesIcon = build(Languages);
 export const DownloadIcon = build(Download);
 export const UploadIcon = build(Upload);

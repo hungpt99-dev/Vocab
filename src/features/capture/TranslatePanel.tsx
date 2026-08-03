@@ -4,6 +4,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
+import { LanguagesIcon } from '@/shared/ui/Icons';
 
 export interface TranslatePanelProps {
   selection: SelectionPayload | null;
@@ -38,6 +39,7 @@ export function TranslatePanel({ selection }: TranslatePanelProps) {
     <div className="border-b border-slate-200 px-3 py-2 dark:border-slate-700">
       <div className="flex items-center gap-2">
         <Button size="sm" variant="secondary" disabled={translating} onClick={() => void translate()}>
+          <LanguagesIcon size={14} className="mr-1.5" aria-hidden="true" />
           {translating ? 'Translating…' : 'Translate selection'}
         </Button>
         {error && (
