@@ -7,6 +7,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
+- **Bilingual reading mode.** A keyboard shortcut (`Alt+Shift+R`) or the selection toolbar's
+  "Translate" action opens an article overlay that translates the page paragraph by paragraph into
+  the configured target language, preserving heading structure. Five layouts are supported:
+  side-by-side, original-first, translation-first, hover (translation revealed on hover/focus) and a
+  global original/translation toggle.
+- **Structured paragraph translation.** `TranslateService` is the single application entry point:
+  it resolves the configured provider, translates in bounded chunks (8 paragraphs per request),
+  applies caching, rate-limiting, retry/backoff and optional fallback, and returns results keyed by
+  the caller's paragraph ids. Providers expose a `translate()` capability alongside `explain()`.
+- **Lazy loading + caching.** Translations are fetched chunk by chunk as the reader scrolls into each
+  section (`IntersectionObserver`), with a "Translate all" control and a per-section retry on
+  failure. Translated paragraphs are cached for the session.
+- **Reading controls.** Font size (A−/A+), layout selector and a vocabulary-highlight toggle persist
+  to `chrome.storage.local` (`avs:reading`) and apply to open readers immediately.
+- **Vocabulary integration.** Saved words are highlighted inside the reader using the same matcher
+  and hover card as the rest of the extension.
+- **Accessibility.** The reader is a focus-managed `role="dialog"` (modal), closes on `Escape`,
+  restores focus on close, exposes ARIA labels on every control, and the translated column carries a
+  `lang` hint when the target language maps to a BCP-47 tag.
+
+### Changed
+
+- All providers (OpenAI-compatible presets, Gemini, Anthropic) now implement a `translate()`
+  capability sharing the same prompt and tolerant JSON parser.
+- Explanations and translations share one rate limiter and one retry-once-fallback helper
+  (`run-with-fallback.ts`), removing duplicated logic between the two services.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

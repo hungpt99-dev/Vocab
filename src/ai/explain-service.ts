@@ -2,17 +2,11 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
 import { getProvider } from './registry';
+import { runActiveWithFallback } from './run-with-fallback';
 import type { ExplainRequest } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
-import { createRateLimiter, type RateLimiter } from './rate-limiter';
-
-/**
- * AI calls share a single rate limiter so concurrent requests (e.g. several
- * auto-explain saves at once) do not burst the provider. Defaults to at most
- * 5 requests per 10 seconds — friendly to local models and free tiers alike.
- */
-const rateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+import { sharedRateLimiter } from './rate-limiter';
 
 const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
 
@@ -70,7 +64,7 @@ export class ExplainService {
     signal?: AbortSignal,
   ): Promise<Explanation> {
     const adapter = getProvider(provider.type);
-    await rateLimiter.acquire(signal);
+    await sharedRateLimiter.acquire(signal);
     return withRetry(
       () =>
         adapter.explain(request, {
@@ -92,17 +86,11 @@ export class ExplainService {
     request: ExplainRequest,
     signal?: AbortSignal,
   ): Promise<Explanation> {
-    try {
-      return await this.runOnce(active, request, signal);
-    } catch (primaryError) {
-      if (!fallback) throw primaryError;
-      // Only fall back on transient/retryable failures, never on a hard config error.
-      const code = primaryError instanceof AiError ? primaryError.code : 'unknown';
-      if (code === 'missing_api_key' || code === 'unauthorized' || code === 'bad_response') {
-        throw primaryError;
-      }
-      return this.runOnce(fallback, request, signal);
-    }
+    return runActiveWithFallback(
+      (provider) => this.runOnce(provider, request, signal),
+      active,
+      fallback,
+    );
   }
 
   private cacheKey(provider: SavedProvider, request: ExplainRequest): string {

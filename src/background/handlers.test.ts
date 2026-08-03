@@ -11,6 +11,7 @@ import { createDatabase } from '@/storage/database';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
+import { TranslateService } from '@/ai/translate-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -47,6 +48,9 @@ beforeEach(async () => {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),
     }) as unknown as ExplainService,
+    translate: Object.assign(new TranslateService(settings), {
+      translate: vi.fn(async () => [{ id: 'p1', text: 'Hello', translation: 'Hola' }]),
+    }) as unknown as TranslateService,
   };
 });
 
@@ -185,5 +189,24 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('handles translate-article through the translate service', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      {
+        type: 'translate-article',
+        payload: { language: 'Spanish', paragraphs: [{ id: 'p1', text: 'Hello' }] },
+      },
+      sender,
+    );
+    expect(result).toEqual({
+      ok: true,
+      data: [{ id: 'p1', text: 'Hello', translation: 'Hola' }],
+    });
+    expect(deps.translate.translate).toHaveBeenCalledWith(
+      [{ id: 'p1', text: 'Hello' }],
+      'Spanish',
+    );
   });
 });

@@ -9,6 +9,23 @@ export interface ExplainRequest {
   language?: string;
 }
 
+export interface TranslateParagraph {
+  text: string;
+}
+
+/** One paragraph of an article to be translated. */
+export interface TranslateRequest {
+  paragraphs: readonly TranslateParagraph[];
+  /** Target language for the translation, e.g. "Chinese". */
+  language: string;
+}
+
+/** Result of a structured paragraph translation. */
+export interface TranslateResult {
+  /** One translation per input paragraph, in the same order. */
+  paragraphs: Array<{ text: string; translation: string }>;
+}
+
 export interface ProviderConfig {
   apiKey: string;
   model: string;
@@ -30,6 +47,8 @@ export interface AiProvider {
   /** Whether this provider requires an API key (local runtimes do not). */
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
+  /** Translate a batch of article paragraphs, preserving their order. */
+  translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult>;
 }
 
 export type AiErrorCode =

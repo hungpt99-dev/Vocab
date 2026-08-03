@@ -23,9 +23,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.commands.onCommand.addListener((command) => {
-  if (command !== 'save-selection') return;
-  void handleCapture();
+  if (command === 'save-selection') {
+    void handleCapture();
+    return;
+  }
+  if (command === 'toggle-bilingual-reading') {
+    void toggleBilingualReading();
+  }
 });
+
+/** Ask the active tab's content script to open or close bilingual reading. */
+async function toggleBilingualReading(): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (typeof tab?.id !== 'number') return;
+  await sendToTab(tab.id, { type: 'toggle-bilingual-reading' });
+}
 
 /**
  * Save a selection captured from the context menu or a keyboard shortcut.

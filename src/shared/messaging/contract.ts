@@ -8,12 +8,27 @@ export interface SelectionPayload {
   sourceTitle: string;
 }
 
+/** A paragraph the content script asks to be translated. */
+export interface TranslationParagraphPayload {
+  id: string;
+  text: string;
+}
+
+/** A paragraph plus its translation. */
+export interface TranslatedParagraphPayload {
+  id: string;
+  text: string;
+  translation: string;
+}
+
 export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
   | { type: 'explain'; payload: { word: string; context?: string } }
   | { type: 'get-highlight-data' }
+  | { type: 'translate-article'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
+  | { type: 'toggle-bilingual-reading' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } };
@@ -35,6 +50,8 @@ export interface ResponseMap {
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
   'get-highlight-data': HighlightData;
+  'translate-article': TranslatedParagraphPayload[];
+  'toggle-bilingual-reading': void;
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;

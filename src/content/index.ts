@@ -9,11 +9,13 @@ import { readSelection } from './selection';
 import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
+import { BilingualReader } from './reading/reader';
 
 const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const reader = new BilingualReader();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -23,6 +25,7 @@ registerMessageHandlers({
   'get-selection': () => readSelection(),
   'vocabulary-changed': () => void refresh(),
   'settings-changed': () => void refresh(),
+  'toggle-bilingual-reading': () => void reader.toggle(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
 });
 
@@ -94,8 +97,14 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       toolbar.hide();
       return;
     }
+    case 'translate': {
+      toolbar.hide();
+      const opened = await reader.toggle();
+      if (!opened) showToast('No article content found on this page.', 'error');
+      return;
+    }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // explain / save / more are wired in later issues (VOC-44..48).
       // For now surface what was requested so the toolbar is demonstrably live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
@@ -125,6 +134,7 @@ async function refresh(): Promise<void> {
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
+  reader.updateVocabulary(matcher);
 
   removeHighlights();
   if (!data.enabled || matcher.size === 0) {
@@ -165,7 +175,7 @@ function stopObserving(): void {
   observer = null;
 }
 
-/** Ignore mutations caused by our own highlight, card and toast nodes. */
+/** Ignore mutations caused by our own highlight, card, reader and toast nodes. */
 function isOwnNode(node: Node): boolean {
   if (node.nodeType !== Node.ELEMENT_NODE) return false;
   const element = node as Element;
@@ -173,7 +183,8 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.closest('.avs-reader') !== null
   );
 }
 

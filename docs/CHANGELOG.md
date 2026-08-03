@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Bilingual reading mode**: open an article overlay (toolbar "Translate" action or `Alt+Shift+R`)
+  that translates the page paragraph by paragraph into the configured target language. Five layouts
+  (side-by-side, original-first, translation-first, hover, toggle), font-size controls and a
+  vocabulary-highlight toggle that persist to `chrome.storage.local`. Translations are fetched chunk
+  by chunk as you scroll, cached per session, with "Translate all" and per-section retry.
+- Providers gained a structured `translate()` capability; `TranslateService` is the single entry
+  point for paragraph translation (bounded chunks, cache, rate-limit, retry, fallback), mirroring
+  `ExplainService`.
 - AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
 - New runtime dependency `react-window` (virtualized lists) with `@types/react-window`.
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,
