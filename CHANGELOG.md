@@ -63,6 +63,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Prompts moved into `src/ai/prompts/` (e.g. `explain-word.prompt.ts`) and are imported by the adapters.
 - AI error messages are user-facing and never include the API key; the 300-character provider-text
   cap and header masking keep credentials out of logs and surfaces.
+- **Accessibility polish pass.** Every interactive control in the popup and options pages now shows
+  a visible focus ring when reached by keyboard — including the toast dismiss button, the tag input
+  and the reading-experience sliders. The popup's empty library state uses the same book icon as the
+  rest of the library instead of a settings gear.
 
 ## [0.1.0] — 2026-08-02
 

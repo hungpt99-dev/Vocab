@@ -8,6 +8,16 @@ import { TagInput } from './TagInput';
 import { TextField } from './TextField';
 import { EmptyState } from './EmptyState';
 import { Spinner } from './Spinner';
+import { ToastProvider, useToast } from './Toast';
+
+function ToastDemo() {
+  const { notify } = useToast();
+  return (
+    <button type="button" onClick={() => notify('Saved.', 'success')}>
+      Notify
+    </button>
+  );
+}
 
 describe('Button', () => {
   it('renders and fires onClick', async () => {
@@ -136,5 +146,21 @@ describe('EmptyState / Spinner', () => {
   it('exposes a live status', () => {
     render(<Spinner label="Loading" />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  });
+});
+
+describe('Toast', () => {
+  it('announces a notification and dismisses it via its labelled button', async () => {
+    render(
+      <ToastProvider>
+        <ToastDemo />
+      </ToastProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Notify' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Saved.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

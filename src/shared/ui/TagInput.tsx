@@ -35,7 +35,7 @@ export function TagInput({ label, tags, onChange }: TagInputProps) {
       <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-300">
         {label}
       </label>
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-800 focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600 focus-within:ring-offset-1 dark:focus-within:ring-offset-slate-900">
         {tags.map((tag) => (
           <span
             key={tag}

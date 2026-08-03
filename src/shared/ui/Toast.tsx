@@ -63,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               aria-label="Dismiss notification"
               onClick={() => dismiss(toast.id)}
-              className="shrink-0 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="shrink-0 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900"
             >
               <XIcon size={14} />
             </button>
