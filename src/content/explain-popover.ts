@@ -3,6 +3,7 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import { detectLanguage } from '@/shared/lib/text';
 import { computePosition } from './hover-card';
 import type { SelectionUnit } from './toolbar';
+import { ICON_CLOSE } from './icons';
 
 const POPOVER_ID = 'avs-explain';
 
@@ -23,12 +24,6 @@ export interface ExplainPopoverInput {
   /** Source page title. */
   sourceTitle: string;
 }
-
-/* Lucide close icon (24x24, stroke-based) inlined as SVG, matching the toolbar. */
-const ICON_CLOSE =
-  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
-  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
 /** Map a toolbar classification to the units the explainer supports. */
 export function toExplainUnit(unit: SelectionUnit): ExplainUnit {
