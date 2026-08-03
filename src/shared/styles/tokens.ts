@@ -69,6 +69,14 @@ export const color = {
   overlaySurfaceAltLight: slate[200],
   overlayTextLight: slate[800],
   overlayMutedLight: slate[400],
+  /** Reading-mode page surface: a light paper background with dark text. */
+  readingSurface: slate[50],
+  /** Reading-mode header bar. */
+  readingHeader: brand[50],
+  /** Reading-mode article text. */
+  readingText: slate[900],
+  /** Reading-mode labels and translations. */
+  readingMuted: slate[400],
 } as const;
 
 /** Tailwind utility strings for semantic status colours (light + dark). */
@@ -132,6 +140,8 @@ export const typography = {
   overlayBody: `${reading.fontSize}px/${reading.spacing}`,
   overlayCompact: '13px/1.4',
   overlayLabel: '11px',
+  readingBody: '15px/1.6',
+  readingHeading: '17px/1.5',
 } as const;
 
 export const motion = {
@@ -149,6 +159,8 @@ export const zIndex = {
 
 export const layout = {
   overlayMaxWidth: `${reading.width}px`,
+  /** Comfortable measure for the reading-mode text column. */
+  readingMaxWidth: '720px',
   /** Narrowest supported popup width, asserted by an E2E test. */
   popupMinWidth: '320px',
   popupWidth: '384px',

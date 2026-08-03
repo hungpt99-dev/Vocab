@@ -262,11 +262,273 @@ export function injectStyles(doc: Document = document): void {
       color: ${color.overlayMuted};
       font-size: ${typography.overlayLabel};
     }
+    .avs-explain {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      max-width: ${layout.overlayMaxWidth};
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-explain[hidden] { display: none; }
+    .avs-explain-header {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.sm};
+      margin-bottom: ${spacing.xs};
+    }
+    .avs-explain-title {
+      flex: 1;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .avs-explain-unit {
+      flex: none;
+      padding: 1px ${spacing.sm};
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-explain-close {
+      flex: none;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayMuted};
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .avs-explain-close:hover,
+    .avs-explain-close:focus-visible {
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      outline: none;
+    }
+    .avs-explain-hint {
+      margin: 0 0 ${spacing.md};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+    }
+    .avs-explain-btn {
+      display: inline-block;
+      margin-top: ${spacing.sm};
+      padding: ${spacing.xs} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+    }
+    .avs-explain-btn:hover { background: ${color.overlaySurface}; }
+    .avs-explain-btn:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-explain-status {
+      margin: ${spacing.sm} 0 0;
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+    }
+    .avs-explain-section {
+      margin-top: ${spacing.md};
+      padding: ${spacing.sm} ${spacing.md};
+      border: 1px solid ${color.overlaySurfaceAlt};
+      border-radius: ${radius.md};
+    }
+    .avs-explain-section[open] { background: ${color.overlaySurfaceAlt}; }
+    .avs-explain-section-summary {
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      user-select: none;
+    }
+    .avs-explain-section-summary:hover,
+    .avs-explain-section-summary:focus-visible {
+      color: ${color.overlayText};
+      outline: none;
+    }
+    .avs-explain-value {
+      margin: ${spacing.xs} 0 0;
+      overflow-wrap: anywhere;
+    }
+    .avs-explain-list {
+      margin: ${spacing.xs} 0 0;
+      padding-left: ${spacing.lg};
+    }
+    .avs-explain-item { margin-top: ${spacing.xs}; }
+    .avs-explain-meta {
+      margin: ${spacing.md} 0 0;
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+    }
+    .avs-explain-error {
+      margin: ${spacing.md} 0 0;
+      color: ${color.status.danger};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+    }
+    .avs-reading-mode {
+      position: fixed;
+      inset: 0;
+      z-index: ${zIndex.overlay};
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      background: ${color.readingSurface};
+      color: ${color.readingText};
+      font: ${typography.readingBody} ${typography.systemStack};
+    }
+    .avs-reading-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${spacing.lg};
+      padding: ${spacing.md} ${spacing.xl};
+      background: ${color.readingHeader};
+      border-bottom: 1px solid ${color.readingMuted};
+    }
+    .avs-reading-title {
+      margin: 0;
+      font: ${typography.readingHeading} ${typography.systemStack};
+      overflow-wrap: anywhere;
+    }
+    .avs-reading-controls {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.md};
+      flex: none;
+    }
+    .avs-reading-label {
+      color: ${color.readingMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-reading-layout {
+      padding: ${spacing.xs} ${spacing.md};
+      border: 1px solid ${color.readingMuted};
+      border-radius: ${radius.sm};
+      background: ${color.readingSurface};
+      color: ${color.readingText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+    }
+    .avs-reading-layout:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-reading-toggle {
+      padding: ${spacing.xs} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.brand[600]};
+      color: ${color.readingSurface};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      cursor: pointer;
+    }
+    .avs-reading-toggle:hover { background: ${color.brand[700]}; }
+    .avs-reading-toggle:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-reading-close {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.readingMuted};
+      cursor: pointer;
+    }
+    .avs-reading-close:hover,
+    .avs-reading-close:focus-visible {
+      background: ${color.readingHeader};
+      color: ${color.readingText};
+      outline: none;
+    }
+    .avs-reading-status {
+      padding: ${spacing.sm} ${spacing.xl};
+      background: ${color.status.warningBg};
+      color: ${color.status.warning};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+    }
+    .avs-reading-status[hidden] { display: none; }
+    .avs-reading-scroll {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .avs-reading-blocks {
+      max-width: ${layout.readingMaxWidth};
+      margin: 0 auto;
+      padding: ${spacing.xl};
+    }
+    .avs-reading-block {
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.xs};
+      padding: ${spacing.md} 0;
+      border-bottom: 1px solid ${color.readingMuted};
+    }
+    .avs-reading-block:last-child { border-bottom: 0; }
+    .avs-reading-block[data-kind='heading'] .avs-reading-original {
+      font: ${typography.readingHeading} ${typography.systemStack};
+    }
+    .avs-reading-translation {
+      color: ${color.readingMuted};
+    }
+    .avs-reading-translation[data-status='pending'] { font-style: italic; }
+    .avs-reading-translation[data-status='error'] {
+      color: ${color.status.danger};
+      font-style: italic;
+    }
+    .avs-reading-blocks[data-layout='side-by-side'] .avs-reading-block {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: ${spacing.xl};
+    }
+    .avs-reading-blocks[data-layout='translation-first'] .avs-reading-block {
+      flex-direction: column-reverse;
+    }
+    .avs-reading-blocks[data-layout='hover-translation'] .avs-reading-translation,
+    .avs-reading-blocks[data-layout='toggle-translation']:not([data-show-translation='true']) .avs-reading-translation {
+      display: none;
+    }
+    .avs-reading-blocks[data-layout='hover-translation'] .avs-reading-block:hover .avs-reading-translation,
+    .avs-reading-blocks[data-layout='hover-translation'] .avs-reading-original:focus-visible + .avs-reading-translation,
+    .avs-reading-blocks[data-layout='toggle-translation'][data-show-translation='true'] .avs-reading-translation {
+      display: block;
+    }
+    @media (max-width: ${layout.readingMaxWidth}) {
+      .avs-reading-blocks[data-layout='side-by-side'] .avs-reading-block {
+        grid-template-columns: 1fr;
+        gap: ${spacing.xs};
+      }
+      .avs-reading-header {
+        flex-wrap: wrap;
+      }
+    }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-assist-menu { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-panel { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-explain { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-reading-mode { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;
