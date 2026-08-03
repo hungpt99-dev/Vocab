@@ -10,6 +10,7 @@ import {
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
+import { TranslateService } from '@/ai/translate-service';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
@@ -49,6 +50,9 @@ beforeEach(async () => {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),
     }) as unknown as ExplainService,
+    translate: {
+      translate: vi.fn(async () => []),
+    } as unknown as TranslateService,
   };
 });
 
@@ -244,6 +248,7 @@ describe('saveDifficultWords', () => {
       context: 'Serendipity is ephemeral.',
       sourceUrl: 'https://example.com',
       sourceTitle: 'Example',
+      sourceLanguage: '',
     });
 
     expect(entries).toHaveLength(2);
@@ -260,6 +265,7 @@ describe('saveDifficultWords', () => {
       context: 'Nothing hard here.',
       sourceUrl: 'https://example.com',
       sourceTitle: 'Example',
+      sourceLanguage: '',
     });
 
     expect(deps.explain.explain).toHaveBeenCalledWith({
@@ -281,6 +287,7 @@ describe('saveDifficultWords', () => {
       word: 'The cake.',
       sourceUrl: 'https://example.com',
       sourceTitle: 'Example',
+      sourceLanguage: '',
     });
 
     expect(entries).toHaveLength(1);

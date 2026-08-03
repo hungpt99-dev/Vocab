@@ -18,9 +18,9 @@ export interface ToolbarState {
   /** Non-collapsed selected text, whitespace-collapsed. */
   text: string;
   /** Surrounding sentence of the selection, used as explain context. */
-  sentence: string;
-  sourceUrl: string;
-  sourceTitle: string;
+  sentence?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
   /** Detected selection unit. */
   unit: SelectionUnit;
   /** Bounding rect of the selection range, viewport-relative. */

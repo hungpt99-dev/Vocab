@@ -5,8 +5,8 @@ import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
 import {
-  TranslationService,
-  translationService as defaultTranslationService,
+  TranslateService,
+  translateService as defaultTranslationService,
 } from '@/ai/translate-service';
 import {
   SettingsRepository,
@@ -21,7 +21,7 @@ export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
   explain: ExplainService;
-  translate: TranslationService;
+  translate: TranslateService;
 }
 
 export const defaultDeps: BackgroundDeps = {
@@ -192,6 +192,25 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       ),
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     translate: (message) => translateUnit(deps, message.payload),
+    'translate-blocks': async (message) => {
+      const settings = await deps.settings.get();
+      const language = settings.targetLanguage || 'English';
+      const paragraphs = message.payload.blocks.map((text, index) => ({ id: String(index), text }));
+      const results = await deps.translate.translate(paragraphs, language);
+      const byId = new Map(results.map((result) => [result.id, result.translation]));
+      return paragraphs.map((paragraph) => byId.get(paragraph.id) ?? null);
+    },
+    'translate-article': async (message) => {
+      const results = await deps.translate.translate(message.payload.paragraphs, message.payload.language);
+      return results.map((result) => ({
+        id: result.id,
+        text: result.text,
+        translation: result.translation,
+      }));
+    },
+    'open-options': () => {
+      void chrome.runtime.openOptionsPage();
+    },
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

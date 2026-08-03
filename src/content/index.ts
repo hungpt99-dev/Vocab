@@ -203,8 +203,9 @@ async function saveDifficultWords(state: ToolbarState): Promise<void> {
       payload: {
         word: state.text,
         context: state.sentence || undefined,
-        sourceUrl: state.sourceUrl,
-        sourceTitle: state.sourceTitle,
+        sourceUrl: state.sourceUrl ?? '',
+        sourceTitle: state.sourceTitle ?? '',
+        sourceLanguage: state.selection?.sourceLanguage ?? '',
       },
     });
     showToast(
