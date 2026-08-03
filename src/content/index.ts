@@ -1,6 +1,7 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
+import { aiErrorMessage } from '@/ai/types';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
@@ -174,8 +175,17 @@ async function handleToolbarAction(
       }
       return;
     }
+    case 'explain': {
+      // Real explain flow: ask the AI and show the result panel.
+      toolbar.hide();
+      if (state) {
+        await runExplain('Explain', 'word', state);
+      } else {
+        showToast('Select a word first, then choose Explain.', 'error');
+      }
+      return;
+    }
     default:
-      // Only the explain action is left unwired; surface it so the toolbar is live.
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
   }
@@ -205,7 +215,7 @@ async function runExplain(label: string, kind: ExplainKind, state: ToolbarState)
     });
     explainPanel.show(label, state, explanation);
   } catch (cause) {
-    showToast(cause instanceof Error ? cause.message : 'The AI request failed.', 'error');
+    showToast(aiErrorMessage(cause), 'error');
   }
 }
 

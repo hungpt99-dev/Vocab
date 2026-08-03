@@ -1,6 +1,8 @@
 import type { ExplainRequest, ExplainUnit } from '@/shared/types/explain';
 import type { Explanation } from '@/shared/types/vocabulary';
 import { detectLanguage } from '@/shared/lib/text';
+import { aiErrorMessage } from '@/ai/types';
+import { sendMessage } from '@/shared/messaging/client';
 import { computePosition } from './hover-card';
 import type { SelectionUnit } from './toolbar';
 import { ICON_CLOSE } from './icons';
@@ -227,14 +229,24 @@ export class ExplainPopover {
       );
       popover.append(...sections, meta);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'The AI request failed.';
+      const message = aiErrorMessage(cause);
       const error = element('p', 'avs-explain-error', message);
       error.setAttribute('role', 'alert');
       const retry = buttonElement('avs-explain-btn', 'Try again');
       retry.dataset.action = 'explain';
       retry.setAttribute('aria-label', 'Retry the AI explanation');
       retry.addEventListener('click', () => void this.runExplain());
-      status.replaceWith(error, retry);
+      const actions: HTMLElement[] = [error, retry];
+      // When no provider is configured, offer a direct path to Settings.
+      if (/no ai provider|provider is configured|api key/i.test(message)) {
+        const settings = buttonElement('avs-explain-settings', 'Open Settings');
+        settings.addEventListener('click', () => {
+          void sendMessage({ type: 'open-options' });
+          this.hide();
+        });
+        actions.push(settings);
+      }
+      status.replaceWith(...actions);
     }
   }
 

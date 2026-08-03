@@ -187,3 +187,36 @@ test('popup AI explain with no valid provider shows an actionable toast', async 
   await expect(toast).toBeVisible({ timeout: 15_000 });
   await expect(toast).toHaveText(/Settings|API key|provider/i);
 });
+
+test('on-page explain shows an actionable error (not a dummy toast) with no provider', async ({
+  page,
+  samplePageUrl,
+}) => {
+  await page.goto(samplePageUrl);
+  await page.bringToFront();
+
+  // Select "serendipity" to surface the floating toolbar.
+  await page.evaluate(() => {
+    const paragraph = document.getElementById('para')!;
+    const text = paragraph.firstChild as Text;
+    const start = text.data.indexOf('serendipity');
+    const range = document.createRange();
+    range.setStart(text, start);
+    range.setEnd(text, start + 'serendipity'.length);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+
+  const explainBtn = page.locator('.avs-toolbar [data-action="explain"]');
+  await expect(explainBtn).toBeVisible({ timeout: 10_000 });
+  await explainBtn.click();
+
+  // The explain action must surface a real, actionable error (API key / provider),
+  // never the old dummy "explain: <word>" toast.
+  const toast = page.locator('[role="status"]').last();
+  await expect(toast).toBeVisible({ timeout: 15_000 });
+  await expect(toast).toHaveText(/API key|provider|Settings/i);
+  await expect(toast).not.toHaveText(/^explain: /);
+});
