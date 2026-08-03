@@ -71,6 +71,44 @@ test('save-current-selection captures highlighted text from the page', async ({
   await expect(popup.getByRole('listitem').filter({ hasText: 'serendipity' })).toBeVisible();
 });
 
+test('popup reads the active page selection through the background', async ({
+  page,
+  context,
+  extensionId,
+  samplePageUrl,
+}) => {
+  await page.goto(samplePageUrl);
+
+  // Select "serendipity" in the first paragraph.
+  await page.evaluate(() => {
+    const paragraph = document.getElementById('para')!;
+    const text = paragraph.firstChild as Text;
+    const start = text.data.indexOf('serendipity');
+    const range = document.createRange();
+    range.setStart(text, start);
+    range.setEnd(text, start + 'serendipity'.length);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.bringToFront();
+
+  // The popup is opened as a tab, so it would become the active tab; bring the
+  // sample page back to front so the background reads the page selection. The
+  // popup then sends the same get-selection request its mount effect uses.
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+  await page.bringToFront();
+
+  const result = await popup.evaluate(
+    () =>
+      new Promise<unknown>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'get-selection' }, resolve);
+      }),
+  );
+  expect(result).toMatchObject({ ok: true, data: { word: 'serendipity' } });
+});
+
 test('saving through the worker shows a toast on the page', async ({
   page,
   serviceWorker,

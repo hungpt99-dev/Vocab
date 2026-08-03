@@ -168,6 +168,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
+    'get-selection': () => readActiveSelection(),
     'save-current-selection': async () => {
       const selection = await readActiveSelection();
       if (!selection?.word.trim()) return null;

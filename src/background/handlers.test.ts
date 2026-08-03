@@ -340,6 +340,32 @@ describe('createHandlers', () => {
     expect(result).toMatchObject({ ok: true, data: { enabled: true } });
   });
 
+  it('handles get-selection by reading the active tab', async () => {
+    chromeMock().tabs.sendMessage.mockResolvedValue({
+      ok: true,
+      data: {
+        word: 'serendipity',
+        sentence: 'Pure serendipity struck.',
+        precedingText: 'Everyone noticed',
+        sourceUrl: 'https://x',
+        sourceTitle: 'X',
+      },
+    });
+
+    const result = await dispatch(createHandlers(deps), { type: 'get-selection' }, sender);
+    expect(result).toMatchObject({
+      ok: true,
+      data: { word: 'serendipity', sentence: 'Pure serendipity struck.' },
+    });
+  });
+
+  it('returns null from get-selection when no content script is present', async () => {
+    chromeMock().tabs.sendMessage.mockRejectedValue(new Error('no receiver'));
+
+    const result = await dispatch(createHandlers(deps), { type: 'get-selection' }, sender);
+    expect(result).toEqual({ ok: true, data: null });
+  });
+
   it('handles explain', async () => {
     const result = await dispatch(
       createHandlers(deps),
