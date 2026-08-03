@@ -45,6 +45,40 @@ test('popup is fully keyboard navigable', async ({ page, extensionId }) => {
   expect(unnamed).toEqual([]);
 });
 
+test('every keyboard-focused popup control shows a visible focus ring', async ({ page, extensionId }) => {
+  await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+
+  // A ring may be drawn on the focused element or an ancestor (e.g. the tag
+  // input highlights its whole container), so walk up until we find one.
+  const describeFocus = (): Promise<{ name: string; ring: boolean } | null> =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return null;
+      let node: HTMLElement | null = el;
+      while (node && node !== document.body) {
+        const style = getComputedStyle(node);
+        if (style.boxShadow !== 'none' || style.outlineStyle !== 'none') {
+          const name =
+            el.getAttribute('aria-label') ?? el.textContent ?? el.getAttribute('placeholder') ?? '';
+          return { name: name.trim().slice(0, 40) || el.tagName, ring: true };
+        }
+        node = node.parentElement;
+      }
+      return { name: el.tagName, ring: false };
+    });
+
+  // The word field autofocuses; check it, then Tab through every control until
+  // focus leaves the document.
+  let state = await describeFocus();
+  expect(state?.ring ?? true).toBe(true);
+  for (let i = 0; i < 60; i += 1) {
+    await page.keyboard.press('Tab');
+    state = await describeFocus();
+    if (!state) break;
+    expect(state.ring, `visible focus ring on “${state.name}”`).toBe(true);
+  }
+});
+
 test('options page exposes labelled sections and controls', async ({ page, extensionId }) => {
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
 

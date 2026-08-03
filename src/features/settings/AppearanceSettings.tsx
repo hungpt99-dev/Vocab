@@ -37,7 +37,7 @@ function RangeSetting({ label, value, min, max, step, display, onChange }: Range
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-brand-600"
+        className="w-full accent-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900"
       />
     </div>
   );

@@ -6,7 +6,7 @@ import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { Button } from '@/shared/ui/Button';
-import { SettingsIcon } from '@/shared/ui/Icons';
+import { BookIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
@@ -110,7 +110,7 @@ function LibraryScreen() {
         <SkeletonList rows={4} />
       ) : entries.length === 0 ? (
         <EmptyState
-          icon={<SettingsIcon size={20} />}
+          icon={<BookIcon size={20} />}
           title={isFiltered ? 'No matches' : 'No words yet'}
           description={
             isFiltered
