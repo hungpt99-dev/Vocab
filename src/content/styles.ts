@@ -383,6 +383,86 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-popover-list { margin: ${spacing.xs} 0 0; padding-left: ${spacing.lg}; }
     .avs-popover-list li { margin-top: ${spacing.xs}; }
+    .avs-explain {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      box-sizing: border-box;
+      width: ${layout.overlayMaxWidth};
+      max-width: calc(100vw - ${spacing.xl} * 2);
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-explain[hidden] { display: none; }
+    .avs-explain-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${spacing.md};
+      margin-bottom: ${spacing.md};
+      padding-bottom: ${spacing.md};
+      border-bottom: 1px solid var(--avs-overlay-divider);
+    }
+    .avs-explain-title { font-weight: 600; }
+    .avs-explain-unit {
+      margin-left: auto;
+      padding: 0 ${spacing.sm};
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface-alt);
+      color: var(--avs-overlay-muted);
+      font-size: ${typography.overlayLabel};
+      text-transform: capitalize;
+    }
+    .avs-explain-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: var(--avs-overlay-muted);
+      cursor: pointer;
+    }
+    .avs-explain-close:hover { background: var(--avs-overlay-surface-alt); color: var(--avs-overlay-text); }
+    .avs-explain-close:active { background: var(--avs-overlay-surface-active); }
+    .avs-explain-close:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 1px; }
+    .avs-explain-hint { margin: 0 0 ${spacing.md}; color: var(--avs-overlay-muted); }
+    .avs-explain-status { margin: 0; color: var(--avs-overlay-muted); }
+    .avs-explain-error { margin: 0 0 ${spacing.sm}; color: ${color.status.danger}; }
+    .avs-explain-btn,
+    .avs-explain-settings {
+      display: inline-block;
+      margin: ${spacing.xs} ${spacing.sm} 0 0;
+      padding: ${spacing.xs} ${spacing.md};
+      border: 1px solid var(--avs-overlay-border);
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-fg);
+      font: inherit;
+      cursor: pointer;
+    }
+    .avs-explain-btn:hover,
+    .avs-explain-settings:hover { background: var(--avs-overlay-surface-active); }
+    .avs-explain-btn:focus-visible,
+    .avs-explain-settings:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 1px; }
+    .avs-explain-section { margin-top: ${spacing.md}; }
+    .avs-explain-section-summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--avs-overlay-text);
+    }
+    .avs-explain-value { margin: ${spacing.xs} 0 0; }
+    .avs-explain-list { margin: ${spacing.xs} 0 0; padding-left: ${spacing.lg}; }
+    .avs-explain-list li { margin-top: ${spacing.xs}; }
+    .avs-explain-meta { margin: ${spacing.md} 0 0; color: var(--avs-overlay-muted); font-size: ${typography.overlayLabel}; }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
