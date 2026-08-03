@@ -33,7 +33,6 @@ export async function handleToolbarAction(
       await saveToVocabulary(deps.hideToolbar);
       return;
     case 'explain':
-    case 'translate':
       await openResultPopover(action, text, deps);
       return;
     case 'more':

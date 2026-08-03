@@ -134,21 +134,6 @@ describe('handleToolbarAction — explain / translate', () => {
     });
   });
 
-  it('routes translate through the bus and opens the popover with the translation', async () => {
-    const { deps } = makeDeps();
-    sendMessageMock().mockResolvedValue({ ok: true, data: '巧合' });
-
-    await handleToolbarAction('translate', 'luck', deps);
-
-    expect(deps.popover.show).toHaveBeenCalledWith(expect.objectContaining({ title: 'Translate' }));
-
-    const options = (deps.popover.show as ReturnType<typeof vi.fn>).mock.calls[0]![0]!;
-    await expect(options.load()).resolves.toEqual({ kind: 'translate', translation: '巧合' });
-    expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({
-      type: 'translate',
-      payload: { text: 'luck' },
-    });
-  });
 
   it('hides the toolbar before opening the popover', async () => {
     const { deps } = makeDeps();

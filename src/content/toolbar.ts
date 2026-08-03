@@ -4,6 +4,17 @@ import type { SelectionPayload } from '@/shared/messaging/contract';
 import { readSelection } from './selection';
 import { computePosition } from './hover-card';
 import { computeMenuPosition } from './more-menu';
+import {
+  ICON_BOOK,
+  ICON_BOOKMARK,
+  ICON_BOOK_OPEN,
+  ICON_COPY,
+  ICON_FILE,
+  ICON_MESSAGE,
+  ICON_MINIMIZE,
+  ICON_MORE,
+  ICON_SPARKLES,
+} from './icons';
 
 const TOOLBAR_ID = 'avs-toolbar';
 const MENU_ID = 'avs-assist-menu';
@@ -30,44 +41,9 @@ export interface ToolbarState {
   selection?: SelectionPayload;
 }
 
-/* Lucide icon paths (24x24, stroke-based) inlined as SVG so the toolbar needs
- * no runtime icon dependency inside the third-party page. */
-const wrap = (paths: string): string =>
-  `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ` +
-  `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-
-const ICON_SPARKLES = wrap(
-  '<path d="M9.94 14.34A2 2 0 0 0 8.66 13.06L3 11l5.66-2.06A2 2 0 0 0 9.94 9.66L12 4l2.06 5.66a2 2 0 0 0 1.28 1.28L21 11l-5.66 2.06a2 2 0 0 0-1.28 1.28L12 20l-2.06-5.66z"/>',
-);
-const ICON_LANGUAGES = wrap(
-  '<path d="m5 8 3-3 3 3"/><path d="M12 19h4l3-3 3 3"/><path d="M5.5 8.5h5"/><path d="M14.5 15.5h5"/>' +
-    '<path d="M3 11c2 1 4 1.5 6 1.5s4-.5 6-1.5"/>',
-);
-const ICON_BOOKMARK = wrap('<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>');
-const ICON_COPY = wrap(
-  '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-);
-const ICON_MORE = wrap('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
-const ICON_BOOK_OPEN = wrap(
-  '<path d="M12 7c-2.5-1.5-6-1.5-8 0v11c2-1.5 5.5-1.5 8 0 2.5-1.5 6-1.5 8 0V7c-2-1.5-5.5-1.5-8 0z"/>' +
-    '<path d="M12 7v11"/>',
-);
-const ICON_MESSAGE = wrap(
-  '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/>',
-);
-const ICON_BOOK = wrap(
-  '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
-);
-const ICON_MINIMIZE = wrap(
-  '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
-);
-const ICON_FILE = wrap(
-  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
-);
 
 const TOOLBAR_ACTIONS = [
   { id: 'explain', label: 'Explain with AI', icon: ICON_SPARKLES },
-  { id: 'translate', label: 'Translate', icon: ICON_LANGUAGES },
   { id: 'save', label: 'Save to Vocabulary', icon: ICON_BOOKMARK },
   { id: 'copy', label: 'Copy', icon: ICON_COPY },
   { id: 'more', label: 'More', icon: ICON_MORE },

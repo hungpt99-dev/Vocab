@@ -110,7 +110,7 @@ describe('computeToolbarPosition', () => {
 });
 
 describe('SelectionToolbar', () => {
-  it('renders five action buttons with aria-labels and emits an action event', () => {
+  it('renders action buttons with aria-labels and emits an action event', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
     toolbarUi.show(makeState('hello', 'phrase'));
@@ -118,7 +118,7 @@ describe('SelectionToolbar', () => {
     const element = document.getElementById('avs-toolbar')!;
     expect(element.hidden).toBe(false);
     expect(element.getAttribute('role')).toBe('toolbar');
-    expect(element.querySelectorAll('.avs-toolbar-btn')).toHaveLength(5);
+    expect(element.querySelectorAll('.avs-toolbar-btn')).toHaveLength(4);
 
     const handler = vi.fn();
     document.addEventListener('avs-toolbar-action', handler);
