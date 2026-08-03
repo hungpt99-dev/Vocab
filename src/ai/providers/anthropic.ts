@@ -1,7 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
-  EXPLAIN_WORD_SYSTEM_PROMPT,
   TRANSLATE_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,

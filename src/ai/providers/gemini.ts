@@ -1,7 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
-  EXPLAIN_WORD_SYSTEM_PROMPT,
   TRANSLATE_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,
@@ -25,7 +24,7 @@ export class GeminiProvider implements AiProvider {
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
     const content = await this.complete(
       config,
-      EXPLAIN_WORD_SYSTEM_PROMPT,
+      buildExplainSystemPrompt(request.kind),
       buildExplainWordUserPrompt(request),
       'application/json',
     );
@@ -62,8 +61,8 @@ export class GeminiProvider implements AiProvider {
       signal: config.signal,
       timeoutMs: config.timeoutMs,
       body: {
-        systemInstruction: { parts: [{ text: buildExplainSystemPrompt(request.kind) }] },
-        contents: [{ role: 'user', parts: [{ text: buildExplainWordUserPrompt(request) }] }],
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
         generationConfig: {
           temperature: config.temperature ?? 0.2,
           ...(config.maxTokens !== undefined && config.maxTokens !== null

@@ -144,12 +144,16 @@ export async function saveDifficultWords(
   if (entries.length > 0) {
     await broadcast({ type: 'vocabulary-changed' });
   }
-  return entries;/** Translate a single page unit (paragraph, heading, list item…) via the AI layer. */
+  return entries;
+}
+
+/** Translate a single page unit (paragraph, heading, list item…) via the AI layer. */
 export async function translateUnit(
   deps: BackgroundDeps,
   payload: { text: string; language?: string },
 ): Promise<string> {
-  return deps.translate.translate({ text: payload.text, language: payload.language });}
+  return deps.translate.translate({ text: payload.text, language: payload.language });
+}
 
 /** Build the handler map used by the service worker's message router. */
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {

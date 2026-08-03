@@ -2,7 +2,6 @@ import type { AiProviderId } from '@/shared/types/settings';
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
-  EXPLAIN_WORD_SYSTEM_PROMPT,
   TRANSLATE_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,
@@ -52,7 +51,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
     const { content, model } = await this.complete(
       config,
-      EXPLAIN_WORD_SYSTEM_PROMPT,
+      buildExplainSystemPrompt(request.kind),
       buildExplainWordUserPrompt(request),
     );
     return toExplanation(content, { provider: this.id, model });
@@ -90,8 +89,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       body: {
         model,
         messages: [
-          { role: 'system', content: buildExplainSystemPrompt(request.kind) },
-          { role: 'user', content: buildExplainWordUserPrompt(request) },
+          { role: 'system', content: system },
+          { role: 'user', content: user },
         ],
         temperature: config.temperature ?? 0.2,
         ...(config.maxTokens !== undefined && config.maxTokens !== null
