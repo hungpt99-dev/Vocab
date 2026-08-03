@@ -36,7 +36,6 @@ export class GeminiProvider implements AiProvider {
       config,
       TRANSLATE_SYSTEM_PROMPT,
       buildTranslateUserPrompt(request),
-      'text/plain',
     );
     return extractTranslation(content);
   }
@@ -46,7 +45,7 @@ export class GeminiProvider implements AiProvider {
     config: ProviderConfig,
     system: string,
     user: string,
-    responseMimeType: string,
+    responseMimeType?: string,
   ): Promise<string> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
