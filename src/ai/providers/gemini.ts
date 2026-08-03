@@ -1,8 +1,15 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import {
+  TRANSLATE_SYSTEM_PROMPT,
+  buildExplainSystemPrompt,
+  buildExplainWordUserPrompt,
+  buildTranslateUserPrompt,
+} from '../prompts';
 import { toExplanation } from '../parse';
-import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
+import { parseTranslations } from '../parse-translation';
+import type { TranslateResult } from '../types';
+import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -17,6 +24,16 @@ export class GeminiProvider implements AiProvider {
   readonly requiresApiKey = true;
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
+    const content = await this.complete(
+      config,
+      buildExplainSystemPrompt(request.kind),
+      buildExplainWordUserPrompt(request),
+      'application/json',
+    );
+    return toExplanation(content, { provider: this.id, model: config.model || this.defaultModel });
+  }
+
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
     }
@@ -30,10 +47,10 @@ export class GeminiProvider implements AiProvider {
       signal: config.signal,
       timeoutMs: config.timeoutMs,
       body: {
-        systemInstruction: { parts: [{ text: EXPLAIN_WORD_SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: buildExplainWordUserPrompt(request) }] }],
+        systemInstruction: { parts: [{ text: TRANSLATE_SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: buildTranslateUserPrompt(request) }] }],
         generationConfig: {
-          temperature: config.temperature ?? 0.2,
+          temperature: config.temperature ?? 0.1,
           ...(config.maxTokens !== undefined && config.maxTokens !== null
             ? { maxOutputTokens: config.maxTokens }
             : {}),
@@ -46,6 +63,51 @@ export class GeminiProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Gemini returned an empty response.');
     }
-    return toExplanation(content, { provider: this.id, model });
+    const translations = parseTranslations(content, request.paragraphs.length);
+    return {
+      paragraphs: request.paragraphs.map((paragraph, index) => ({
+        text: paragraph.text,
+        translation: translations[index] ?? '',
+      })),
+    };
+  }
+
+  /** Post one generateContent call with a system instruction and read the text. */
+  private async complete(
+    config: ProviderConfig,
+    system: string,
+    user: string,
+    responseMimeType?: string,
+  ): Promise<string> {
+    if (!config.apiKey) {
+      throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
+    }
+
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+
+    const data = await postJson<GeminiResponse>({
+      url: joinUrl(baseUrl, `models/${model}:generateContent`),
+      headers: { 'x-goog-api-key': config.apiKey },
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: config.temperature ?? 0.2,
+          ...(config.maxTokens !== undefined && config.maxTokens !== null
+            ? { maxOutputTokens: config.maxTokens }
+            : {}),
+          responseMimeType,
+        },
+      },
+    });
+
+    const content = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('');
+    if (!content) {
+      throw new AiError('bad_response', 'Gemini returned an empty response.');
+    }
+    return content;
   }
 }

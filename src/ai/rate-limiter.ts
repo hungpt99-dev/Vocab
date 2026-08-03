@@ -27,6 +27,14 @@ interface Bucket {
   nextRefill: number;
 }
 
+/**
+ * The single rate limiter shared by every AI capability (explanations and
+ * translations), so concurrent requests across features do not burst a provider.
+ * Defaults to at most 5 requests per 10 seconds — friendly to local models and
+ * free tiers alike.
+ */
+export const sharedRateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
+
 export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
   const now = options.now ?? Date.now;
   const bucket: Bucket = { tokens: options.maxRequests, nextRefill: now() };
@@ -89,3 +97,10 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
     },
   };
 }
+
+/**
+ * One rate limiter shared by every AI capability (explanations and reading-mode
+ * translations) so concurrent requests do not burst the provider. Defaults to at
+ * most 5 requests per 10 seconds — friendly to local models and free tiers.
+ */
+export const aiRateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });

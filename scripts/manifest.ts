@@ -29,6 +29,10 @@ export function buildManifest(): Record<string, unknown> {
         suggested_key: { default: 'Ctrl+Shift+S', mac: 'Command+Shift+S' },
         description: 'Save the selected word to your vocabulary',
       },
+      'toggle-bilingual-reading': {
+        suggested_key: { default: 'Alt+Shift+R', mac: 'Alt+Shift+R' },
+        description: 'Toggle bilingual reading mode',
+      },
       _execute_action: {
         suggested_key: { default: 'Ctrl+Shift+E', mac: 'Command+Shift+E' },
       },

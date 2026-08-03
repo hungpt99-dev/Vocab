@@ -1,8 +1,13 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
-import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
+import type { DifficultWordsPayload, HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
+import {
+  TranslationService,
+  translationService as defaultTranslationService,
+} from '@/ai/translate-service';
 import {
   SettingsRepository,
   settingsRepository as defaultSettingsRepository,
@@ -16,12 +21,14 @@ export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
   explain: ExplainService;
+  translate: TranslationService;
 }
 
 export const defaultDeps: BackgroundDeps = {
   vocabulary: defaultVocabularyRepository,
   settings: defaultSettingsRepository,
   explain: defaultExplainService,
+  translate: defaultTranslationService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -41,6 +48,7 @@ export async function saveSelection(
     sentence: selection.sentence,
     sourceUrl: selection.sourceUrl,
     sourceTitle: selection.sourceTitle,
+    sourceLanguage: selection.sourceLanguage,
   });
 
   const settings = await deps.settings.get();
@@ -49,6 +57,8 @@ export async function saveSelection(
       const explanation = await deps.explain.explainWith(settings, {
         word: entry.word,
         context: entry.sentence,
+        pageTitle: selection.sourceTitle,
+        precedingText: selection.precedingText,
       });
       return await deps.vocabulary.update(entry.id, { explanation });
     } catch {
@@ -67,6 +77,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
   return {
     enabled: settings.highlightEnabled,
     color: settings.highlightColor,
+    readingExperience: settings.readingExperience,
     entries: entries.map((entry) => ({
       id: entry.id,
       word: entry.word,
@@ -74,6 +85,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
       note: entry.note,
       createdAt: entry.createdAt,
       meaning: entry.explanation?.meaning ?? '',
+      pronunciation: entry.explanation?.pronunciation ?? '',
     })),
   };
 }
@@ -82,14 +94,70 @@ export async function explainWord(
   deps: BackgroundDeps,
   word: string,
   context?: string,
+  kind?: ExplainKind,
+  pageTitle?: string,
+  precedingText?: string,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context });
+  const explanation = await deps.explain.explain({ word, context, kind, pageTitle, precedingText });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
     await broadcast({ type: 'vocabulary-changed' });
   }
   return explanation;
+}
+
+/** Split a "term: brief meaning" item into its word and meaning halves. */
+export function splitVocabularyTerm(item: string): { word: string; meaning: string } {
+  const [word = '', ...rest] = item.split(/\s*[—–:]\s*/u);
+  return { word: word.trim(), meaning: rest.join(': ').trim() };
+}
+
+/**
+ * Extract the difficult words from a selection via the AI, then persist each
+ * as a vocabulary entry. Returns the entries that were saved (new or merged).
+ */
+export async function saveDifficultWords(
+  deps: BackgroundDeps,
+  input: DifficultWordsPayload,
+): Promise<VocabularyEntry[]> {
+  const explanation = await deps.explain.explain({
+    word: input.word,
+    context: input.context,
+    kind: 'vocabulary',
+  });
+
+  const entries: VocabularyEntry[] = [];
+  for (const raw of explanation.relatedWords) {
+    const { word, meaning } = splitVocabularyTerm(raw);
+    if (!word.trim()) continue;
+    entries.push(
+      await deps.vocabulary.save({
+        word,
+        sentence: input.context,
+        sourceUrl: input.sourceUrl,
+        sourceTitle: input.sourceTitle,
+        note: meaning,
+      }),
+    );
+  }
+
+  if (entries.length > 0) {
+    await broadcast({ type: 'vocabulary-changed' });
+  }
+  return entries;
+}
+
+/** Translate a single page unit (paragraph, heading, list item…) via the AI layer. */
+export async function translateUnit(
+  deps: BackgroundDeps,
+  payload: { text: string; language?: string },
+): Promise<string> {
+  const results = await deps.translate.translate(
+    [{ id: 'unit', text: payload.text }],
+    payload.language ?? 'English',
+  );
+  return results[0]?.translation ?? '';
 }
 
 /** Build the handler map used by the service worker's message router. */
@@ -107,8 +175,23 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
+    'save-selection': async (message) => {
+      const entry = await saveSelection(deps, message.payload);
+      await broadcast({ type: 'vocabulary-changed' });
+      return entry;
+    },
     'get-highlight-data': () => buildHighlightData(deps),
-    explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    explain: (message) =>
+      explainWord(
+        deps,
+        message.payload.word,
+        message.payload.context,
+        message.payload.kind,
+        message.payload.pageTitle,
+        message.payload.precedingText,
+      ),
+    'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
+    translate: (message) => translateUnit(deps, message.payload),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

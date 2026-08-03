@@ -20,6 +20,20 @@ export function extractJsonObject(raw: string): unknown {
   }
 }
 
+/**
+ * Extract the translated text from a model response that may be wrapped in
+ * markdown fences. Placeholders (`[[n]]`) inside it are passed through intact.
+ */
+export function extractTranslation(raw: string): string {
+  const text = raw.trim();
+  const fenced = text.match(/```(?:[a-z0-9_-]*)?\s*([\s\S]*?)```/i);
+  const translation = (fenced?.[1] ?? text).trim();
+  if (!translation) {
+    throw new AiError('bad_response', 'The AI response was empty.');
+  }
+  return translation;
+}
+
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -54,6 +68,10 @@ export function toExplanation(
     pronunciation: asString(parsed.pronunciation),
     collocations: asStringArray(parsed.collocations),
     grammar: asString(parsed.grammar),
+    partOfSpeech: asString(parsed.partOfSpeech),
+    usage: asString(parsed.usage),
+    summary: asString(parsed.summary),
+    difficultVocabulary: asStringArray(parsed.difficultVocabulary),
     provider: meta.provider,
     model: meta.model,
     generatedAt: Date.now(),

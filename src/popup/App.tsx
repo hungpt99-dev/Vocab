@@ -12,6 +12,7 @@ import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
+import { TranslatePanel } from '@/features/capture/TranslatePanel';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
 
@@ -59,6 +60,7 @@ function LibraryScreen() {
           sentence: selection?.word === word ? selection.sentence : '',
           sourceUrl: selection?.sourceUrl ?? '',
           sourceTitle: selection?.sourceTitle ?? '',
+          sourceLanguage: selection?.sourceLanguage ?? '',
         });
         notify(`Saved “${word}”.`, 'success');
         await reload();
@@ -77,7 +79,7 @@ function LibraryScreen() {
       try {
         const explanation = await sendMessage({
           type: 'explain',
-          payload: { word: entry.word, context: entry.sentence },
+          payload: { word: entry.word, context: entry.sentence, pageTitle: entry.sourceTitle },
         });
         await update(entry.id, { explanation });
       } catch (cause) {
@@ -94,6 +96,7 @@ function LibraryScreen() {
   return (
     <>
       <SaveForm selection={selection} saving={saving} onSave={handleSave} />
+      <TranslatePanel selection={selection} />
 
       {error && (
         <p role="alert" className={`px-3 py-1.5 text-xs ${tints.dangerText}`}>

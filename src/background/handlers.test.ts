@@ -4,7 +4,9 @@ import {
   createHandlers,
   explainWord,
   readActiveSelection,
+  saveDifficultWords,
   saveSelection,
+  splitVocabularyTerm,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -54,7 +56,13 @@ describe('readActiveSelection', () => {
   it('asks the active tab for its selection', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'cake', sentence: 'I like cake.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: {
+        word: 'cake',
+        sentence: 'I like cake.',
+        precedingText: 'Everyone says',
+        sourceUrl: 'https://x',
+        sourceTitle: 'X',
+      },
     });
 
     expect(await readActiveSelection()).toMatchObject({ word: 'cake' });
@@ -75,6 +83,7 @@ describe('saveSelection', () => {
   const selection = {
     word: 'serendipity',
     sentence: 'Pure serendipity.',
+    precedingText: 'She found it by',
     sourceUrl: 'https://example.com',
     sourceTitle: 'Example',
   };
@@ -95,6 +104,21 @@ describe('saveSelection', () => {
     await deps.settings.update({ autoExplainOnSave: true });
     const entry = await saveSelection(deps, selection);
     expect(entry.explanation?.meaning).toBe('A fortunate accident.');
+  });
+
+  it('passes page context to the explainer when auto-explain is on', async () => {
+    await deps.settings.update({ autoExplainOnSave: true });
+    await saveSelection(deps, selection);
+
+    expect(deps.explain.explainWith).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        word: 'serendipity',
+        context: 'Pure serendipity.',
+        pageTitle: 'Example',
+        precedingText: 'She found it by',
+      }),
+    );
   });
 
   it('still saves when auto-explain fails', async () => {
@@ -120,10 +144,36 @@ describe('buildHighlightData', () => {
     expect(data.entries[0]).toMatchObject({ word: 'Alpha', wordKey: 'alpha', note: 'first', meaning: '' });
   });
 
+  it('carries the reading experience preferences', async () => {
+    await deps.settings.update({
+      readingExperience: { showOriginal: false, showTranslation: true, width: 400, fontSize: 15, spacing: 1.8 },
+    });
+
+    const data = await buildHighlightData(deps);
+    expect(data.readingExperience).toEqual({
+      showOriginal: false,
+      showTranslation: true,
+      width: 400,
+      fontSize: 15,
+      spacing: 1.8,
+    });
+  });
+
   it('includes the cached meaning when present', async () => {
     const entry = await deps.vocabulary.save({ word: 'beta' });
     await deps.vocabulary.update(entry.id, { explanation });
     expect((await buildHighlightData(deps)).entries[0]?.meaning).toBe('A fortunate accident.');
+  });
+
+  it('includes the pronunciation when an explanation is cached', async () => {
+    const entry = await deps.vocabulary.save({ word: 'serendipity' });
+    await deps.vocabulary.update(entry.id, { explanation: { ...explanation, pronunciation: '/ˌser.ənˈdɪp.ə.ti/' } });
+    expect((await buildHighlightData(deps)).entries[0]?.pronunciation).toBe('/ˌser.ənˈdɪp.ə.ti/');
+  });
+
+  it('defaults the pronunciation to empty when absent', async () => {
+    await deps.vocabulary.save({ word: 'gamma' });
+    expect((await buildHighlightData(deps)).entries[0]?.pronunciation).toBe('');
   });
 });
 
@@ -135,10 +185,106 @@ describe('explainWord', () => {
     expect((await deps.vocabulary.get(entry.id))?.explanation?.meaning).toBe('A fortunate accident.');
   });
 
+  it('forwards page context to the explainer', async () => {
+    await explainWord(deps, 'serendipity', 'context', undefined, 'Page Title', 'preceding');
+
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'serendipity',
+      context: 'context',
+      pageTitle: 'Page Title',
+      precedingText: 'preceding',
+    });
+  });
+
   it('returns an explanation for an unsaved word without storing it', async () => {
     const result = await explainWord(deps, 'unsaved');
     expect(result.meaning).toBe('A fortunate accident.');
     expect(await deps.vocabulary.count()).toBe(0);
+  });
+
+  it('forwards the analysis kind to the explain service', async () => {
+    await explainWord(deps, 'a sentence.', 'context', 'summarize');
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'a sentence.',
+      context: 'context',
+      kind: 'summarize',
+    });
+  });
+});
+
+describe('splitVocabularyTerm', () => {
+  it('splits a "term: meaning" item', () => {
+    expect(splitVocabularyTerm('serendipity: a fortunate accident')).toEqual({
+      word: 'serendipity',
+      meaning: 'a fortunate accident',
+    });
+  });
+
+  it('splits a "term — meaning" item', () => {
+    expect(splitVocabularyTerm('ephemeral — short-lived')).toEqual({
+      word: 'ephemeral',
+      meaning: 'short-lived',
+    });
+  });
+
+  it('returns the whole item as the word when there is no separator', () => {
+    expect(splitVocabularyTerm('just-a-phrase')).toEqual({ word: 'just-a-phrase', meaning: '' });
+  });
+});
+
+describe('saveDifficultWords', () => {
+  it('saves each difficult word extracted by the AI', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['serendipity: a fortunate accident', 'ephemeral: short-lived'],
+    });
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'Serendipity is ephemeral.',
+      context: 'Serendipity is ephemeral.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ word: 'serendipity', note: 'a fortunate accident' });
+    expect(entries[1]).toMatchObject({ word: 'ephemeral', note: 'short-lived' });
+    expect(await deps.vocabulary.findByWord('serendipity')).toBeDefined();
+  });
+
+  it('asks for a vocabulary analysis and saves nothing when no words are found', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(explanation);
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'Nothing hard here.',
+      context: 'Nothing hard here.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'Nothing hard here.',
+      context: 'Nothing hard here.',
+      kind: 'vocabulary',
+    });
+    expect(entries).toEqual([]);
+    expect(await deps.vocabulary.count()).toBe(0);
+  });
+
+  it('skips empty extracted terms', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['', '  ', 'cake: a baked dessert'],
+    });
+
+    const entries = await saveDifficultWords(deps, {
+      word: 'The cake.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ word: 'cake' });
   });
 });
 
@@ -157,7 +303,10 @@ describe('createHandlers', () => {
   });
 
   it('returns null when saving with no active selection', async () => {
-    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: { word: '  ', sentence: '', sourceUrl: '', sourceTitle: '' } });
+    chromeMock().tabs.sendMessage.mockResolvedValue({
+      ok: true,
+      data: { word: '  ', sentence: '', precedingText: '', sourceUrl: '', sourceTitle: '' },
+    });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
     expect(result).toEqual({ ok: true, data: null });
   });
@@ -165,7 +314,13 @@ describe('createHandlers', () => {
   it('saves the current selection when one exists', async () => {
     chromeMock().tabs.sendMessage.mockResolvedValue({
       ok: true,
-      data: { word: 'ephemeral', sentence: 'It is ephemeral.', sourceUrl: 'https://x', sourceTitle: 'X' },
+      data: {
+        word: 'ephemeral',
+        sentence: 'It is ephemeral.',
+        precedingText: 'Time is',
+        sourceUrl: 'https://x',
+        sourceTitle: 'X',
+      },
     });
     const result = await dispatch(createHandlers(deps), { type: 'save-current-selection' }, sender);
 
@@ -185,5 +340,42 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('handles explain with an analysis kind', async () => {
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'The cat sat down.', kind: 'simplify' } },
+      sender,
+    );
+    expect(result.ok).toBe(true);
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'The cat sat down.',
+      kind: 'simplify',
+    });
+  });
+
+  it('handles save-difficult-words', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...explanation,
+      relatedWords: ['serendipity: a fortunate accident'],
+    });
+
+    const result = await dispatch(
+      createHandlers(deps),
+      {
+        type: 'save-difficult-words',
+        payload: {
+          word: 'Serendipity.',
+          context: 'Serendipity.',
+          sourceUrl: 'https://example.com',
+          sourceTitle: 'Example',
+        },
+      },
+      sender,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(await deps.vocabulary.findByWord('serendipity')).toBeDefined();
   });
 });

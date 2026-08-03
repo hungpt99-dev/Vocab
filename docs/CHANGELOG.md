@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Smart AI assistance on a selected/translated sentence: the selection toolbar's "More" menu exposes
+  Explain sentence, Explain grammar, Explain vocabulary, Simplify, Summarize and Save difficult words.
+  Each analysis routes through the provider-agnostic `ExplainService` (with a dedicated prompt per
+  kind) and the result opens in a dismissible panel; "Save difficult words" extracts the hard terms
+  and persists each to the vocabulary library.
+- Vocabulary integration in reading mode: saved words are highlighted in both the original and the
+  translated column of bilingual pages; the hover card shows the IPA pronunciation (when available),
+  note, saved date and an in-place **AI explain** shortcut; and the selection toolbar's **Save to
+  Vocabulary** button persists the selected word straight from the page. The AI request is routed
+  through the provider-agnostic `ExplainService` in the background worker — the content script never
+  couples to a provider.
+- **Reading experience controls.** The hover card over a saved word can now hide the original word and/or
+  the translation, and its width, font size and spacing are adjustable. Settings apply live to open pages
+  via CSS custom properties (`--avs-card-width`, `--avs-card-font-size`, `--avs-card-spacing`), so the
+  overlay reflows instantly.
 - AI resilience: automatic retry with exponential backoff for transient failures, and a shared token-bucket rate limiter so concurrent requests do not burst the provider. Recorded as [ADR-014](DECISION_LOG.md#adr-014--retry-and-rate-limit-only-transient-ai-failures).
 - New runtime dependency `react-window` (virtualized lists) with `@types/react-window`.
 - Complete documentation suite under `docs/`: overview, requirements, architecture, system design,

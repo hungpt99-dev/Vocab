@@ -7,6 +7,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+<<<<<<< HEAD
+- **Reading-mode accessibility.** In-page overlays (selection toolbar, hover card, toast) now follow the
+  OS light/dark theme via `prefers-color-scheme`, constrain themselves to narrow viewports (toolbar
+  wraps, toast goes edge-to-edge on small screens, the card scrolls when tall), and the selection
+  toolbar implements the ARIA `toolbar` keyboard pattern — arrow keys move focus, Home/End jump, and a
+  single tab stop roving tabindex.
+- **Keyboard-only selection.** The selection toolbar now also appears when text is selected with the
+  keyboard (Shift + arrows), not only with the mouse.
+- **Vocabulary integration in reading mode.** Saved words are highlighted across the whole page —
+  including bilingual pages where original and translated text sit side by side in two columns.
+  Hovering (or keyboard-focusing) a highlight now also shows the IPA **pronunciation** when the entry
+  has an explanation, plus an **AI explain** shortcut on the card that requests a fresh explanation
+  in place. The selection toolbar's **Save to Vocabulary** button is now live: selecting any word and
+  clicking it saves the word straight from the page and highlights it immediately.
+- **Reading experience controls.** The hover card over a saved word can hide the original word and/or the
+  translation, and its width, font size and spacing are adjustable. Settings apply live to open pages via
+  CSS custom properties, so the overlay reflows instantly.
+=======
+- **Structured paragraph-by-paragraph translation.** Select any text and choose **Translate** from the
+  selection toolbar to translate the whole page. The DOM is walked and each paragraph-sized block
+  (headings, paragraphs, list items, table cells, block quotes) is translated as its own unit — never
+  the page as a single block. Text nodes are translated around `[[n]]` markers, so headings, lists,
+  links and inline markup keep every tag and attribute and the page layout is never disturbed; code
+  blocks, scripts, form controls and the extension's own nodes are left untouched. The AI call goes
+  through the shared provider abstraction (`TranslationService`), so no content-script code touches a
+  provider SDK, and it honours the user's target-language setting with per-request fallback.
+>>>>>>> 1bc71b5 (feat(vocab): structured paragraph-by-paragraph page translation)
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.
@@ -22,6 +49,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Connection test.** The Options page can test a saved provider on demand and reports a clear message.
 
 ### Changed
+- **Richer page context for AI explanations.** `ExplainRequest` now carries the page title
+  (`pageTitle`) and a short excerpt of the text preceding the selection (`precedingText`), captured by
+  the content script and passed through the save and explain flows. The prompt includes both, so the
+  model can pick the right sense from context.
+- **Term preservation.** The explainer prompt instructs the model to keep proper nouns, brand names,
+  technical terms and code snippets verbatim — never translating them in the translation or examples.
+- The response cache key now includes `pageTitle` and `precedingText`, so the same word on different
+  pages is not served a stale explanation.
 - `ExplainService` is now the single application entry point for AI: it resolves the active provider,
   applies caching, rate-limiting, retry/backoff and optional fallback. Feature code never references a
   provider SDK.

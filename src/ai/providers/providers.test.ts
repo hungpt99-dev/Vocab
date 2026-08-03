@@ -120,6 +120,30 @@ describe('OpenAiCompatibleProvider', () => {
     controller.abort();
     await expect(promise).rejects.toMatchObject({ code: 'aborted' });
   });
+
+  it('translates paragraphs through the chat-completions endpoint', async () => {
+    const translationPayload = JSON.stringify({ translations: ['Hola', 'Mundo'] });
+    const fetchMock = mockFetch({ choices: [{ message: { content: translationPayload } }] });
+    const result = await provider.translate(
+      { paragraphs: [{ text: 'Hello' }, { text: 'World' }], language: 'Spanish' },
+      config,
+    );
+
+    const [, init] = callAt(fetchMock, 0);
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain('paragraph');
+    expect(body.temperature).toBe(0.1);
+    expect(result.paragraphs).toEqual([
+      { text: 'Hello', translation: 'Hola' },
+      { text: 'World', translation: 'Mundo' },
+    ]);
+  });
+
+  it('requires an API key to translate when the preset demands one', async () => {
+    await expect(
+      provider.translate({ paragraphs: [{ text: 'Hello' }], language: 'Spanish' }, { ...config, apiKey: '' }),
+    ).rejects.toMatchObject({ code: 'missing_api_key' });
+  });
 });
 
 describe('GeminiProvider', () => {
@@ -144,6 +168,18 @@ describe('GeminiProvider', () => {
   it('rejects an empty candidate list', async () => {
     mockFetch({ candidates: [] });
     await expect(provider.explain(request, config)).rejects.toThrow(/empty response/);
+  });
+
+  it('translates paragraphs through generateContent', async () => {
+    const translationPayload = JSON.stringify({ translations: ['你好'] });
+    const fetchMock = mockFetch({ candidates: [{ content: { parts: [{ text: translationPayload }] } }] });
+    const result = await provider.translate({ paragraphs: [{ text: 'Hello' }], language: 'Chinese' }, config);
+
+    const [url, init] = callAt(fetchMock, 0);
+    expect(url).toContain('models/gemini-1.5-flash:generateContent');
+    const body = JSON.parse(init.body as string);
+    expect(body.contents[0].parts[0].text).toContain('Chinese');
+    expect(result.paragraphs).toEqual([{ text: 'Hello', translation: '你好' }]);
   });
 });
 
@@ -171,5 +207,16 @@ describe('AnthropicProvider', () => {
   it('rejects an empty content list', async () => {
     mockFetch({ content: [] });
     await expect(provider.explain(request, config)).rejects.toThrow(/empty response/);
+  });
+
+  it('translates paragraphs through the messages endpoint', async () => {
+    const translationPayload = JSON.stringify({ translations: ['Hola'] });
+    const fetchMock = mockFetch({ content: [{ type: 'text', text: translationPayload }] });
+    const result = await provider.translate({ paragraphs: [{ text: 'Hello' }], language: 'Spanish' }, config);
+
+    const [, init] = callAt(fetchMock, 0);
+    const body = JSON.parse(init.body as string);
+    expect(body.max_tokens).toBe(4096);
+    expect(result.paragraphs).toEqual([{ text: 'Hello', translation: 'Hola' }]);
   });
 });

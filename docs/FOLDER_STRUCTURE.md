@@ -129,10 +129,10 @@ browser.
 ### `src/content/`
 
 **Purpose.** Everything that happens inside a third-party page: reading the selection, highlighting,
-the hover card, toasts.
+the hover card, toasts, the explain popover.
 
 **Contains.** `index.ts`, `matcher.ts`, `highlighter.ts`, `hover-card.ts`, `selection.ts`,
-`styles.ts`, `toast.ts`.
+`styles.ts`, `toast.ts`, `toolbar.ts`, `explain-popover.ts`.
 
 **May depend on.** `shared/lib`, `shared/messaging`, `shared/types`, `shared/styles/tokens`.
 

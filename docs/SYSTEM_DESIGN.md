@@ -145,7 +145,7 @@ ExplainService.explain(word, context)
   → settingsRepository.get()                    // provider, key, model, baseUrl
   → registry.getProvider(settings.provider)
   → guard: key required but absent → AiError('missing_api_key')   // no network call
-  → buildPrompt(word, context)
+  → buildPrompt(word, context, unit, sourceLanguage)   // unit selects the prompt variant
   → provider.explain() → postJson()
         ├── AbortController with a 30 s timeout
         ├── caller's AbortSignal chained in

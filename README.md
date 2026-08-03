@@ -53,8 +53,9 @@ explains your words — stays under your control.
 | **Save a selection** | Right-click menu, popup form, or `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS) |
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
-| **On-page highlighting** | Saved words highlighted everywhere; hover or keyboard-focus shows meaning, note and saved date |
+| **On-page highlighting** | Saved words highlighted everywhere — including both columns of bilingual (original/translation) pages; hover or keyboard-focus shows meaning, pronunciation, note, saved date and an AI-explain shortcut |
 | **AI Explain** | Meaning, simple explanation, examples, synonyms, IPA pronunciation and collocations |
+| **Page translation** | Translate a page paragraph-by-paragraph; headings, lists, links and code preserved, layout untouched |
 | **Bring your own key** | OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama and LM Studio |
 | **Portable data** | Versioned JSON export and import, with merge or replace |
 | **Accessible** | Keyboard navigable, screen-reader labelled, respects `prefers-reduced-motion` and dark mode |
@@ -154,6 +155,11 @@ Open the popup and choose **Settings**, or right-click the extension icon → *O
 | Base URL | provider default | For proxies, gateways or non-standard ports |
 | Highlight saved words | on | Applies to open tabs immediately |
 | Highlight colour | `#fde68a` | Applies to open tabs immediately |
+| Show original word | on | Hover card heading over a saved word |
+| Show translation | on | Hover card meaning block |
+| Translation width | `320px` | Hover card max width, `240–480px` |
+| Card font size | `13px` | Hover card text, `11–18px` |
+| Card spacing | `1.5` | Hover card line-height and row gaps, `1.2–2.0` |
 | Explain automatically on save | off | Costs an API call per saved word |
 
 Use **Test connection** to verify a provider before saving words.
@@ -181,16 +187,28 @@ Adding a provider is usually a one-object change: see
 
 ## Usage
 
-**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, or
-open the popup (the selection is prefilled) and click **Save to vocabulary**.
+**Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, open
+the popup (the selection is prefilled) and click **Save to vocabulary**, or use the floating
+**Save** button that appears above any selection.
 
 **Browse your library.** The popup lists entries newest first. Search matches words, notes, sentences
 and tags. Filter by favourites or tag.
 
-**Explain a word.** Click **AI explain** on an entry. The result is cached until you refresh it.
+**Explain a word.** Click **AI explain** on an entry, or on a hover card over a highlighted word. The
+result is cached until you refresh it.
+
+<<<<<<< HEAD
+**Highlighting.** Saved words are highlighted as you browse, in both the original and translated text
+of bilingual pages. Hover — or tab to a highlight — to see the meaning, pronunciation, your note and
+the saved date, plus an **AI explain** shortcut. Press `Escape` to dismiss.
+=======
+**Translate a page.** Select any text, then click **Translate** on the selection toolbar. Each
+paragraph, heading, list item and table cell is translated individually — never the whole page as one
+block — so headings, lists, links and code blocks stay intact and the layout is unchanged.
 
 **Highlighting.** Saved words are highlighted as you browse. Hover — or tab to a highlight — to see the
 meaning, your note and the saved date. Press `Escape` to dismiss.
+>>>>>>> 1bc71b5 (feat(vocab): structured paragraph-by-paragraph page translation)
 
 **Back up.** Settings → *Export JSON*. Restore with *Import JSON* using **merge** (keeps newer entries)
 or **replace** (clears first).

@@ -22,6 +22,7 @@ The system is layered. Dependencies point in one direction only:
         ┌───────────────────────▼─────────────────────┐
         │  Application    background/handlers         │  orchestration, pure functions
         │                 ai/explain-service          │
+        │                 ai/translate-service        │
         └───────────────────────┬─────────────────────┘
                                 │ interfaces
         ┌───────────────────────▼─────────────────────┐

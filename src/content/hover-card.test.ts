@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { computePosition, formatSavedDate, HoverCard } from './hover-card';
+import { CARD_ACTION_EVENT, computePosition, formatSavedDate, HoverCard } from './hover-card';
 import type { HighlightEntry } from './matcher';
 
 const entry: HighlightEntry = {
@@ -9,6 +9,7 @@ const entry: HighlightEntry = {
   note: 'from an article',
   createdAt: Date.UTC(2026, 0, 15),
   meaning: 'A fortunate accident.',
+  pronunciation: '',
 };
 
 beforeEach(() => {
@@ -68,6 +69,36 @@ describe('HoverCard', () => {
     expect(document.getElementById('avs-hover-card')!.textContent).toContain('No explanation yet');
   });
 
+  it('hides the original word when requested', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: false, showTranslation: true });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).not.toContain(entry.word);
+    expect(element.textContent).toContain('A fortunate accident.');
+  });
+
+  it('hides the translation when requested', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: true, showTranslation: false });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).toContain(entry.word);
+    expect(element.textContent).not.toContain('A fortunate accident.');
+  });
+
+  it('keeps note and date when both sections are hidden', () => {
+    document.body.innerHTML = '<mark id="m">x</mark>';
+    const card = new HoverCard();
+    card.show(document.getElementById('m') as HTMLElement, entry, { showOriginal: false, showTranslation: false });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).toContain('from an article');
+    expect(element.textContent).toContain('Saved');
+  });
+
   it('hides and clears the aria link', () => {
     document.body.innerHTML = '<mark id="m">x</mark>';
     const anchor = document.getElementById('m') as HTMLElement;
@@ -91,5 +122,95 @@ describe('HoverCard', () => {
 
     card.destroy();
     expect(document.querySelectorAll('.avs-card')).toHaveLength(0);
+  });
+
+  it('shows the pronunciation row when one is available', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+
+    card.show(anchor, { ...entry, pronunciation: '/ˌser.ənˈdɪp.ə.ti/' });
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.textContent).toContain('/ˌser.ənˈdɪp.ə.ti/');
+    expect(element.textContent).toContain('Pronunciation');
+
+    card.destroy();
+  });
+
+  it('omits the pronunciation row when there is none', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    new HoverCard().show(document.getElementById('m') as HTMLElement, entry);
+    expect(document.getElementById('avs-hover-card')!.textContent).not.toContain('Pronunciation');
+  });
+
+  it('renders an AI-explain shortcut that dispatches the card action', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+    card.show(anchor, entry);
+
+    const button = document.querySelector<HTMLButtonElement>('.avs-card-explain')!;
+    expect(button).not.toBeNull();
+    expect(button.textContent).toBe('AI explain');
+
+    const dispatched: HighlightEntry[] = [];
+    document.addEventListener(CARD_ACTION_EVENT, (event) => {
+      dispatched.push((event as CustomEvent<{ entry: HighlightEntry }>).detail.entry);
+    });
+    button.click();
+
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]?.word).toBe('serendipity');
+
+    card.destroy();
+  });
+
+  it('reflects the loading state while an explanation is requested', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+    card.show(anchor, entry);
+
+    card.setExplaining(true);
+    const button = document.querySelector<HTMLButtonElement>('.avs-card-explain')!;
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toBe('Explaining…');
+
+    card.setExplaining(false);
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toBe('AI explain');
+
+    card.destroy();
+  });
+
+  it('re-renders in place with fresh information and stays open', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+    card.show(anchor, entry);
+
+    const updated = { ...entry, meaning: 'A new meaning.', pronunciation: '/njuː/' };
+    card.update(updated);
+
+    const element = document.getElementById('avs-hover-card')!;
+    expect(element.hidden).toBe(false);
+    expect(element.textContent).toContain('A new meaning.');
+    expect(element.textContent).toContain('/njuː/');
+
+    card.destroy();
+  });
+
+  it('reports whether a node lives inside the card', () => {
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+    card.show(anchor, entry);
+
+    const button = document.querySelector('.avs-card-explain')!;
+    expect(card.contains(button)).toBe(true);
+    expect(card.contains(document.body)).toBe(false);
+
+    card.destroy();
   });
 });

@@ -26,6 +26,8 @@ export interface AiProvider {
 export interface ExplainRequest {
   word: string;
   context?: string;   // sentence the word appeared in, to disambiguate sense
+  pageTitle?: string; // page title where the word was found, for topical context
+  precedingText?: string; // short excerpt of text before the word, for topical context
   language?: string;
 }
 
@@ -118,8 +120,8 @@ self-hosted vLLM, a corporate gateway, or a local runtime on a non-default port 
 `baseUrl` and `model`. Local models (Ollama, LM Studio) need no key and talk to `http://localhost:…/v1`.
 
 `ExplainService` (the single app entry point, `src/ai/explain-service.ts`) resolves the active provider,
-applies an in-memory **cache** (24 h TTL, keyed by `type|model|word|context|language`), then rate-limit +
-retry, and on a transient failure retries **once** against the configured fallback provider before
+applies an in-memory **cache** (24 h TTL, keyed by `type|model|word|context|pageTitle|precedingText|language`),
+then rate-limit + retry, and on a transient failure retries **once** against the configured fallback provider before
 surfacing the error. Fallback is intentionally skipped for hard errors (missing key, unauthorized,
 malformed response) because a replay would only waste quota.
 
@@ -134,7 +136,7 @@ ExplainService.explain(word, context)
   ├─ cache.get(type|model|word|context|language)   hit → return immediately
   ├─ registry.getProvider(type)            → AiError('unknown_provider') if absent
   ├─ guard: requiresApiKey && !apiKey      → AiError('missing_api_key')   no network call
-  ├─ buildExplainWordUserPrompt(word, context)   src/ai/prompts/explain-word.prompt.ts
+  ├─ buildExplainWordUserPrompt(word, context, pageTitle, precedingText)   src/ai/prompts/explain-word.prompt.ts
   ├─ runOnce(active, request)
   │     ├─ rateLimiter.acquire()           shared token bucket (5 / 10 s)
   │     ├─ withRetry(...)                  up to 3 attempts, backoff + jitter
@@ -204,9 +206,28 @@ retries, that error surfaces to the user as a clear message.
 ## Caching
 
 **Implemented.** `ExplainService` keeps an in-memory cache (24 h TTL) keyed by
-`type|model|word|context|language`. Identical requests within the window return the stored `Explanation`
+`type|model|word|context|pageTitle|precedingText|language`. Identical requests within the window return the stored `Explanation`
 without a network call, so re-saving a word or re-opening a cached explanation is instant and free. The
 key includes the provider type and model so different providers/models never collide.
+
+## Page context and term preservation
+
+The explainer is fed three layers of context about where the word was found, so the model can pick the
+right sense and translate accordingly:
+
+| Input | Source | Used for |
+| --- | --- | --- |
+| `context` | The surrounding sentence | Disambiguating the sense of the word |
+| `pageTitle` | `document.title` via the selection payload | Topical grounding (e.g. a coding article vs. a novel) |
+| `precedingText` | A ~200-character excerpt of the page text before the selection | Same topical grounding, without sending the whole page |
+
+`pageTitle` and `precedingText` are captured by the content script at save time (`src/content/selection.ts`)
+and flow through the `SelectionPayload` message to the background worker, which passes them into
+`ExplainRequest`. Nothing about the page is persisted beyond the already-stored sentence and title.
+
+The system prompt additionally instructs the model to **preserve proper nouns, brand names, technical
+terms and code snippets verbatim** — never translating them in the translation field or in examples.
+This keeps `React`, `API`, a project name or an identifier intact when the surrounding prose is translated.
 
 ## Streaming
 

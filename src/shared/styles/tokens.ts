@@ -32,6 +32,7 @@ export const brand = {
 /** Neutral slate ramp used for surfaces and text. */
 export const slate = {
   50: '#f8fafc',
+  200: '#e2e8f0',
   400: '#94a3b8',
   800: '#1e293b',
   900: '#0f172a',
@@ -63,6 +64,11 @@ export const color = {
   overlaySurfaceAlt: slate[800],
   overlayText: slate[50],
   overlayMuted: slate[400],
+  /** Light-theme counterparts, applied when the host prefers a light scheme. */
+  overlaySurfaceLight: slate[50],
+  overlaySurfaceAltLight: slate[200],
+  overlayTextLight: slate[800],
+  overlayMutedLight: slate[400],
 } as const;
 
 /** Tailwind utility strings for semantic status colours (light + dark). */
@@ -99,11 +105,31 @@ export const elevation = {
   overlay: '0 8px 24px rgba(15, 23, 42, 0.35)',
 } as const;
 
+/**
+ * Numeric presets and bounds for the user-tunable reading experience. Kept
+ * here (not in settings) so the hover card's default look and the settings
+ * controls share one source of truth with the injected stylesheet.
+ */
+export const reading = {
+  width: 320,
+  widthMin: 240,
+  widthMax: 480,
+  widthStep: 20,
+  fontSize: 13,
+  fontSizeMin: 11,
+  fontSizeMax: 18,
+  fontSizeStep: 1,
+  spacing: 1.5,
+  spacingMin: 1.2,
+  spacingMax: 2,
+  spacingStep: 0.1,
+} as const;
+
 export const typography = {
   /** System stack: overlays must render before any webfont loads. */
   systemStack: "system-ui, -apple-system, 'Segoe UI', sans-serif",
   brandStack: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-  overlayBody: '13px/1.5',
+  overlayBody: `${reading.fontSize}px/${reading.spacing}`,
   overlayCompact: '13px/1.4',
   overlayLabel: '11px',
 } as const;
@@ -122,7 +148,7 @@ export const zIndex = {
 } as const;
 
 export const layout = {
-  overlayMaxWidth: '320px',
+  overlayMaxWidth: `${reading.width}px`,
   /** Narrowest supported popup width, asserted by an E2E test. */
   popupMinWidth: '320px',
   popupWidth: '384px',

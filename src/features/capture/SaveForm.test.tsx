@@ -6,8 +6,10 @@ import { SaveForm } from './SaveForm';
 const selection = {
   word: 'serendipity',
   sentence: 'Pure serendipity struck.',
+  precedingText: 'Everyone noticed',
   sourceUrl: 'https://example.com',
   sourceTitle: 'Example',
+  sourceLanguage: 'English',
 };
 
 describe('SaveForm', () => {

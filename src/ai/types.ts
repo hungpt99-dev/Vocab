@@ -1,3 +1,4 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation } from '@/shared/types/vocabulary';
 import type { AiProviderId } from '@/shared/types/settings';
 
@@ -5,9 +6,37 @@ export interface ExplainRequest {
   word: string;
   /** Sentence the word appeared in, used to disambiguate the sense. */
   context?: string;
+  /** Page title where the word was encountered, for topical context. */
+  pageTitle?: string;
+  /** Short excerpt of text preceding the word on the page, for topical context. */
+  precedingText?: string;
   /** Target language for the explanation. */
   language?: string;
+  /** Which analysis to produce. Defaults to 'word'. */
+  kind?: ExplainKind;
 }
+
+export interface TranslateRequest {
+  /** Paragraphs to translate, in order. */
+  paragraphs: Array<{ text: string }>;
+  /** Target language name, e.g. "Russian". */
+  language: string;
+}
+
+/** A paragraph the caller wants translated, with a stable caller-owned id. */
+export interface TranslationParagraph {
+  id: string;
+  text: string;
+}
+
+/** A translated paragraph, keyed by the caller's paragraph id. */
+export interface TranslationResult {
+  id: string;
+  text: string;
+  translation: string;
+}
+
+export type TranslateResultList = TranslationResult[];
 
 export interface ProviderConfig {
   apiKey: string;
@@ -30,6 +59,12 @@ export interface AiProvider {
   /** Whether this provider requires an API key (local runtimes do not). */
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
+  translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult>;
+}
+
+/** Provider-level translation response: one translation per input paragraph. */
+export interface TranslateResult {
+  paragraphs: Array<{ text: string; translation: string }>;
 }
 
 export type AiErrorCode =

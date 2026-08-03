@@ -28,6 +28,16 @@ describe('readSelection', () => {
     expect(result?.sourceUrl).toContain('http');
   });
 
+  it('returns a short excerpt of the text preceding the selection', () => {
+    document.body.innerHTML =
+      '<p>The team reviewed the API design. Serendipity led to a cleaner schema.</p>';
+    const paragraph = document.querySelector('p')!;
+    stubSelection('Serendipity', paragraph.firstChild);
+
+    const result = readSelection();
+    expect(result?.precedingText).toBe('The team reviewed the API design.');
+  });
+
   it('returns null when nothing is selected', () => {
     stubSelection('   ', null);
     expect(readSelection()).toBeNull();
@@ -36,5 +46,6 @@ describe('readSelection', () => {
   it('falls back to the selection when there is no context', () => {
     stubSelection('word', null);
     expect(readSelection()?.sentence).toBe('word');
+    expect(readSelection()?.precedingText).toBe('');
   });
 });

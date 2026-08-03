@@ -64,12 +64,17 @@ tokens into its CSS string. One source, two renderers.
 | `color.overlaySurfaceAlt` | `slate.800` | Toast background |
 | `color.overlayText` | `slate.50` | Overlay text |
 | `color.overlayMuted` | `slate.400` | Overlay labels |
+| `color.readingSurface` | `slate.50` | Reading-mode page background |
+| `color.readingHeader` | `brand.50` | Reading-mode header bar |
+| `color.readingText` | `slate.900` | Reading-mode article text |
+| `color.readingMuted` | `slate.400` | Reading-mode labels and translations |
 
 `DEFAULT_HIGHLIGHT_COLOR` is `#fde68a`. It is a token because it is also the default value of a user
 setting — see `DEFAULT_SETTINGS` in `src/storage/settings-repository.ts`.
 
 Overlays use an inverted (dark) surface deliberately: it reads acceptably on both light and dark host
-pages, which cannot be predicted.
+pages, which cannot be predicted. Reading mode is a full-page surface rather than a floating overlay,
+so it inverts the usual scheme: a light paper surface with dark text.
 
 ### Typography
 
@@ -80,6 +85,8 @@ pages, which cannot be predicted.
 | `typography.overlayBody` | `13px/1.5` | Hover card |
 | `typography.overlayCompact` | `13px/1.4` | Toast |
 | `typography.overlayLabel` | `11px` | Uppercase labels |
+| `typography.readingBody` | `15px/1.6` | Reading-mode paragraphs |
+| `typography.readingHeading` | `17px/1.5` | Reading-mode headings and title |
 
 Overlays use the system stack rather than Inter because a font still loading would cause a visible
 reflow on someone else's page.
@@ -122,6 +129,7 @@ contexts are unknown; any lower value can be beaten by a host page's sticky head
 | `layout.popupWidth` | `384px` | Default popup width |
 | `layout.popupMinWidth` | `320px` | Narrowest supported; asserted by an E2E test |
 | `layout.overlayMaxWidth` | `320px` | Hover card and toast |
+| `layout.readingMaxWidth` | `720px` | Comfortable measure for the reading-mode text column |
 
 ---
 

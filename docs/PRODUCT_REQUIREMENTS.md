@@ -23,6 +23,7 @@ Status reflects the current release, v0.1.0. See [Roadmap](ROADMAP.md) for what 
 | FR-1.6 | Saving the same word twice updates the existing entry rather than creating a duplicate. | Done |
 | FR-1.7 | Capture confirms with an on-page toast that does not require dismissal. | Done |
 | FR-1.8 | Optionally, an explanation is requested automatically when a word is saved. | Done (off by default) |
+| FR-1.9 | The user can save any word directly from reading mode via the floating toolbar's Save action, without leaving the page. | Done |
 
 **Acceptance criteria.** Selecting text on any HTTP(S) page and using any of the three routes produces
 exactly one entry containing the selected text, the sentence containing it, and the page URL. The page
@@ -78,6 +79,8 @@ than creating a duplicate (consistent with FR-1.6).
 | FR-3.6 | Content added after page load is highlighted. | Done |
 | FR-3.7 | Highlight colour is user-configurable and applies to open pages immediately. | Done |
 | FR-3.8 | Highlighting can be disabled entirely, taking effect on open pages immediately. | Done |
+| FR-3.9 | Hovering a highlight shows the IPA pronunciation when the entry has an explanation, and an AI explain shortcut that fetches an explanation in place. | Done |
+| FR-3.10 | Saved vocabulary is highlighted in both columns of a two-column (original + translation) reading layout. | Done |
 
 **Acceptance criteria.** After saving a word, loading a page containing it shows every occurrence
 highlighted. Changing the colour or toggling the feature updates already-open tabs without a reload.
@@ -108,6 +111,7 @@ highlighted. Changing the colour or toggling the feature updates already-open ta
 | FR-4.7 | Connectivity can be verified from Settings before saving words. | Done |
 | FR-4.8 | Responses stream token-by-token. | **Not implemented** — see [Known limitations](KNOWN_LIMITATIONS.md) |
 | FR-4.9 | Failed requests are retried automatically with backoff. | **Not implemented** — see [Known limitations](KNOWN_LIMITATIONS.md) |
+| FR-4.10 | Selecting text and clicking "Explain with AI" opens a popover with structured, expandable sections tailored to the unit (word / phrase / sentence); the AI is called only when the user clicks Explain, and the full context (selection, surrounding paragraph, page title, URL, detected and target languages) is sent to the provider. | Done |
 
 **Acceptance criteria.** With a valid key, requesting an explanation returns a populated structured
 result. With an invalid key, the user sees an `unauthorized` message naming the problem, and no
@@ -146,6 +150,33 @@ open content scripts. Exported JSON re-imports into a clean profile and reproduc
 Importing a file from a future schema version is rejected rather than partially applied. Merge keeps
 the newer of two entries with the same word key; replace clears existing data first and warns before
 doing so.
+
+---
+
+## 6. Reading mode
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| FR-6.1 | The user can enter reading mode from the selection toolbar (More → Reading mode). | Done |
+| FR-6.2 | Reading mode shows the article's title and top-level paragraphs/headings, skipping navigation and code. | Done |
+| FR-6.3 | Each paragraph is translated into the user's target language through the configured AI provider. | Done |
+| FR-6.4 | Five layouts are available: side-by-side, original-first, translation-first, hover-translation, toggle-translation. | Done |
+| FR-6.5 | Switching layout is instant and never reloads the page or rebuilds the article. | Done |
+| FR-6.6 | A block whose translation failed shows an "unavailable" note without blocking the rest. | Done |
+
+**Acceptance criteria.** Selecting text and choosing **More → Reading mode** opens a full-page bilingual
+view of the article. Changing the layout dropdown updates the arrangement immediately. The page is not
+navigated or reloaded, and closing reading mode returns to the untouched page.
+
+**Edge cases.**
+
+| Case | Required behaviour |
+| --- | --- |
+| Page with no extractable article content | Reading mode is not opened; a toast explains why. |
+| No active AI provider configured | A status banner explains the requirement instead of a dead UI. |
+| A single paragraph fails to translate | That block shows "Translation unavailable"; the rest still translate. |
+| Very long articles | Extraction is bounded to the first blocks so translation stays fast. |
+| Keyboard users in hover-translation layout | Paragraphs are focusable, so the translation appears on focus as well as hover. |
 
 ---
 

@@ -16,13 +16,15 @@ Delivery is tracked in Linear under the **AI Vocabulary Saver** project (team `V
 
 Ordered by expected value.
 
-1. **Spaced-repetition review mode** — a daily queue over saved words using an SM-2-style schedule.
+1. **Reading mode** — a distraction-free, bilingual view of any article. Entry + five instantly
+   switchable layouts shipped; translation engine, streaming and per-site controls follow.
+2. **Spaced-repetition review mode** — a daily queue over saved words using an SM-2-style schedule.
    The largest gap between "saving words" and "learning words".
-2. **Pronunciation audio** — play IPA via the Web Speech API; no extra API key needed.
-3. **Bulk operations** — multi-select in the library for tagging, favouriting and deleting.
-4. **Streaming explanations** — render tokens as they arrive to reduce perceived latency.
-5. **Per-site highlight control** — allow-list and block-list of domains.
-6. **CSV / Anki export** — alongside the existing JSON backup.
+3. **Pronunciation audio** — play IPA via the Web Speech API; no extra API key needed.
+4. **Bulk operations** — multi-select in the library for tagging, favouriting and deleting.
+5. **Streaming explanations** — render tokens as they arrive to reduce perceived latency.
+6. **Per-site highlight control** — allow-list and block-list of domains.
+7. **CSV / Anki export** — alongside the existing JSON backup.
 
 ## Considered and deliberately deferred
 

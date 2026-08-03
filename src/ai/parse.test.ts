@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractJsonObject, toExplanation } from './parse';
+import { extractJsonObject, extractTranslation, toExplanation } from './parse';
 import { AiError } from './types';
 
 const valid = JSON.stringify({
@@ -59,6 +59,21 @@ describe('toExplanation', () => {
     expect(explanation.antonyms).toEqual([]);
     expect(explanation.relatedWords).toEqual([]);
     expect(explanation.grammar).toBe('');
+    expect(explanation.partOfSpeech).toBe('');
+    expect(explanation.usage).toBe('');
+    expect(explanation.summary).toBe('');
+    expect(explanation.difficultVocabulary).toEqual([]);
+  });
+
+  it('coerces the unit-specific fields', () => {
+    const explanation = toExplanation(
+      '{"meaning":"m","partOfSpeech":"noun","usage":"idiom","summary":"gist","difficultVocabulary":"gloss: x"}',
+      meta,
+    );
+    expect(explanation.partOfSpeech).toBe('noun');
+    expect(explanation.usage).toBe('idiom');
+    expect(explanation.summary).toBe('gist');
+    expect(explanation.difficultVocabulary).toEqual(['gloss: x']);
   });
 
   it('falls back simpleExplanation to meaning', () => {
@@ -77,5 +92,27 @@ describe('toExplanation', () => {
 
   it('rejects a response without a meaning', () => {
     expect(() => toExplanation('{"synonyms":["a"]}', meta)).toThrow(/missing a meaning/);
+  });
+});
+
+describe('extractTranslation', () => {
+  it('returns plain text unchanged', () => {
+    expect(extractTranslation('Bonjour le monde.')).toBe('Bonjour le monde.');
+  });
+
+  it('strips markdown fences', () => {
+    expect(extractTranslation('```\nBonjour le monde.\n```')).toBe('Bonjour le monde.');
+  });
+
+  it('strips fenced blocks with a language hint', () => {
+    expect(extractTranslation('```text\nBonjour le monde.\n```')).toBe('Bonjour le monde.');
+  });
+
+  it('keeps placeholder markers intact', () => {
+    expect(extractTranslation('Bonjour [[0]]monde [[1]]!')).toBe('Bonjour [[0]]monde [[1]]!');
+  });
+
+  it('rejects an empty response', () => {
+    expect(() => extractTranslation('   ')).toThrow(AiError);
   });
 });
