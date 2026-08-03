@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Selection toolbar actions.** The floating selection toolbar's five actions are now fully wired:
+  - **Explain** opens an on-page popover with the structured AI explanation (meaning, pronunciation, examples, synonyms, collocations).
+  - **Translate** asks the service worker for a translation of the selection and shows it in the popover.
+  - **Save** routes to the existing `save-current-selection` flow, storing the word with its surrounding context.
+  - **Copy** writes the selection to the clipboard.
+  - **More** opens an accessible dropdown menu (currently: open extension settings).
+- The content script talks only to the message bus; all AI work stays in the service worker behind the provider-agnostic `ExplainService`, so no provider knowledge leaks into the page.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

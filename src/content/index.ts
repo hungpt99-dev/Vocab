@@ -7,6 +7,9 @@ import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import { handleToolbarAction, type ToolbarActionDeps } from './toolbar-actions';
+import { SelectionPopover, type PopoverAnchor } from './selection-popover';
+import { MoreMenu } from './more-menu';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -14,10 +17,21 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const popover = new SelectionPopover();
+const moreMenu = new MoreMenu();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
 let rescanTimer: ReturnType<typeof setTimeout> | undefined;
+
+const toolbarActionDeps: ToolbarActionDeps = {
+  getAnchor: () => actionAnchor(),
+  getMoreButton: () =>
+    toolbarElement()?.querySelector<HTMLButtonElement>('[data-action="more"]') ?? null,
+  popover,
+  menu: moreMenu,
+  hideToolbar: () => toolbar.hide(),
+};
 
 registerMessageHandlers({
   'get-selection': () => readSelection(),
@@ -45,6 +59,7 @@ function attachSelectionToolbar(): void {
   document.addEventListener('mouseup', () => {
     // Defer: the selection is finalised after the mouseup event completes.
     setTimeout(() => {
+      if (popover.isVisible || moreMenu.isVisible) return;
       const state = readToolbarSelection();
       if (state) toolbar.show(state);
     }, 0);
@@ -69,7 +84,7 @@ function attachSelectionToolbar(): void {
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
     const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
-    void handleToolbarAction(detail.action, detail.text);
+    void handleToolbarAction(detail.action, detail.text, toolbarActionDeps);
   }) as EventListener);
 }
 
@@ -81,25 +96,19 @@ function toolbarElement(): HTMLElement | null {
   return document.getElementById('avs-toolbar');
 }
 
-/** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
-  switch (action) {
-    case 'copy': {
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard', 'success');
-      } catch {
-        showToast('Could not copy', 'error');
-      }
-      toolbar.hide();
-      return;
-    }
-    default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
-      // For now surface what was requested so the toolbar is demonstrably live.
-      showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
-      toolbar.hide();
+/**
+ * The popover is anchored to the live selection, falling back to the toolbar's
+ * last position and then a neutral viewport spot when neither is measurable.
+ */
+function actionAnchor(): PopoverAnchor {
+  const selection = readToolbarSelection();
+  if (selection) return selection.rect;
+
+  const rect = toolbarElement()?.getBoundingClientRect();
+  if (rect && rect.width > 0 && rect.height > 0) {
+    return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
   }
+  return { top: 120, bottom: 140, left: window.innerWidth / 2, width: 0 };
 }
 
 /**
@@ -165,7 +174,7 @@ function stopObserving(): void {
   observer = null;
 }
 
-/** Ignore mutations caused by our own highlight, card and toast nodes. */
+/** Ignore mutations caused by our own highlight, card, toast, popover and menu nodes. */
 function isOwnNode(node: Node): boolean {
   if (node.nodeType !== Node.ELEMENT_NODE) return false;
   const element = node as Element;
@@ -173,7 +182,9 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.classList.contains('avs-popover') ||
+    element.classList.contains('avs-menu')
   );
 }
 

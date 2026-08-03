@@ -5,6 +5,7 @@ import {
   explainWord,
   readActiveSelection,
   saveSelection,
+  translateWord,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -185,5 +186,39 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+});
+
+describe('translateWord', () => {
+  it('returns the translation produced by the explain service', async () => {
+    const translated = { ...explanation, translation: 'Pâte' };
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(translated);
+
+    expect(await translateWord(deps, 'cake')).toBe('Pâte');
+  });
+
+  it('is routed through the message bus', async () => {
+    const translated = { ...explanation, translation: 'Sorte' };
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(translated);
+
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'translate', payload: { text: 'luck' } },
+      sender,
+    );
+    expect(result).toEqual({ ok: true, data: 'Sorte' });
+  });
+
+  it('surfaces an empty translation when the model returned none', async () => {
+    (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(explanation);
+    expect(await translateWord(deps, 'cake')).toBe('');
+  });
+});
+
+describe('open-options handler', () => {
+  it('opens the options page from the service worker', async () => {
+    const result = await dispatch(createHandlers(deps), { type: 'open-options' }, sender);
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(chromeMock().runtime.openOptionsPage).toHaveBeenCalledOnce();
   });
 });

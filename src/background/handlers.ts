@@ -92,6 +92,12 @@ export async function explainWord(
   return explanation;
 }
 
+/** Translate text into the user's configured target language. */
+export async function translateWord(deps: BackgroundDeps, text: string): Promise<string> {
+  const explanation = await deps.explain.explain({ word: text });
+  return explanation.translation;
+}
+
 /** Build the handler map used by the service worker's message router. */
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
   return {
@@ -109,6 +115,11 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'get-highlight-data': () => buildHighlightData(deps),
     explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    translate: (message) => translateWord(deps, message.payload.text),
+    'open-options': () => {
+      chrome.runtime.openOptionsPage();
+      return undefined;
+    },
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

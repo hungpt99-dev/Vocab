@@ -13,6 +13,8 @@ export type Message =
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
   | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'translate'; payload: { text: string; context?: string } }
+  | { type: 'open-options' }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
@@ -34,6 +36,8 @@ export interface ResponseMap {
   'get-selection': SelectionPayload | null;
   'save-current-selection': VocabularyEntry | null;
   explain: Explanation;
+  translate: string;
+  'open-options': void;
   'get-highlight-data': HighlightData;
   'vocabulary-changed': void;
   'settings-changed': void;

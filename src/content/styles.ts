@@ -109,9 +109,108 @@ export function injectStyles(doc: Document = document): void {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;
     }
+    .avs-popover {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      max-width: ${layout.overlayMaxWidth};
+      padding: ${spacing.md};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-popover[hidden] { display: none; }
+    .avs-popover-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${spacing.sm};
+      margin-bottom: ${spacing.xs};
+    }
+    .avs-popover-title {
+      font-size: ${typography.overlayLabel};
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: ${color.overlayMuted};
+    }
+    .avs-popover-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      cursor: pointer;
+    }
+    .avs-popover-close:hover { background: ${color.overlaySurfaceAlt}; }
+    .avs-popover-close:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-popover-status { color: ${color.overlayMuted}; }
+    .avs-popover-error { color: ${color.status.danger}; }
+    .avs-popover-body { max-height: 240px; overflow-y: auto; }
+    .avs-popover-meaning { font-weight: 600; }
+    .avs-popover-pronunciation {
+      margin-top: ${spacing.xs};
+      color: ${color.overlayMuted};
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .avs-popover-simple { margin-top: ${spacing.xs}; }
+    .avs-popover-section { margin-top: ${spacing.md}; }
+    .avs-popover-label {
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: ${color.overlayMuted};
+    }
+    .avs-popover-list {
+      margin: ${spacing.xs} 0 0;
+      padding-left: ${spacing.lg};
+    }
+    .avs-popover-list li { margin-top: ${spacing.xs}; }
+    .avs-menu {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      min-width: 160px;
+      padding: ${spacing.xs};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayCompact} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+    }
+    .avs-menu[hidden] { display: none; }
+    .avs-menu-item {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.sm};
+      width: 100%;
+      padding: ${spacing.sm} ${spacing.md};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .avs-menu-item:hover { background: ${color.overlaySurfaceAlt}; }
+    .avs-menu-item:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-popover { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-menu { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;

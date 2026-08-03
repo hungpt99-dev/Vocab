@@ -1,4 +1,5 @@
 import { isPhrase } from '@/shared/lib/text';
+import { ICON_BOOKMARK, ICON_COPY, ICON_LANGUAGES, ICON_MORE, ICON_SPARKLES } from './icons';
 
 const TOOLBAR_ID = 'avs-toolbar';
 const OFFSET = 8;
@@ -18,24 +19,8 @@ export interface ToolbarState {
   rect: { top: number; bottom: number; left: number; width: number };
 }
 
-/* Lucide icon paths (24x24, stroke-based) inlined as SVG so the toolbar needs
- * no runtime icon dependency inside the third-party page. */
-const wrap = (paths: string): string =>
-  `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ` +
-  `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-
-const ICON_SPARKLES = wrap(
-  '<path d="M9.94 14.34A2 2 0 0 0 8.66 13.06L3 11l5.66-2.06A2 2 0 0 0 9.94 9.66L12 4l2.06 5.66a2 2 0 0 0 1.28 1.28L21 11l-5.66 2.06a2 2 0 0 0-1.28 1.28L12 20l-2.06-5.66z"/>',
-);
-const ICON_LANGUAGES = wrap(
-  '<path d="m5 8 3-3 3 3"/><path d="M12 19h4l3-3 3 3"/><path d="M5.5 8.5h5"/><path d="M14.5 15.5h5"/>' +
-    '<path d="M3 11c2 1 4 1.5 6 1.5s4-.5 6-1.5"/>',
-);
-const ICON_BOOKMARK = wrap('<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>');
-const ICON_COPY = wrap(
-  '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-);
-const ICON_MORE = wrap('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
+/* Icons (see ./icons) provide the toolbar buttons with lucide glyphs without
+ * a runtime icon dependency inside the third-party page. */
 
 const TOOLBAR_ACTIONS = [
   { id: 'explain', label: 'Explain with AI', icon: ICON_SPARKLES },
