@@ -45,7 +45,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
     "fake-indexeddb": "^6.0.0",
-    "globals": "^15.11.0",
+    "globals": "^17.8.0",
     "jsdom": "^25.0.1",
     "lucide-static": "^0.453.0",
     "postcss": "^8.4.47",
