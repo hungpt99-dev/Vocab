@@ -6,7 +6,9 @@ import {
   buildExplainWordUserPrompt,
   buildTranslateUserPrompt,
 } from '../prompts';
-import { extractTranslation, toExplanation } from '../parse';
+import { toExplanation } from '../parse';
+import { parseTranslations } from '../parse-translation';
+import type { TranslateResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface GeminiResponse {
@@ -31,13 +33,43 @@ export class GeminiProvider implements AiProvider {
     return toExplanation(content, { provider: this.id, model: config.model || this.defaultModel });
   }
 
-  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
-    const content = await this.complete(
-      config,
-      TRANSLATE_SYSTEM_PROMPT,
-      buildTranslateUserPrompt(request),
-    );
-    return extractTranslation(content);
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult> {
+    if (!config.apiKey) {
+      throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
+    }
+
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+
+    const data = await postJson<GeminiResponse>({
+      url: joinUrl(baseUrl, `models/${model}:generateContent`),
+      headers: { 'x-goog-api-key': config.apiKey },
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        systemInstruction: { parts: [{ text: TRANSLATE_SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: buildTranslateUserPrompt(request) }] }],
+        generationConfig: {
+          temperature: config.temperature ?? 0.1,
+          ...(config.maxTokens !== undefined && config.maxTokens !== null
+            ? { maxOutputTokens: config.maxTokens }
+            : {}),
+          responseMimeType: 'application/json',
+        },
+      },
+    });
+
+    const content = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('');
+    if (!content) {
+      throw new AiError('bad_response', 'Gemini returned an empty response.');
+    }
+    const translations = parseTranslations(content, request.paragraphs.length);
+    return {
+      paragraphs: request.paragraphs.map((paragraph, index) => ({
+        text: paragraph.text,
+        translation: translations[index] ?? '',
+      })),
+    };
   }
 
   /** Post one generateContent call with a system instruction and read the text. */

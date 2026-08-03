@@ -17,18 +17,26 @@ export interface ExplainRequest {
 }
 
 export interface TranslateRequest {
-  /** Text of a single translation unit (paragraph, heading, list item…). */
-  text: string;
-  /** Target language; falls back to the user's target-language setting. */
-  language?: string;
-}
-
-export interface TranslateRequest {
-  /** Source text to translate. */
-  text: string;
+  /** Paragraphs to translate, in order. */
+  paragraphs: Array<{ text: string }>;
   /** Target language name, e.g. "Russian". */
   language: string;
 }
+
+/** A paragraph the caller wants translated, with a stable caller-owned id. */
+export interface TranslationParagraph {
+  id: string;
+  text: string;
+}
+
+/** A translated paragraph, keyed by the caller's paragraph id. */
+export interface TranslationResult {
+  id: string;
+  text: string;
+  translation: string;
+}
+
+export type TranslateResultList = TranslationResult[];
 
 export interface ProviderConfig {
   apiKey: string;
@@ -51,7 +59,12 @@ export interface AiProvider {
   /** Whether this provider requires an API key (local runtimes do not). */
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
-  translate(request: TranslateRequest, config: ProviderConfig): Promise<string>;
+  translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult>;
+}
+
+/** Provider-level translation response: one translation per input paragraph. */
+export interface TranslateResult {
+  paragraphs: Array<{ text: string; translation: string }>;
 }
 
 export type AiErrorCode =

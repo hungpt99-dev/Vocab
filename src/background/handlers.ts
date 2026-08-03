@@ -153,7 +153,11 @@ export async function translateUnit(
   deps: BackgroundDeps,
   payload: { text: string; language?: string },
 ): Promise<string> {
-  return deps.translate.translate({ text: payload.text, language: payload.language });
+  const results = await deps.translate.translate(
+    [{ id: 'unit', text: payload.text }],
+    payload.language ?? 'English',
+  );
+  return results[0]?.translation ?? '';
 }
 
 /** Build the handler map used by the service worker's message router. */

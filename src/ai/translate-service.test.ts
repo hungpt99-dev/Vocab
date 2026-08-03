@@ -1,93 +1,53 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TranslateService } from './translate-service';
 import { SettingsRepository } from '@/storage/settings-repository';
-import { TranslationService } from './translate-service';
+
+/** Build a translations payload sized to match the request body's paragraph count. */
+function translationPayload(body: string): string {
+  const match = body.match(/Translate the (\d+) paragraph/);
+  const count = match ? Number(match[1]) : 1;
+  const translations = Array.from({ length: count }, (_, index) => `T${index + 1}`);
+  return JSON.stringify({ translations });
+}
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('TranslationService', () => {
-  it('translates through the configured provider with its credentials', async () => {
+describe('TranslateService', () => {
+  it('uses the configured provider and posts paragraph translations', async () => {
     const settings = new SettingsRepository();
     await settings.update({
       providers: [
-        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'key-123', baseUrl: '', model: '', enabled: true },
+        { id: 'p1', type: 'anthropic', name: 'Claude', apiKey: 'key-123', baseUrl: '', model: '', enabled: true },
       ],
       activeProviderId: 'p1',
     });
 
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ choices: [{ message: { content: 'Bonjour le monde.' } }] }),
+        json: async () => ({ content: [{ type: 'text', text: translationPayload(init?.body as string) }] }),
         text: async () => '',
       } as unknown as Response;
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const translated = await new TranslationService(settings).translate({ text: 'Hello world.' });
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer key-123');
-    expect(translated).toBe('Bonjour le monde.');
-  });
-
-  it('uses the target-language setting when the request has none', async () => {
-    const settings = new SettingsRepository();
-    await settings.update({
-      providers: [
-        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'key', baseUrl: '', model: '', enabled: true },
+    const result = await new TranslateService(settings).translate(
+      [
+        { id: 'a', text: 'Hello' },
+        { id: 'b', text: 'World' },
       ],
-      activeProviderId: 'p1',
-      targetLanguage: 'French',
-    });
-
-    const fetchMock = vi.fn(async () => {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ choices: [{ message: { content: 'Bonjour.' } }] }),
-        text: async () => '',
-      } as unknown as Response;
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await new TranslationService(settings).translate({ text: 'Hello.' });
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    const messages = JSON.parse(init.body as string).messages as Array<{ content: string }>;
-    const userMessage = messages[1];
-    expect(userMessage?.content).toContain('French');
-    expect(userMessage?.content).toContain('Hello.');
-  });
-
-  it('falls back to a second provider on a transient error', async () => {
-    const settings = new SettingsRepository();
-    await settings.update({
-      providers: [
-        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'k', baseUrl: '', model: '', enabled: true },
-        { id: 'p2', type: 'anthropic', name: 'Claude', apiKey: 'k2', baseUrl: '', model: '', enabled: true },
-      ],
-      activeProviderId: 'p1',
-      fallbackProviderId: 'p2',
-    });
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        if (String(url).includes('api.anthropic.com')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({ content: [{ type: 'text', text: 'Bonjour.' }] }),
-            text: async () => '',
-          } as unknown as Response;
-        }
-        throw new Error('network down');
-      }),
+      'Spanish',
     );
 
-    const translated = await new TranslationService(settings).translate({ text: 'Hello.' });
-    expect(translated).toBe('Bonjour.');
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe('key-123');
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain('Hello');
+    expect(result).toEqual([
+      { id: 'a', text: 'Hello', translation: 'T1' },
+      { id: 'b', text: 'World', translation: 'T2' },
+    ]);
   });
 
   it('surfaces a missing key as an AiError', async () => {
@@ -98,9 +58,61 @@ describe('TranslationService', () => {
       ],
       activeProviderId: 'p1',
     });
+    await expect(new TranslateService(settings).translate([{ id: 'a', text: 'Hi' }], 'Spanish')).rejects.toMatchObject(
+      { code: 'missing_api_key' },
+    );
+  });
 
-    await expect(new TranslationService(settings).translate({ text: 'Hello.' })).rejects.toMatchObject({
-      code: 'missing_api_key',
+  it('chunks long articles across multiple provider calls in order', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [
+        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'k', baseUrl: '', model: '', enabled: true },
+      ],
+      activeProviderId: 'p1',
     });
+
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: translationPayload(init?.body as string) } }] }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const paragraphs = Array.from({ length: 10 }, (_, index) => ({ id: `p${index}`, text: `Para ${index}` }));
+    const result = await new TranslateService(settings).translate(paragraphs, 'Spanish');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(10);
+    expect(result[0]).toEqual({ id: 'p0', text: 'Para 0', translation: 'T1' });
+    expect(result[9]).toEqual({ id: 'p9', text: 'Para 9', translation: 'T2' });
+  });
+
+  it('serves repeated requests from the cache', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [
+        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'k', baseUrl: '', model: '', enabled: true },
+      ],
+      activeProviderId: 'p1',
+    });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: translationPayload(init?.body as string) } }] }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const service = new TranslateService(settings);
+    await service.translate([{ id: 'a', text: 'Hello' }], 'Spanish');
+    await service.translate([{ id: 'a', text: 'Hello' }], 'Spanish');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

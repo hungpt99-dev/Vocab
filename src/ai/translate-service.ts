@@ -1,49 +1,162 @@
 import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
-import { runAiCall, runWithFallback } from './pipeline';
-import type { TranslateRequest } from './types';
+import { getProvider } from './registry';
+import { runActiveWithFallback } from './run-with-fallback';
+import type { TranslateRequest, TranslationParagraph, TranslationResult } from './types';
+import { AiError } from './types';
+import { withRetry, type RetryOptions } from './retry';
+import { sharedRateLimiter } from './rate-limiter';
+
+const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
+
+/** Keep each provider request small enough to stay inside a model context. */
+const CHUNK_SIZE = 8;
+
+interface CacheEntry {
+  translations: string[];
+  expiresAt: number;
+}
 
 /**
- * Application-level entry point for page translation. It is the ONLY thing the
- * content script talks to: it resolves the configured provider(s), applies
- * rate-limiting and retry/backoff via the shared AI pipeline, and returns the
- * translated unit. No content-script code touches a provider SDK.
+ * Application-level entry point for paragraph translation. It is the only thing
+ * feature code talks to: it resolves the configured provider(s), applies
+ * caching, rate-limiting, retry/backoff and optional fallback, and returns a
+ * normalised result keyed by the caller's paragraph ids. No feature code
+ * touches a provider SDK directly.
  */
-export class TranslationService {
-  constructor(private readonly settings: SettingsRepository = settingsRepository) {}
+export class TranslateService {
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly cacheTtlMs: number;
 
-  async translate(request: TranslateRequest, signal?: AbortSignal): Promise<string> {
+  constructor(
+    private readonly settings: SettingsRepository = settingsRepository,
+    cacheTtlMs = 1000 * 60 * 60 * 24,
+  ) {
+    this.cacheTtlMs = cacheTtlMs;
+  }
+
+  async translate(
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<TranslationResult[]> {
     const settings = await this.settings.get();
-    return this.translateWith(settings, request, signal);
+    return this.translateWith(settings, paragraphs, language, signal);
   }
 
   /** Translate using an explicit settings object (used by tests). */
   async translateWith(
     settings: Settings,
-    request: TranslateRequest,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
     signal?: AbortSignal,
-  ): Promise<string> {
-    const language = request.language || settings.targetLanguage || 'English';
-    const { value } = await runWithFallback(
-      settings,
-      (provider, sig) => this.runOnce(provider, { ...request, language }, sig),
-      signal,
-    );
-    return value;
+  ): Promise<TranslationResult[]> {
+    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
+    if (!active) {
+      throw new AiError('unknown_provider', 'No active AI provider is configured.');
+    }
+    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
+
+    const results: TranslationResult[] = [];
+    for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
+      const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
+      const chunkResults = await this.translateChunk(active, fallback, chunk, language, signal);
+      results.push(...chunkResults);
+    }
+    return results;
   }
 
-  /** Run a single translation against a specific saved provider. */
-  runOnce(
+  private async translateChunk(
+    active: SavedProvider,
+    fallback: SavedProvider | undefined,
+    chunk: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<TranslationResult[]> {
+    const cached = this.readCache(active, chunk, language);
+    const translations = cached ?? (await this.runChunk(active, fallback, chunk, language, signal));
+    if (!cached) this.writeCache(active, chunk, language, translations);
+
+    return chunk.map((paragraph, index) => ({
+      id: paragraph.id,
+      text: paragraph.text,
+      translation: translations[index] ?? '',
+    }));
+  }
+
+  private async runChunk(
+    active: SavedProvider,
+    fallback: SavedProvider | undefined,
+    chunk: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const request: TranslateRequest = {
+      paragraphs: chunk.map(({ text }) => ({ text })),
+      language,
+    };
+    return runActiveWithFallback(
+      (provider) => this.runOnce(provider, request, signal),
+      active,
+      fallback,
+    );
+  }
+
+  private async runOnce(
     provider: SavedProvider,
     request: TranslateRequest,
     signal?: AbortSignal,
-  ): Promise<string> {
-    return runAiCall(
-      provider,
-      (adapter, config) => adapter.translate(request, config),
-      signal,
+  ): Promise<string[]> {
+    const adapter = getProvider(provider.type);
+    await sharedRateLimiter.acquire(signal);
+    const result = await withRetry(
+      () =>
+        adapter.translate(request, {
+          apiKey: provider.apiKey,
+          model: provider.model,
+          baseUrl: provider.baseUrl,
+          temperature: provider.temperature,
+          maxTokens: provider.maxTokens,
+          signal,
+          timeoutMs: provider.timeoutMs,
+        }),
+      { ...RETRY_OPTIONS, signal },
     );
+    return result.paragraphs.map(({ translation }) => translation);
+  }
+
+  private cacheKey(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+  ): string {
+    const body = paragraphs.map(({ text }) => text).join('␞');
+    return `${provider.type}|${provider.model}|${language}|${body}`;
+  }
+
+  private readCache(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+  ): string[] | null {
+    const key = this.cacheKey(provider, paragraphs, language);
+    const entry = this.cache.get(key);
+    if (entry && entry.expiresAt > Date.now()) return entry.translations;
+    this.cache.delete(key);
+    return null;
+  }
+
+  private writeCache(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+    translations: readonly string[],
+  ): void {
+    this.cache.set(this.cacheKey(provider, paragraphs, language), {
+      translations: [...translations],
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
   }
 }
 
-export const translationService = new TranslationService();
+export const translateService = new TranslateService();

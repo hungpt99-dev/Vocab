@@ -7,7 +7,9 @@ import {
   buildExplainWordUserPrompt,
   buildTranslateUserPrompt,
 } from '../prompts';
-import { extractTranslation, toExplanation } from '../parse';
+import { toExplanation } from '../parse';
+import { parseTranslations } from '../parse-translation';
+import type { TranslateResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface ChatCompletionResponse {
@@ -57,13 +59,45 @@ export class OpenAiCompatibleProvider implements AiProvider {
     return toExplanation(content, { provider: this.id, model });
   }
 
-  async translate(request: TranslateRequest, config: ProviderConfig): Promise<string> {
-    const { content } = await this.complete(
-      config,
-      TRANSLATE_SYSTEM_PROMPT,
-      buildTranslateUserPrompt(request),
-    );
-    return extractTranslation(content);
+  async translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult> {
+    if (this.requiresApiKey && !config.apiKey) {
+      throw new AiError('missing_api_key', `An API key is required for ${this.label}.`);
+    }
+
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+    const headers: Record<string, string> = { ...this.preset.extraHeaders };
+    if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+
+    const data = await postJson<ChatCompletionResponse>({
+      url: joinUrl(baseUrl, 'chat/completions'),
+      headers,
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        model,
+        messages: [
+          { role: 'system', content: TRANSLATE_SYSTEM_PROMPT },
+          { role: 'user', content: buildTranslateUserPrompt(request) },
+        ],
+        temperature: config.temperature ?? 0.1,
+        ...(config.maxTokens !== undefined && config.maxTokens !== null
+          ? { max_tokens: config.maxTokens }
+          : { max_tokens: 4096 }),
+      },
+    });
+
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new AiError('bad_response', `${this.label} returned an empty response.`);
+    }
+    const translations = parseTranslations(content, request.paragraphs.length);
+    return {
+      paragraphs: request.paragraphs.map((paragraph, index) => ({
+        text: paragraph.text,
+        translation: translations[index] ?? '',
+      })),
+    };
   }
 
   /** Post one chat-completions call with a system + user turn and extract the text. */

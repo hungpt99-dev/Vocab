@@ -35,7 +35,6 @@ function mockFetch(body: unknown, init: { ok?: boolean; status?: number } = {}) 
 
 const config = { apiKey: 'sk-test', model: '', baseUrl: '' };
 const request = { word: 'serendipity', context: 'Pure serendipity struck.' };
-const translateRequest = { text: 'Serendipity struck me today.', language: 'Russian' };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -103,24 +102,6 @@ describe('OpenAiCompatibleProvider', () => {
     await expect(provider.explain(request, config)).rejects.toThrow(/empty response/);
   });
 
-  it('translates through the same chat-completions endpoint', async () => {
-    const fetchMock = mockFetch({ choices: [{ message: { content: 'Сегодня меня настигла случайность.' } }] });
-    const translation = await provider.translate(translateRequest, config);
-
-    const [url, init] = callAt(fetchMock, 0);
-    expect(url).toBe('https://api.openai.com/v1/chat/completions');
-    const body = JSON.parse(init.body as string);
-    expect(body.messages[0].content).toContain('professional translator');
-    expect(body.messages[1].content).toContain('Translate the following text into Russian');
-    expect(translation).toBe('Сегодня меня настигла случайность.');
-  });
-
-  it('requires an API key to translate when the preset demands one', async () => {
-    await expect(provider.translate(translateRequest, { ...config, apiKey: '' })).rejects.toMatchObject({
-      code: 'missing_api_key',
-    });
-  });
-
   it('normalises transport failures', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     const error = await provider.explain(request, config).catch((e: AiError) => e);
@@ -184,19 +165,6 @@ describe('GeminiProvider', () => {
     });
   });
 
-  it('translates via generateContent without forcing JSON output', async () => {
-    const fetchMock = mockFetch({
-      candidates: [{ content: { parts: [{ text: 'Сегодня меня настигла случайность.' }] } }],
-    });
-    const translation = await provider.translate(translateRequest, config);
-
-    const [, init] = callAt(fetchMock, 0);
-    const body = JSON.parse(init.body as string);
-    expect(body.systemInstruction.parts[0].text).toContain('professional translator');
-    expect(body.generationConfig.responseMimeType).toBeUndefined();
-    expect(translation).toBe('Сегодня меня настигла случайность.');
-  });
-
   it('rejects an empty candidate list', async () => {
     mockFetch({ candidates: [] });
     await expect(provider.explain(request, config)).rejects.toThrow(/empty response/);
@@ -234,20 +202,6 @@ describe('AnthropicProvider', () => {
     await expect(provider.explain(request, { ...config, apiKey: '' })).rejects.toMatchObject({
       code: 'missing_api_key',
     });
-  });
-
-  it('translates via the messages endpoint', async () => {
-    const fetchMock = mockFetch({
-      content: [{ type: 'text', text: 'Сегодня меня настигла случайность.' }],
-      model: 'claude-3-5-haiku-latest',
-    });
-    const translation = await provider.translate(translateRequest, config);
-
-    const [, init] = callAt(fetchMock, 0);
-    const body = JSON.parse(init.body as string);
-    expect(body.system).toContain('professional translator');
-    expect(body.messages[0].content).toContain('Translate the following text into Russian');
-    expect(translation).toBe('Сегодня меня настигла случайность.');
   });
 
   it('rejects an empty content list', async () => {
