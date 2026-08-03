@@ -470,8 +470,44 @@ export function injectStyles(doc: Document = document): void {
       .avs-assist-menu { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-panel { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-popover { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
-      @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+    .avs-inline-translation {
+      display: block;
+      margin: 2px 0 6px;
+      padding-left: 10px;
+      border-left: 2px solid var(--avs-overlay-divider);
+      color: var(--avs-overlay-muted);
+      font-size: 0.92em;
+      line-height: 1.5;
+      font-style: italic;
     }
+    .avs-inline-translation[hidden] { display: none; }
+    .avs-inline-control {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: ${zIndex.overlay};
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: ${radius.md};
+      background: var(--avs-overlay-surface);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .avs-inline-control[hidden] { display: none; }
+    .avs-inline-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: var(--avs-overlay-text);
+      cursor: pointer;
+    }
+    .avs-inline-btn:hover { background: var(--avs-overlay-surface-alt); }
+    .avs-inline-btn svg { width: 16px; height: 16px; }
   `;
   (doc.head ?? doc.documentElement).append(style);
 }

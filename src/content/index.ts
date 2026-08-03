@@ -21,8 +21,7 @@ import {
 import { ExplainPanel } from './explain-panel';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
-import { translateCurrentPage } from './translate/translate';
-import { BilingualReader } from './reading/reader';
+import { InlineReader } from './reading/inline-reader';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -30,7 +29,7 @@ const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
 const explainPanel = new ExplainPanel();
-const reader = new BilingualReader();
+const reader = new InlineReader();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -146,25 +145,6 @@ async function handleToolbarAction(
       if (state) assistMenu.toggle(state);
       return;
     }
-    case 'translate': {
-      toolbar.hide();
-      try {
-        const result = await translateCurrentPage();
-        if (result.translated > 0) {
-          showToast(
-            `Translated ${result.translated} passage${result.translated === 1 ? '' : 's'}`,
-            'success',
-          );
-        } else if (result.error) {
-          showToast(`Translation failed: ${result.error}`, 'error');
-        } else {
-          showToast('Nothing to translate', 'error');
-        }
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Translation failed.', 'error');
-      }
-      return;
-    }
     case 'save': {
       toolbar.hide();
       try {
@@ -275,7 +255,6 @@ async function refresh(): Promise<void> {
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
-  reader.updateVocabulary(data.enabled ? matcher : null);
 
   removeHighlights();
   if (!data.enabled || matcher.size === 0) {
