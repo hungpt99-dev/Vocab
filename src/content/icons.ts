@@ -4,6 +4,7 @@
  * size so the injected markup stays compact and never leaks the lucide class
  * into the host page. */
 import {
+  AlignVerticalJustifyStart,
   Book,
   Bookmark,
   BookOpen,
@@ -42,3 +43,5 @@ export const ICON_MESSAGE = icon(MessageSquare);
 export const ICON_BOOK = icon(Book);
 export const ICON_MINIMIZE = icon(Minimize2);
 export const ICON_FILE = icon(FileText);
+/** Bilingual-book sentence alignment toggle (stacked facing lines). */
+export const ICON_ALIGN_SENTENCE = icon(AlignVerticalJustifyStart);

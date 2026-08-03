@@ -130,4 +130,40 @@ describe('BilingualReader', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(document.querySelector('.avs-reader')).toBeNull();
   });
+
+  it('renders one row per sentence in sentence alignment', async () => {
+    stubTranslate();
+    document.body.innerHTML =
+      '<article><p>First sentence here. Second sentence there!</p><p>Another block.</p></article>';
+    await chromeMock().storage.local.set({ 'avs:reading': { alignment: 'sentence' } });
+    const reader = new BilingualReader();
+    await reader.open();
+
+    const overlay = document.querySelector('.avs-reader');
+    expect(overlay?.getAttribute('data-align')).toBe('sentence');
+    const sections = [...(overlay?.querySelectorAll('.avs-block') ?? [])].map(
+      (s) => (s as HTMLElement).dataset.align,
+    );
+    expect(sections).toEqual(['sentence', 'sentence', 'sentence']);
+    const texts = [...(overlay?.querySelectorAll('.avs-block-src') ?? [])].map(
+      (s) => s.textContent,
+    );
+    expect(texts).toEqual(['First sentence here.', 'Second sentence there!', 'Another block.']);
+    reader.close();
+  });
+
+  it('hides translations when bilingual mode is off', async () => {
+    stubTranslate();
+    document.body.innerHTML = '<article><p>Hello world.</p></article>';
+    await chromeMock().storage.local.set({ 'avs:settings': { bilingualMode: false } });
+    const reader = new BilingualReader();
+    await reader.open();
+
+    const overlay = document.querySelector('.avs-reader');
+    expect(overlay?.getAttribute('data-bilingual')).toBe('off');
+    const tgt = document.querySelector('.avs-block-tgt');
+    expect(tgt).not.toBeNull();
+    expect(tgt).toHaveAttribute('hidden');
+    reader.close();
+  });
 });

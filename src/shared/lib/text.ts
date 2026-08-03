@@ -31,6 +31,86 @@ export function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Matches terminal punctuation that can end a sentence. */
+const SENTENCE_TERMINATORS = /[.!?。！？]/u;
+
+/** Common abbreviations whose trailing period is not a sentence boundary. */
+const ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'e.g', 'i.e', 'u.s', 'u.k']);
+
+/** A single-letter initial ("J. Smith"), lowercased by normalizeSentenceToken. */
+const INITIAL = /^[a-z]$/u;
+
+/** Fold a boundary candidate token into a comparable key ("Mr." → "mr"). */
+function normalizeSentenceToken(token: string): string {
+  return token.toLowerCase().replace(/[.']+$/u, '');
+}
+
+/**
+ * True when the terminator at `index` does NOT close a sentence: it is a
+ * decimal/version number, a known abbreviation or a single-letter initial.
+ */
+function isIntraSentenceBoundary(text: string, index: number): boolean {
+  const char = text[index];
+  const prev = text[index - 1];
+  const next = text[index + 1];
+  if (char === '.' && prev && next && /\d/.test(prev) && /\d/.test(next)) return true;
+  if (char !== '.') return false;
+
+  const token = normalizeSentenceToken(cutBackwards(text, index));
+  if (ABBREVIATIONS.has(token)) return true;
+  if (INITIAL.test(token)) return true;
+  return false;
+}
+
+/** The word token ending at `index`, including internal periods ("U.S."). */
+function cutBackwards(text: string, index: number): string {
+  let end = index + 1;
+  while (end < text.length && /[.']/u.test(text[end] ?? '')) end += 1;
+  let start = index - 1;
+  while (start >= 0 && /[\p{L}.']/u.test(text[start] ?? '')) start -= 1;
+  return text.slice(start + 1, end);
+}
+
+/**
+ * Split a paragraph into sentences. Each returned sentence keeps its terminal
+ * punctuation and any trailing closing quotes/brackets. Guards against splitting
+ * on common abbreviations, single-letter initials and decimal/version numbers.
+ * Empty input yields an empty array.
+ */
+export function splitIntoSentences(input: string): string[] {
+  const text = input.trim();
+  if (!text) return [];
+
+  const sentences: string[] = [];
+  let sentenceStart = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (!char || !SENTENCE_TERMINATORS.test(char)) continue;
+    if (isIntraSentenceBoundary(text, index)) continue;
+
+    let end = index + 1;
+    while (end < text.length && /[」』”’)\]＞]/.test(text[end] ?? '')) end += 1;
+    // For Latin text a terminator followed by letters/digits with no space is
+    // mid-sentence (e.g. a URL), so only close when the rest is blank or starts
+    // with a space. CJK sentences are not space-delimited, so always split.
+    if (char !== '。' && char !== '！' && char !== '？') {
+      const rest = text[end];
+      if (rest !== undefined && !/\s/u.test(rest)) continue;
+    }
+
+    sentences.push(text.slice(sentenceStart, end).trim());
+    sentenceStart = end;
+  }
+
+  if (sentenceStart < text.length) {
+    const tail = text.slice(sentenceStart).trim();
+    if (tail) sentences.push(tail);
+  }
+
+  return sentences.filter((sentence) => sentence.length > 0);
+}
+
 const SENTENCE_BOUNDARY = /[.!?。！？]\s|\n/;
 
 /**

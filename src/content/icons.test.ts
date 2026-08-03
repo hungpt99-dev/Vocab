@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   icon,
+  ICON_ALIGN_SENTENCE,
   ICON_BOOK,
   ICON_BOOKMARK,
   ICON_BOOK_OPEN,
@@ -49,6 +50,7 @@ describe('icon()', () => {
       ICON_BOOK,
       ICON_MINIMIZE,
       ICON_FILE,
+      ICON_ALIGN_SENTENCE,
     ];
     for (const constant of constants) {
       expect(constant).toMatch(/^<svg viewBox="0 0 24 24" width="16" height="16"/);
