@@ -14,6 +14,9 @@ import {
 const STYLE_ID = 'avs-styles';
 
 export const HIGHLIGHT_COLOR_VAR = '--avs-highlight-color';
+export const CARD_WIDTH_VAR = '--avs-card-width';
+export const CARD_FONT_SIZE_VAR = '--avs-card-font-size';
+export const CARD_SPACING_VAR = '--avs-card-spacing';
 
 /**
  * Inject (once) the stylesheet used by highlights, hover card and toasts.
@@ -59,6 +62,7 @@ export function injectStyles(doc: Document = document): void {
       position: fixed;
       z-index: ${zIndex.overlay};
       box-sizing: border-box;
+      width: var(${CARD_WIDTH_VAR}, ${layout.overlayMaxWidth});
       max-width: ${layout.overlayMaxWidth};
       max-height: min(320px, 70vh);
       overflow-y: auto;
@@ -67,6 +71,8 @@ export function injectStyles(doc: Document = document): void {
       background: var(--avs-overlay-surface);
       color: var(--avs-overlay-text);
       font: ${typography.overlayBody} ${typography.systemStack};
+      font-size: var(${CARD_FONT_SIZE_VAR}, 1rem);
+      line-height: var(${CARD_SPACING_VAR}, 1.5);
       box-shadow: ${elevation.overlay};
       pointer-events: none;
     }
@@ -270,4 +276,18 @@ export function injectStyles(doc: Document = document): void {
 /** Apply the user's highlight colour as a CSS custom property. */
 export function applyHighlightColor(value: string, doc: Document = document): void {
   doc.documentElement.style.setProperty(HIGHLIGHT_COLOR_VAR, value);
+}
+
+/**
+ * Apply the reading-experience overrides (card width, font size and line
+ * spacing) as CSS custom properties consumed by the injected stylesheet.
+ */
+export function applyReadingExperience(
+  experience: { width: number; fontSize: number; spacing: number },
+  doc: Document = document,
+): void {
+  const root = doc.documentElement;
+  root.style.setProperty(CARD_WIDTH_VAR, `${experience.width}px`);
+  root.style.setProperty(CARD_FONT_SIZE_VAR, `${experience.fontSize}px`);
+  root.style.setProperty(CARD_SPACING_VAR, String(experience.spacing));
 }

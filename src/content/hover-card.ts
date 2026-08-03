@@ -3,6 +3,14 @@ import type { HighlightEntry } from './matcher';
 const CARD_ID = 'avs-hover-card';
 const OFFSET = 10;
 
+/** Which sections of the hover card are visible. */
+export interface HoverCardOptions {
+  showOriginal: boolean;
+  showTranslation: boolean;
+}
+
+const DEFAULT_OPTIONS: HoverCardOptions = { showOriginal: true, showTranslation: true };
+
 /** Custom event dispatched when a card shortcut is activated. */
 export const CARD_ACTION_EVENT = 'avs-card-action';
 
@@ -54,11 +62,11 @@ export class HoverCard {
     return card;
   }
 
-  show(anchor: HTMLElement, entry: HighlightEntry): void {
+  show(anchor: HTMLElement, entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     this.explaining = false;
 
     const card = this.ensureElement();
-    this.render(entry);
+    this.render(entry, options);
     card.hidden = false;
 
     anchor.setAttribute('aria-describedby', CARD_ID);
@@ -105,22 +113,27 @@ export class HoverCard {
     this.element = null;
   }
 
-  private render(entry: HighlightEntry): void {
+  private render(entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     if (!this.element) return;
-    this.element.replaceChildren(...renderContent(entry, this.explaining));
+    this.element.replaceChildren(...renderContent(entry, this.explaining, options));
   }
 }
 
-function renderContent(entry: HighlightEntry, explaining: boolean): HTMLElement[] {
+function renderContent(entry: HighlightEntry, explaining: boolean, options: HoverCardOptions): HTMLElement[] {
   const nodes: HTMLElement[] = [];
 
-  const word = document.createElement('div');
-  word.className = 'avs-card-word';
-  word.textContent = entry.word;
-  nodes.push(word);
+  if (options.showOriginal) {
+    const word = document.createElement('div');
+    word.className = 'avs-card-word';
+    word.textContent = entry.word;
+    nodes.push(word);
+  }
 
   if (entry.pronunciation) nodes.push(row('Pronunciation', entry.pronunciation));
-  nodes.push(row('Meaning', entry.meaning || 'No explanation yet — use AI explain below.'));
+  // The "translation" section is the meaning/explanation of the entry.
+  if (options.showTranslation) {
+    nodes.push(row('Meaning', entry.meaning || 'No explanation yet — use AI explain below.'));
+  }
   if (entry.note) nodes.push(row('Note', entry.note));
   nodes.push(row('Saved', formatSavedDate(entry.createdAt)));
 
