@@ -359,6 +359,18 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-popover-status { margin: 0; color: var(--avs-overlay-muted); }
     .avs-popover-error { margin: 0; color: ${color.status.danger}; }
+    .avs-popover-action {
+      margin-top: ${spacing.sm};
+      padding: ${spacing.xs} ${spacing.md};
+      border: 1px solid var(--avs-overlay-border);
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-fg);
+      font: inherit;
+      cursor: pointer;
+    }
+    .avs-popover-action:hover { background: var(--avs-overlay-surface-active); }
+    .avs-popover-action:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 1px; }
     .avs-popover-meaning { margin: 0 0 ${spacing.sm}; font-weight: 600; }
     .avs-popover-pronunciation { margin: 0 0 ${spacing.sm}; color: var(--avs-overlay-muted); }
     .avs-popover-simple { margin: 0 0 ${spacing.md}; }

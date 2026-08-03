@@ -167,3 +167,23 @@ test('saves a word straight from the page with the floating toolbar', async ({
   await expect(highlights.first()).toBeVisible({ timeout: 10_000 });
   await expect(highlights).toHaveCount(2);
 });
+
+test('popup AI explain with no valid provider shows an actionable toast', async ({
+  context,
+  extensionId,
+}) => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+  // The fixture's default provider has no API key, so explain must surface a
+  // clear, actionable message (not a blank/cryptic toast).
+  await popup.getByLabel(/word or phrase/i).fill('serendipity');
+  await popup.getByRole('button', { name: /save to vocabulary/i }).click();
+  const explainBtn = popup.getByRole('button', { name: /AI explain|Refresh explanation/i });
+  await explainBtn.first().waitFor({ state: 'visible', timeout: 10_000 });
+  await explainBtn.first().click();
+
+  // Poll for the actionable toast (explain round-trips to the provider and may take a moment).
+  const toast = popup.locator('[role="status"]').last();
+  await expect(toast).toBeVisible({ timeout: 15_000 });
+  await expect(toast).toHaveText(/Settings|API key|provider/i);
+});

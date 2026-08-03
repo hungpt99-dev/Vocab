@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { SelectionPayload } from '@/shared/messaging/contract';
 import { sendMessage } from '@/shared/messaging/client';
+import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
 
@@ -25,7 +26,7 @@ export function TranslatePanel({ selection }: TranslatePanelProps) {
     try {
       setTranslation(await sendMessage({ type: 'translate', payload: { text } }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The translation request failed.');
+      setError(aiErrorMessage(cause));
     } finally {
       setTranslating(false);
     }
