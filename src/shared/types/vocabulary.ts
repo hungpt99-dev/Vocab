@@ -14,6 +14,14 @@ export interface Explanation {
   collocations: string[];
   /** Brief grammatical notes: part of speech, countability, irregular forms. */
   grammar: string;
+  /** Part of speech, e.g. "noun". Populated for word-level explanations. */
+  partOfSpeech?: string;
+  /** How a phrase is used: register, typical contexts. Populated for phrases. */
+  usage?: string;
+  /** Plain-language gist of a sentence. Populated for sentence explanations. */
+  summary?: string;
+  /** Words in a sentence a learner may not know, each rendered "word: gloss". */
+  difficultVocabulary?: string[];
   /** Provider id that generated this explanation. */
   provider: string;
   /** Model identifier used, when reported. */

@@ -59,6 +59,21 @@ describe('toExplanation', () => {
     expect(explanation.antonyms).toEqual([]);
     expect(explanation.relatedWords).toEqual([]);
     expect(explanation.grammar).toBe('');
+    expect(explanation.partOfSpeech).toBe('');
+    expect(explanation.usage).toBe('');
+    expect(explanation.summary).toBe('');
+    expect(explanation.difficultVocabulary).toEqual([]);
+  });
+
+  it('coerces the unit-specific fields', () => {
+    const explanation = toExplanation(
+      '{"meaning":"m","partOfSpeech":"noun","usage":"idiom","summary":"gist","difficultVocabulary":"gloss: x"}',
+      meta,
+    );
+    expect(explanation.partOfSpeech).toBe('noun');
+    expect(explanation.usage).toBe('idiom');
+    expect(explanation.summary).toBe('gist');
+    expect(explanation.difficultVocabulary).toEqual(['gloss: x']);
   });
 
   it('falls back simpleExplanation to meaning', () => {

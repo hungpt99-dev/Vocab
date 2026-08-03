@@ -46,6 +46,8 @@ src/
 │   ├── toolbar.ts            Floating selection toolbar with a 'More' menu
 │   ├── reading-mode.ts       Bilingual article overlay with five switchable layouts
 │   ├── styles.ts             Injected CSS and the highlight colour variable
+│   ├── toolbar.ts            Floating action bar on selection, with unit detection
+│   ├── explain-popover.ts    Expandable, per-unit "Explain with AI" panel
 │   └── toast.ts              Transient status messages
 │
 ├── features/               Feature-scoped UI
@@ -87,13 +89,19 @@ selection → content script (readSelection)
 **Explaining a word**
 
 ```
-popup → sendMessage('explain')
-      → service worker → ExplainService
-      → registry.getProvider(settings.provider)
-      → provider.explain()  [direct HTTPS to the provider]
-      → parse.toExplanation()
-      → cached on the entry, broadcast to all surfaces
+content script (toolbar "Explain with AI") → ExplainPopover (calls AI only on click)
+          → sendMessage('explain', full context: word, unit, surrounding paragraph,
+              page title, URL, detected source language)
+          → service worker → ExplainService
+          → registry.getProvider(settings.provider)
+          → provider.explain()  [direct HTTPS to the provider]
+          → parse.toExplanation()
+          → cached on the entry, broadcast to all surfaces
 ```
+
+The content popover never talks to a provider: it sends the full `ExplainRequest` over the typed
+message bus, and `ExplainService` resolves the provider, rate-limiting, retry, fallback and the
+user's preferred (target) language from settings.
 
 **Highlighting a page**
 
