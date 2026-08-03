@@ -186,7 +186,7 @@ describe('explainWord', () => {
   });
 
   it('forwards page context to the explainer', async () => {
-    await explainWord(deps, 'serendipity', 'context', 'Page Title', 'preceding');
+    await explainWord(deps, 'serendipity', 'context', undefined, 'Page Title', 'preceding');
 
     expect(deps.explain.explain).toHaveBeenCalledWith({
       word: 'serendipity',
