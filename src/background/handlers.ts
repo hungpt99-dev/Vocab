@@ -1,6 +1,7 @@
 import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import type { HandlerMap } from '@/shared/messaging/router';
+import type { SelectionUnit } from '@/shared/lib/selection';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
 import {
@@ -49,6 +50,8 @@ export async function saveSelection(
       const explanation = await deps.explain.explainWith(settings, {
         word: entry.word,
         context: entry.sentence,
+        unit: selection.unit,
+        sourceLanguage: selection.language,
       });
       return await deps.vocabulary.update(entry.id, { explanation });
     } catch {
@@ -82,8 +85,10 @@ export async function explainWord(
   deps: BackgroundDeps,
   word: string,
   context?: string,
+  unit?: SelectionUnit,
+  sourceLanguage?: string,
 ): Promise<Explanation> {
-  const explanation = await deps.explain.explain({ word, context });
+  const explanation = await deps.explain.explain({ word, context, unit, sourceLanguage });
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
@@ -108,7 +113,14 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       return entry;
     },
     'get-highlight-data': () => buildHighlightData(deps),
-    explain: (message) => explainWord(deps, message.payload.word, message.payload.context),
+    explain: (message) =>
+      explainWord(
+        deps,
+        message.payload.word,
+        message.payload.context,
+        message.payload.unit,
+        message.payload.sourceLanguage,
+      ),
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
   };

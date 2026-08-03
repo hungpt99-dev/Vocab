@@ -1,4 +1,5 @@
 import type { ExplainRequest } from '../types';
+import type { SelectionUnit } from '@/shared/lib/selection';
 
 /**
  * System instruction for the "explain a word" capability. Kept separate from
@@ -20,14 +21,28 @@ export const EXPLAIN_WORD_SYSTEM_PROMPT = [
   'grammar briefly notes part of speech, countability and irregular forms.',
 ].join(' ');
 
-/** Build the user turn for a word-explanation request. */
+/** Task instruction for the detected selection unit, chosen by `unit`. */
+const UNIT_INSTRUCTIONS: Record<SelectionUnit, string> = {
+  word: 'Explain this word, its meaning and how it is used.',
+  phrase: 'Explain this phrase or idiom and how it is used.',
+  sentence: 'Explain the meaning and grammar of this sentence.',
+  paragraph: 'Summarise and explain this paragraph, highlighting its key vocabulary.',
+};
+
+/** Build the user turn for a word-explanation request, per selection unit. */
 export function buildExplainWordUserPrompt({
   word,
   context,
   language = 'English',
+  unit = 'word',
+  sourceLanguage,
 }: ExplainRequest): string {
   const lines = [`Word or phrase: "${word}"`];
   if (context) lines.push(`It appeared in this sentence: "${context}"`);
+  lines.push(UNIT_INSTRUCTIONS[unit]);
+  if (sourceLanguage && sourceLanguage !== language) {
+    lines.push(`The selected text is in ${sourceLanguage}.`);
+  }
   lines.push(`Explain it in ${language}. Respond with JSON only.`);
   return lines.join('\n');
 }

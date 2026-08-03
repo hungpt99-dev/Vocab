@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  classifySelection,
   computeToolbarPosition,
   readToolbarSelection,
   SelectionToolbar,
@@ -9,28 +8,6 @@ import {
 beforeEach(() => {
   document.body.innerHTML = '';
   vi.restoreAllMocks();
-});
-
-describe('classifySelection', () => {
-  it('treats a single token as a word', () => {
-    expect(classifySelection('serendipity')).toBe('word');
-  });
-
-  it('treats a multi-word span as a phrase', () => {
-    expect(classifySelection('a piece of cake')).toBe('phrase');
-  });
-
-  it('treats a single sentence as a sentence', () => {
-    expect(classifySelection('Serendipity struck me today.')).toBe('sentence');
-  });
-
-  it('treats two sentences as a paragraph', () => {
-    expect(classifySelection('One sentence. Then another one.')).toBe('paragraph');
-  });
-
-  it('returns word for empty input', () => {
-    expect(classifySelection('   ')).toBe('word');
-  });
 });
 
 describe('readToolbarSelection', () => {
@@ -44,7 +21,7 @@ describe('readToolbarSelection', () => {
     expect(readToolbarSelection()).toBeNull();
   });
 
-  it('returns text, unit and rect for a real selection', () => {
+  it('returns text, unit, language and rect for a real selection', () => {
     const range = {
       getBoundingClientRect: () => ({ width: 50, height: 14, top: 100, bottom: 114, left: 20 }),
     };
@@ -56,7 +33,26 @@ describe('readToolbarSelection', () => {
     } as unknown as Selection);
 
     const result = readToolbarSelection();
-    expect(result).toMatchObject({ text: 'serendipity', unit: 'word', rect: { top: 100, left: 20, width: 50 } });
+    expect(result).toMatchObject({
+      text: 'serendipity',
+      unit: 'word',
+      language: 'English',
+      rect: { top: 100, left: 20, width: 50 },
+    });
+  });
+
+  it('detects the unit and language of a multi-sentence selection', () => {
+    const range = {
+      getBoundingClientRect: () => ({ width: 200, height: 40, top: 100, bottom: 140, left: 20 }),
+    };
+    vi.spyOn(document, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      rangeCount: 1,
+      toString: () => 'One sentence. Then another one.',
+      getRangeAt: () => range,
+    } as unknown as Selection);
+
+    expect(readToolbarSelection()).toMatchObject({ unit: 'paragraph', language: 'English' });
   });
 });
 
@@ -90,7 +86,7 @@ describe('SelectionToolbar', () => {
   it('renders five action buttons with aria-labels and emits an action event', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+    toolbarUi.show({ text: 'hello', unit: 'word', language: 'English', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
 
     const element = document.getElementById('avs-toolbar')!;
     expect(element.hidden).toBe(false);
@@ -102,7 +98,9 @@ describe('SelectionToolbar', () => {
     element.querySelector<HTMLButtonElement>('[data-action="copy"]')!.click();
 
     expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { action: 'copy', text: 'hello' } }),
+      expect.objectContaining({
+        detail: { action: 'copy', text: 'hello', unit: 'word', language: 'English' },
+      }),
     );
     toolbarUi.destroy();
   });
@@ -110,7 +108,7 @@ describe('SelectionToolbar', () => {
   it('hides and detaches scroll handling', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hi', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 20 } });
+    toolbarUi.show({ text: 'hi', unit: 'word', language: 'English', rect: { top: 100, bottom: 114, left: 20, width: 20 } });
     expect(toolbarUi.isVisible).toBe(true);
 
     toolbarUi.hide();
@@ -122,8 +120,8 @@ describe('SelectionToolbar', () => {
   it('reuses a single toolbar element across shows', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'a', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 10 } });
-    toolbarUi.show({ text: 'b', unit: 'phrase', rect: { top: 200, bottom: 214, left: 40, width: 30 } });
+    toolbarUi.show({ text: 'a', unit: 'word', language: 'English', rect: { top: 100, bottom: 114, left: 20, width: 10 } });
+    toolbarUi.show({ text: 'b', unit: 'phrase', language: 'English', rect: { top: 200, bottom: 214, left: 40, width: 30 } });
     expect(document.querySelectorAll('.avs-toolbar')).toHaveLength(1);
     toolbarUi.destroy();
   });

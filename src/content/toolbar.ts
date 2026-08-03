@@ -1,19 +1,15 @@
-import { isPhrase } from '@/shared/lib/text';
+import { detectSelection, type SelectionUnit } from '@/shared/lib/selection';
 
 const TOOLBAR_ID = 'avs-toolbar';
 const OFFSET = 8;
-
-/**
- * The unit of the current selection. Drives which explain prompt the
- * downstream popover uses (word vs phrase vs sentence vs paragraph).
- */
-export type SelectionUnit = 'word' | 'phrase' | 'sentence' | 'paragraph';
 
 export interface ToolbarState {
   /** Non-collapsed selected text, whitespace-collapsed. */
   text: string;
   /** Detected selection unit. */
   unit: SelectionUnit;
+  /** Detected source language of the selection. */
+  language: string;
   /** Bounding rect of the selection range, viewport-relative. */
   rect: { top: number; bottom: number; left: number; width: number };
 }
@@ -47,22 +43,13 @@ const TOOLBAR_ACTIONS = [
 
 export type ToolbarActionId = (typeof TOOLBAR_ACTIONS)[number]['id'];
 
-/**
- * Classify a selection's text into a unit. Mirrors the existing `isPhrase`
- * heuristic but adds sentence/paragraph detection: a selection spanning more
- * than one sentence boundary is treated as a paragraph, a single multi-word
- * span as a phrase, etc.
- */
-export function classifySelection(text: string): SelectionUnit {
-  const collapsed = text.trim();
-  if (!collapsed) return 'word';
-  if (isPhrase(collapsed)) {
-    const sentenceCount = (collapsed.match(/[.!?。！？]+(\s|$)/gu) ?? []).length;
-    if (sentenceCount >= 2) return 'paragraph';
-    if (sentenceCount === 1) return 'sentence';
-    return 'phrase';
-  }
-  return 'word';
+/** Detail emitted with `avs-toolbar-action`, including the detected unit and
+ * source language so the downstream explain prompt can be selected per unit. */
+export interface ToolbarActionDetail {
+  action: ToolbarActionId;
+  text: string;
+  unit: SelectionUnit;
+  language: string;
 }
 
 /** Read the current selection text + unit + viewport-rect, or null if empty. */
@@ -76,7 +63,7 @@ export function readToolbarSelection(doc: Document = document): ToolbarState | n
 
   return {
     text,
-    unit: classifySelection(text),
+    ...detectSelection(text),
     rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
   };
 }
@@ -131,8 +118,13 @@ export class SelectionToolbar {
         event.stopPropagation();
         if (this.state) {
           document.dispatchEvent(
-            new CustomEvent('avs-toolbar-action', {
-              detail: { action: action.id, text: this.state.text },
+            new CustomEvent<ToolbarActionDetail>('avs-toolbar-action', {
+              detail: {
+                action: action.id,
+                text: this.state.text,
+                unit: this.state.unit,
+                language: this.state.language,
+              },
             }),
           );
         }

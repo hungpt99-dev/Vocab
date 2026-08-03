@@ -1,9 +1,14 @@
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
+import type { SelectionUnit } from '@/shared/lib/selection';
 
 /** Payload the content script reports about the current selection. */
 export interface SelectionPayload {
   word: string;
   sentence: string;
+  /** Detected selection unit, when the text can be classified. */
+  unit?: SelectionUnit;
+  /** Detected source language, when recognisable. */
+  language?: string;
   sourceUrl: string;
   sourceTitle: string;
 }
@@ -12,7 +17,7 @@ export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'explain'; payload: { word: string; context?: string; unit?: SelectionUnit; sourceLanguage?: string } }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }

@@ -25,8 +25,10 @@ export interface AiProvider {
 
 export interface ExplainRequest {
   word: string;
-  context?: string;   // sentence the word appeared in, to disambiguate sense
-  language?: string;
+  context?: string;          // sentence the word appeared in, to disambiguate sense
+  language?: string;         // target language for the explanation
+  unit?: 'word' | 'phrase' | 'sentence' | 'paragraph';  // selects the prompt variant
+  sourceLanguage?: string;   // detected source language of the selection
 }
 
 export interface ProviderConfig {
@@ -46,6 +48,8 @@ provider-specific belongs behind this interface. If you find yourself writing
 
 Prompts live in `src/ai/prompts/` (e.g. `explain-word.prompt.ts`) and are imported by the adapters, never
 inlined in provider code, so prompt strategy can evolve independently of the wire format.
+`buildExplainWordUserPrompt` picks an instruction variant from the request's `unit` (word / phrase /
+sentence / paragraph) and names the detected `sourceLanguage` when it differs from the target language.
 
 ---
 

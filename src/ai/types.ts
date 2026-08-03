@@ -1,5 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import type { AiProviderId } from '@/shared/types/settings';
+import type { SelectionUnit } from '@/shared/lib/selection';
 
 export interface ExplainRequest {
   word: string;
@@ -7,6 +8,10 @@ export interface ExplainRequest {
   context?: string;
   /** Target language for the explanation. */
   language?: string;
+  /** Detected selection unit — selects the explain prompt variant. */
+  unit?: SelectionUnit;
+  /** Detected source language of the selection. */
+  sourceLanguage?: string;
 }
 
 export interface ProviderConfig {

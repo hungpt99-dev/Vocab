@@ -6,7 +6,12 @@ import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import {
+  SelectionToolbar,
+  readToolbarSelection,
+  type ToolbarActionDetail,
+  type ToolbarActionId,
+} from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -68,7 +73,7 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
+    const detail = (event as CustomEvent<ToolbarActionDetail>).detail;
     void handleToolbarAction(detail.action, detail.text);
   }) as EventListener);
 }

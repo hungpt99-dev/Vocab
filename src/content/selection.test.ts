@@ -14,7 +14,7 @@ function stubSelection(text: string, node: Node | null) {
 }
 
 describe('readSelection', () => {
-  it('returns the word, sentence, url and title', () => {
+  it('returns the word, sentence, unit, language, url and title', () => {
     document.body.innerHTML = '<p>I love cake. Serendipity struck me today! Then I left.</p>';
     const paragraph = document.querySelector('p')!;
     stubSelection('Serendipity', paragraph.firstChild);
@@ -23,9 +23,18 @@ describe('readSelection', () => {
     expect(result).toMatchObject({
       word: 'Serendipity',
       sentence: 'Serendipity struck me today!',
+      unit: 'word',
+      language: 'English',
       sourceTitle: 'Test Page',
     });
     expect(result?.sourceUrl).toContain('http');
+  });
+
+  it('detects a phrase selection', () => {
+    document.body.innerHTML = '<p>It was a piece of cake.</p>';
+    const paragraph = document.querySelector('p')!;
+    stubSelection('piece of cake', paragraph.firstChild);
+    expect(readSelection()).toMatchObject({ unit: 'phrase', language: 'English' });
   });
 
   it('returns null when nothing is selected', () => {
