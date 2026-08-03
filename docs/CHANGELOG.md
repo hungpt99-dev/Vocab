@@ -44,7 +44,6 @@ All notable changes to this project are documented here. The format is based on
 - Library list is now virtualized (`react-window`) so large vocabularies render only visible cards; rows re-measure on expand/edit via ResizeObserver.
 - The delete confirmation is now a portaled modal (`createPortal`) rendered above the UI, so it is never trapped inside a virtualized row.
 - Content script styling now reads from the shared token module instead of hardcoded hex values; no visible change to end users.
-  visible change to end users.
 
 ### Fixed
 - AI calls now retry transient failures and are rate-limited; previously a transient 429/5xx failed immediately.
