@@ -1,6 +1,7 @@
 import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { ReadingExperience } from '@/shared/types/settings';
+import type { SelectionUnit } from '@/shared/lib/selection';
 
 /** Payload the content script reports about the current selection. */
 export interface SelectionPayload {
@@ -8,6 +9,10 @@ export interface SelectionPayload {
   sentence: string;
   /** Short excerpt of text immediately before the selection on the page. */
   precedingText: string;
+  /** Detected selection unit, when the text can be classified. */
+  unit?: SelectionUnit;
+  /** Detected source language of the selection (BCP-47-ish label, '' when unknown). */
+  sourceLanguage?: string;
   sourceUrl: string;
   sourceTitle: string;
 }
@@ -22,16 +27,43 @@ export interface DifficultWordsPayload {
   sourceLanguage: string;
 }
 
+/** A paragraph the content script asks to be translated. */
+export interface TranslationParagraphPayload {
+  id: string;
+  text: string;
+}
+
+/** A paragraph plus its translation. */
+export interface TranslatedParagraphPayload {
+  id: string;
+  text: string;
+  translation: string;
+}
+
 export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'save-selection'; payload: SelectionPayload }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string; kind?: ExplainKind; pageTitle?: string; precedingText?: string } }
+  | {
+      type: 'explain';
+      payload: {
+        word: string;
+        context?: string;
+        kind?: ExplainKind;
+        unit?: SelectionUnit;
+        sourceLanguage?: string;
+        pageTitle?: string;
+        precedingText?: string;
+      };
+    }
   | { type: 'save-difficult-words'; payload: DifficultWordsPayload }
   | { type: 'translate'; payload: { text: string; language?: string } }
   | { type: 'get-highlight-data' }
   | { type: 'translate-blocks'; payload: { blocks: string[] } }
+  | { type: 'translate-article'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
+  | { type: 'toggle-bilingual-reading' }
+  | { type: 'open-options' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } };
@@ -61,6 +93,9 @@ export interface ResponseMap {
   'get-highlight-data': HighlightData;
   /** One translated string per input block; null marks a per-block failure. */
   'translate-blocks': Array<string | null>;
+  'translate-article': TranslatedParagraphPayload[];
+  'toggle-bilingual-reading': void;
+  'open-options': void;
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;
