@@ -45,10 +45,9 @@ beforeEach(async () => {
   deps = {
     vocabulary: new VocabularyRepository(db),
     settings,
-    ai: Object.assign(new ExplainService(settings), {
+    explain: Object.assign(new ExplainService(settings), {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),
-      translate: vi.fn(async () => 'la chance'),
     }) as unknown as ExplainService,
   };
 });
@@ -98,7 +97,7 @@ describe('saveSelection', () => {
 
   it('does not call the AI when auto-explain is off', async () => {
     await saveSelection(deps, selection);
-    expect(deps.ai.explainWith).not.toHaveBeenCalled();
+    expect(deps.explain.explainWith).not.toHaveBeenCalled();
   });
 
   it('attaches an explanation when auto-explain is on', async () => {
@@ -124,7 +123,7 @@ describe('saveSelection', () => {
 
   it('still saves when auto-explain fails', async () => {
     await deps.settings.update({ autoExplainOnSave: true });
-    (deps.ai.explainWith as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+    (deps.explain.explainWith as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('no key'),
     );
 
