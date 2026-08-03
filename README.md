@@ -51,6 +51,7 @@ explains your words — stays under your control.
 | Feature | Details |
 | --- | --- |
 | **Save a selection** | Right-click menu, popup form, or `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS) |
+| **Smart selection toolbar** | Select text on any page to get a floating toolbar: explain with AI, translate, save, copy, or copy the source sentence/citation |
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
 | **On-page highlighting** | Saved words highlighted everywhere — including both columns of bilingual (original/translation) pages; hover or keyboard-focus shows meaning, pronunciation, note, saved date and an AI-explain shortcut |
