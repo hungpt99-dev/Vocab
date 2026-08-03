@@ -137,25 +137,6 @@ async function handleToolbarAction(
       toolbar.hide();
       return;
     }
-    case 'save': {
-      toolbar.hide();
-      try {
-        const entry = await sendMessage({ type: 'save-current-selection' });
-        if (entry) {
-          showToast(`Saved "${entry.word}"`, 'success');
-        } else {
-          showToast('No selection to save.', 'error');
-        }
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Could not save that word.', 'error');
-      }
-      return;
-    }
-    case 'explain': {
-      toolbar.hide();
-      if (state) void runExplain('Explain with AI', 'word', state);
-      return;
-    }
     case 'more': {
       if (state) assistMenu.toggle(state);
       return;
@@ -179,6 +160,24 @@ async function handleToolbarAction(
       }
       return;
     }
+    case 'save': {
+      toolbar.hide();
+      try {
+        const entry = await sendMessage({ type: 'save-current-selection' });
+        if (entry) {
+          showToast(`Saved "${entry.word}"`, 'success');
+        } else {
+          showToast('No selection to save.', 'error');
+        }
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Could not save that word.', 'error');
+      }
+      return;
+    }
+    default:
+      // Only the explain action is left unwired; surface it so the toolbar is live.
+      showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
+      toolbar.hide();
   }
 }
 
