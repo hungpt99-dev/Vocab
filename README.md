@@ -198,18 +198,13 @@ and tags. Filter by favourites or tag.
 **Explain a word.** Click **AI explain** on an entry, or on a hover card over a highlighted word. The
 result is cached until you refresh it.
 
-<<<<<<< HEAD
-**Highlighting.** Saved words are highlighted as you browse, in both the original and translated text
-of bilingual pages. Hover — or tab to a highlight — to see the meaning, pronunciation, your note and
-the saved date, plus an **AI explain** shortcut. Press `Escape` to dismiss.
-=======
 **Translate a page.** Select any text, then click **Translate** on the selection toolbar. Each
 paragraph, heading, list item and table cell is translated individually — never the whole page as one
 block — so headings, lists, links and code blocks stay intact and the layout is unchanged.
 
-**Highlighting.** Saved words are highlighted as you browse. Hover — or tab to a highlight — to see the
-meaning, your note and the saved date. Press `Escape` to dismiss.
->>>>>>> 1bc71b5 (feat(vocab): structured paragraph-by-paragraph page translation)
+**Highlighting.** Saved words are highlighted as you browse, in both the original and translated text
+of bilingual pages. Hover — or tab to a highlight — to see the meaning, pronunciation, your note and
+the saved date, plus an **AI explain** shortcut. Press `Escape` to dismiss.
 
 **Back up.** Settings → *Export JSON*. Restore with *Import JSON* using **merge** (keeps newer entries)
 or **replace** (clears first).

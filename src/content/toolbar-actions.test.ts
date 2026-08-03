@@ -96,9 +96,7 @@ describe('handleToolbarAction — save', () => {
     expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({
       type: 'save-current-selection',
     });
-    expect(document.querySelector('.avs-toast')?.textContent).toBe(
-      'Saved "serendipity" to your vocabulary.',
-    );
+    expect(document.querySelector('.avs-toast')?.textContent).toBe('Saved "serendipity"');
     expect(deps.hideToolbar).toHaveBeenCalled();
   });
 

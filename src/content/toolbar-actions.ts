@@ -57,7 +57,7 @@ async function saveToVocabulary(hideToolbar: () => void): Promise<void> {
   try {
     const entry = await sendMessage({ type: 'save-current-selection' });
     if (entry) {
-      showToast(`Saved "${entry.word}" to your vocabulary.`, 'success');
+      showToast(`Saved "${entry.word}"`, 'success');
     } else {
       showToast('No selection to save.', 'error');
     }
