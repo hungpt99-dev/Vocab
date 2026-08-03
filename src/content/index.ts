@@ -18,7 +18,7 @@ import {
   type ToolbarAnyActionId,
   type ToolbarState,
 } from './toolbar';
-import { ExplainPanel } from './explain-panel';
+import { setPendingExplain } from './pending-explain';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
@@ -28,7 +28,6 @@ const RESCAN_DELAY_MS = 400;
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
-const explainPanel = new ExplainPanel();
 const reader = new InlineReader();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
@@ -163,7 +162,7 @@ async function handleToolbarAction(
       // Real explain flow: ask the AI and show the result panel.
       toolbar.hide();
       if (state) {
-        await runExplain('Explain', 'word', state);
+        await runExplain('word', state);
       } else {
         showToast('Select a word first, then choose Explain.', 'error');
       }
@@ -194,16 +193,21 @@ async function handleAssistAction(action: SmartAssistActionId, state: ToolbarSta
   }
   const assistAction = SMART_ASSIST_ACTIONS.find((candidate) => candidate.id === action);
   if (!assistAction?.kind) return;
-  await runExplain(assistAction.label, assistAction.kind, state);
+  await runExplain(assistAction.kind, state);
 }
 
-async function runExplain(label: string, kind: ExplainKind, state: ToolbarState): Promise<void> {
+async function runExplain(kind: ExplainKind, state: ToolbarState): Promise<void> {
   try {
-    const explanation = await sendMessage({
-      type: 'explain',
-      payload: { word: state.text, context: state.sentence || undefined, kind },
-    });
-    explainPanel.show(label, state, explanation);
+    // Consolidate into the popup as the single explain surface: hand the word
+    // off to the popup and open it, instead of a second floating panel.
+    await setPendingExplain({ word: state.text, context: state.sentence || undefined, kind });
+    if (typeof chrome.action?.openPopup === 'function') {
+      try {
+        await chrome.action.openPopup();
+      } catch {
+        /* popup may already be open; ignore */
+      }
+    }
   } catch (cause) {
     showToast(aiErrorMessage(cause), 'error');
   }

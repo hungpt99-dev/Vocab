@@ -5,9 +5,11 @@ import { sendMessage } from '@/shared/messaging/client';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
+import { takePendingExplain } from '@/content/pending-explain';
 import { aiErrorMessage } from '@/ai/types';
+import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, SettingsIcon } from '@/shared/ui/Icons';
+import { BookIcon, LanguagesIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
@@ -92,6 +94,36 @@ function LibraryScreen() {
     [update, notify],
   );
 
+  // When the page toolbar asks to explain a word, it hands the word off here so
+  // the popup is the single explain surface. Explain an existing entry, or save a
+  // new one first, then run the explain flow.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const pending = await takePendingExplain();
+      if (!pending || !active) return;
+      const word = pending.word.trim();
+      if (!word) return;
+      try {
+        let entry = await vocabularyRepository.findByWord(word);
+        if (!entry) {
+          entry = await vocabularyRepository.save({
+            word,
+            sentence: pending.context ?? '',
+            sourceUrl: selection?.sourceUrl ?? '',
+            sourceTitle: selection?.sourceTitle ?? '',
+          });
+        }
+        await handleExplain(entry);
+      } catch (cause) {
+        notify(aiErrorMessage(cause), 'error');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [handleExplain, notify, selection]);
+
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
 
   return (
@@ -136,6 +168,7 @@ function LibraryScreen() {
 }
 
 export function App() {
+  const { settings, update } = useSettings();
   return (
     <ToastProvider>
       <div className="flex min-h-[420px] w-full min-w-[320px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -146,9 +179,24 @@ export function App() {
             </span>
             <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-            Settings
-          </Button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void update({ bilingualMode: !settings.bilingualMode })}
+              aria-pressed={settings.bilingualMode}
+              title={settings.bilingualMode ? 'Bilingual mode on' : 'Bilingual mode off'}
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                settings.bilingualMode
+                  ? 'bg-brand-600 text-white'
+                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+            >
+              <LanguagesIcon size={16} aria-hidden="true" />
+            </button>
+            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
+              Settings
+            </Button>
+          </div>
         </header>
 
         <LibraryScreen />

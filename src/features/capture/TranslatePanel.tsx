@@ -40,7 +40,14 @@ export function TranslatePanel({ selection }: TranslatePanelProps) {
       <div className="flex items-center gap-2">
         <Button size="sm" variant="secondary" disabled={translating} onClick={() => void translate()}>
           <LanguagesIcon size={14} className="mr-1.5" aria-hidden="true" />
-          {translating ? 'Translating…' : 'Translate selection'}
+          {translating ? (
+            <>
+              <Spinner />
+              <span className="ml-1.5">Translating…</span>
+            </>
+          ) : (
+            'Translate selection'
+          )}
         </Button>
         {error && (
           <p role="alert" className="text-xs text-red-600 dark:text-red-400">
