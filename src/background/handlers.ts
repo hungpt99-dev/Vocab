@@ -192,6 +192,14 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       ),
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     translate: (message) => translateUnit(deps, message.payload),
+    'translate-blocks': async (message) => {
+      const settings = await deps.settings.get();
+      const language = settings.targetLanguage || 'English';
+      const paragraphs = message.payload.blocks.map((text, index) => ({ id: String(index), text }));
+      const results = await deps.translate.translate(paragraphs, language);
+      const byId = new Map(results.map((result) => [result.id, result.translation]));
+      return paragraphs.map((paragraph) => byId.get(paragraph.id) ?? null);
+    },
     'translate-article': async (message) => {
       const results = await deps.translate.translate(message.payload.paragraphs, message.payload.language);
       return results.map((result) => ({
