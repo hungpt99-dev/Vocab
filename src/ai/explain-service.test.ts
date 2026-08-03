@@ -39,6 +39,32 @@ describe('ExplainService', () => {
     });
   });
 
+  it('uses the settings target language when the request omits one', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [{ id: 'p1', type: 'anthropic', name: 'Claude', apiKey: 'key-123', baseUrl: '', model: '', enabled: true }],
+      activeProviderId: 'p1',
+      targetLanguage: 'French',
+    });
+
+    let body: Record<string, unknown> | undefined;
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ type: 'text', text: payload }] }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new ExplainService(settings).explain({ word: 'x' });
+
+    const messages = (body as { messages?: Array<{ content?: string }> }).messages ?? [];
+    expect(messages[0]?.content).toContain('Explain it in French.');
+  });
+
   it('falls back to a second provider on a transient error', async () => {
     const settings = new SettingsRepository();
     await settings.update({

@@ -1,7 +1,7 @@
 import type { AiProviderId } from '@/shared/types/settings';
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import { buildExplainSystemPrompt, buildExplainUserPrompt } from '../prompts';
 import { toExplanation } from '../parse';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
 
@@ -61,8 +61,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
       body: {
         model,
         messages: [
-          { role: 'system', content: EXPLAIN_WORD_SYSTEM_PROMPT },
-          { role: 'user', content: buildExplainWordUserPrompt(request) },
+          { role: 'system', content: buildExplainSystemPrompt(request.unit) },
+          { role: 'user', content: buildExplainUserPrompt(request) },
         ],
         temperature: config.temperature ?? 0.2,
         ...(config.maxTokens !== undefined && config.maxTokens !== null

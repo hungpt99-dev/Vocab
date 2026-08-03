@@ -6,7 +6,12 @@ import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { SelectionToolbar, readToolbarSelection, type ToolbarActionId } from './toolbar';
+import { ExplainPopover } from './explain-popover';
+import {
+  SelectionToolbar,
+  readToolbarSelection,
+  type ToolbarActionDetail,
+} from './toolbar';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 
@@ -14,6 +19,7 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
+const explainPopover = new ExplainPopover((request) => sendMessage({ type: 'explain', payload: request }));
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -58,18 +64,22 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('mousedown', (event) => {
-    if (event.target instanceof Node && !toolbarElementContains(event.target)) {
-      toolbar.hide();
-    }
+    if (!(event.target instanceof Node)) return;
+    if (!toolbarElementContains(event.target)) toolbar.hide();
+    if (!explainElementContains(event.target)) explainPopover.hide();
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') toolbar.hide();
+    if (event.key === 'Escape') {
+      toolbar.hide();
+      hoverCard.hide();
+      explainPopover.hide();
+    }
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string }>).detail;
-    void handleToolbarAction(detail.action, detail.text);
+    const detail = (event as CustomEvent<ToolbarActionDetail>).detail;
+    void handleToolbarAction(detail);
   }) as EventListener);
 }
 
@@ -81,12 +91,33 @@ function toolbarElement(): HTMLElement | null {
   return document.getElementById('avs-toolbar');
 }
 
+function explainElementContains(node: Node): boolean {
+  return !!explainElement()?.contains(node);
+}
+
+function explainElement(): HTMLElement | null {
+  return document.getElementById('avs-explain');
+}
+
 /** Route a toolbar action to the existing message bus / handlers. */
-async function handleToolbarAction(action: ToolbarActionId, text: string): Promise<void> {
-  switch (action) {
+async function handleToolbarAction(detail: ToolbarActionDetail): Promise<void> {
+  switch (detail.action) {
+    case 'explain': {
+      toolbar.hide();
+      const selection = readSelection();
+      explainPopover.show({
+        text: detail.text,
+        unit: detail.unit,
+        rect: detail.rect,
+        context: selection?.sentence ?? '',
+        sourceUrl: selection?.sourceUrl ?? '',
+        sourceTitle: selection?.sourceTitle ?? '',
+      });
+      return;
+    }
     case 'copy': {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(detail.text);
         showToast('Copied to clipboard', 'success');
       } catch {
         showToast('Could not copy', 'error');
@@ -95,9 +126,9 @@ async function handleToolbarAction(action: ToolbarActionId, text: string): Promi
       return;
     }
     default:
-      // explain / translate / save / more are wired in later issues (VOC-44..48).
+      // translate / save / more are wired in later issues (VOC-47..48).
       // For now surface what was requested so the toolbar is demonstrably live.
-      showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
+      showToast(`${detail.action}: ${detail.text.slice(0, 24)}${detail.text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
   }
 }
@@ -173,7 +204,8 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains(HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
-    element.classList.contains('avs-toolbar')
+    element.classList.contains('avs-toolbar') ||
+    element.classList.contains('avs-explain')
   );
 }
 

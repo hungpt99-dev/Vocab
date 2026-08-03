@@ -130,15 +130,29 @@ describe('buildHighlightData', () => {
 describe('explainWord', () => {
   it('caches the explanation on an existing entry', async () => {
     const entry = await deps.vocabulary.save({ word: 'serendipity' });
-    await explainWord(deps, 'serendipity', 'context');
+    await explainWord(deps, { word: 'serendipity', context: 'context' });
 
     expect((await deps.vocabulary.get(entry.id))?.explanation?.meaning).toBe('A fortunate accident.');
   });
 
   it('returns an explanation for an unsaved word without storing it', async () => {
-    const result = await explainWord(deps, 'unsaved');
+    const result = await explainWord(deps, { word: 'unsaved' });
     expect(result.meaning).toBe('A fortunate accident.');
     expect(await deps.vocabulary.count()).toBe(0);
+  });
+
+  it('forwards the full request to the explain service', async () => {
+    const request = {
+      word: 'a piece of cake',
+      unit: 'phrase' as const,
+      context: 'It was a piece of cake.',
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example',
+      sourceLanguage: 'English',
+    };
+    await explainWord(deps, request);
+
+    expect(deps.explain.explain).toHaveBeenCalledWith(request);
   });
 });
 

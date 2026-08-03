@@ -1,6 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import { buildExplainSystemPrompt, buildExplainUserPrompt } from '../prompts';
 import { toExplanation } from '../parse';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
 
@@ -30,8 +30,8 @@ export class GeminiProvider implements AiProvider {
       signal: config.signal,
       timeoutMs: config.timeoutMs,
       body: {
-        systemInstruction: { parts: [{ text: EXPLAIN_WORD_SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: buildExplainWordUserPrompt(request) }] }],
+        systemInstruction: { parts: [{ text: buildExplainSystemPrompt(request.unit) }] },
+        contents: [{ role: 'user', parts: [{ text: buildExplainUserPrompt(request) }] }],
         generationConfig: {
           temperature: config.temperature ?? 0.2,
           ...(config.maxTokens !== undefined && config.maxTokens !== null

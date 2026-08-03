@@ -109,9 +109,113 @@ export function injectStyles(doc: Document = document): void {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;
     }
+    .avs-explain {
+      position: fixed;
+      z-index: ${zIndex.overlay};
+      width: ${layout.overlayMaxWidth};
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      padding: ${spacing.md} ${spacing.lg};
+      border-radius: ${radius.md};
+      background: ${color.overlaySurface};
+      color: ${color.overlayText};
+      font: ${typography.overlayBody} ${typography.systemStack};
+      box-shadow: ${elevation.overlay};
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.md};
+    }
+    .avs-explain[hidden] { display: none; }
+    .avs-explain:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-explain-header { display: flex; align-items: center; gap: ${spacing.sm}; }
+    .avs-explain-title {
+      flex: 1;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .avs-explain-unit {
+      padding: 1px ${spacing.sm};
+      border: 1px solid ${color.overlaySurfaceAlt};
+      border-radius: ${radius.sm};
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .avs-explain-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: ${color.overlayText};
+      cursor: pointer;
+    }
+    .avs-explain-close:hover { background: ${color.overlaySurfaceAlt}; }
+    .avs-explain-close:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-explain-hint { margin: 0; color: ${color.overlayMuted}; }
+    .avs-explain-btn {
+      padding: ${spacing.sm} ${spacing.lg};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: ${color.brand[600]};
+      color: ${color.overlayText};
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .avs-explain-btn:hover { background: ${color.brand[700]}; }
+    .avs-explain-btn:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-explain-status { margin: 0; color: ${color.overlayMuted}; }
+    .avs-explain-error {
+      margin: 0;
+      padding: ${spacing.sm} ${spacing.md};
+      border-radius: ${radius.sm};
+      background: ${color.status.danger};
+      color: ${color.overlayText};
+    }
+    .avs-explain-meta { margin: 0; color: ${color.overlayMuted}; font-size: ${typography.overlayLabel}; }
+    .avs-explain-section {
+      margin: 0;
+      padding: ${spacing.sm} ${spacing.md};
+      border-radius: ${radius.sm};
+      background: ${color.overlaySurfaceAlt};
+    }
+    .avs-explain-section[open] .avs-explain-section-summary { margin-bottom: ${spacing.xs}; }
+    .avs-explain-section-summary {
+      color: ${color.overlayMuted};
+      font-size: ${typography.overlayLabel};
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      user-select: none;
+    }
+    .avs-explain-section-summary:focus-visible {
+      outline: 2px solid ${color.focusRing};
+      outline-offset: 1px;
+    }
+    .avs-explain-value { margin: 0; }
+    .avs-explain-list { margin: 0; padding-left: ${spacing.lg}; }
+    .avs-explain-item { margin-top: ${spacing.xs}; }
     @media (prefers-reduced-motion: no-preference) {
       .avs-toast { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       .avs-toolbar { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
+      .avs-explain { animation: avs-fade-in ${motion.fast} ${motion.easing}; }
       @keyframes avs-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
     }
   `;

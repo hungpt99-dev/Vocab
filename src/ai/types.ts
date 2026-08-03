@@ -1,13 +1,8 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import type { AiProviderId } from '@/shared/types/settings';
+import type { ExplainRequest } from '@/shared/types/explain';
 
-export interface ExplainRequest {
-  word: string;
-  /** Sentence the word appeared in, used to disambiguate the sense. */
-  context?: string;
-  /** Target language for the explanation. */
-  language?: string;
-}
+export type { ExplainRequest } from '@/shared/types/explain';
 
 export interface ProviderConfig {
   apiKey: string;

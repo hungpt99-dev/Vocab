@@ -108,6 +108,7 @@ highlighted. Changing the colour or toggling the feature updates already-open ta
 | FR-4.7 | Connectivity can be verified from Settings before saving words. | Done |
 | FR-4.8 | Responses stream token-by-token. | **Not implemented** — see [Known limitations](KNOWN_LIMITATIONS.md) |
 | FR-4.9 | Failed requests are retried automatically with backoff. | **Not implemented** — see [Known limitations](KNOWN_LIMITATIONS.md) |
+| FR-4.10 | Selecting text and clicking "Explain with AI" opens a popover with structured, expandable sections tailored to the unit (word / phrase / sentence); the AI is called only when the user clicks Explain, and the full context (selection, surrounding paragraph, page title, URL, detected and target languages) is sent to the provider. | Done |
 
 **Acceptance criteria.** With a valid key, requesting an explanation returns a populated structured
 result. With an invalid key, the user sees an `unauthorized` message naming the problem, and no

@@ -7,6 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Explain-with-AI popover.** Selecting text and clicking "Explain with AI" on the floating toolbar
+  opens an accessible popover with structured, expandable sections. The section set varies by unit —
+  words get meaning, pronunciation, translation, part of speech, examples, synonyms, antonyms,
+  collocations and related words; phrases get explanation, translation, grammar, usage and examples;
+  sentences get summary, translation, grammar and difficult vocabulary. The AI is called only when the
+  user clicks Explain, never on open.
+- **Full context sent to the provider.** The popover sends the selected text, the surrounding
+  paragraph, page title, URL and detected source language; the target language comes from settings.
+  `ExplainService` fills the target language from settings when the caller omits it.
 - **Multi-provider model.** Settings now store a list of saved providers (`providers: SavedProvider[]`)
   with an active provider and an optional fallback, instead of a single provider. Users can add, edit,
   remove and switch between any number of providers from the Options page.

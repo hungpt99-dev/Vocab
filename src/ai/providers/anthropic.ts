@@ -1,6 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
-import { EXPLAIN_WORD_SYSTEM_PROMPT, buildExplainWordUserPrompt } from '../prompts';
+import { buildExplainSystemPrompt, buildExplainUserPrompt } from '../prompts';
 import { toExplanation } from '../parse';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig } from '../types';
 
@@ -39,8 +39,8 @@ export class AnthropicProvider implements AiProvider {
         model,
         max_tokens: config.maxTokens ?? 1024,
         temperature: config.temperature ?? 0.2,
-        system: EXPLAIN_WORD_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildExplainWordUserPrompt(request) }],
+        system: buildExplainSystemPrompt(request.unit),
+        messages: [{ role: 'user', content: buildExplainUserPrompt(request) }],
       },
     });
 

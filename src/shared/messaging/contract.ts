@@ -1,4 +1,5 @@
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
+import type { ExplainRequest } from '@/shared/types/explain';
 
 /** Payload the content script reports about the current selection. */
 export interface SelectionPayload {
@@ -12,7 +13,7 @@ export type Message =
   | { type: 'save-entry'; payload: NewVocabularyEntry }
   | { type: 'get-selection' }
   | { type: 'save-current-selection' }
-  | { type: 'explain'; payload: { word: string; context?: string } }
+  | { type: 'explain'; payload: ExplainRequest }
   | { type: 'get-highlight-data' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }

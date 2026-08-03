@@ -55,11 +55,17 @@ export class ExplainService {
     }
     const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
-    const cached = this.readCache(active, request);
+    // The caller may not know the user's preferred language; settings are authoritative.
+    const resolved: ExplainRequest = {
+      ...request,
+      language: request.language || settings.targetLanguage,
+    };
+
+    const cached = this.readCache(active, resolved);
     if (cached) return cached;
 
-    const explanation = await this.runWithFallback(active, fallback, request, signal);
-    this.writeCache(active, request, explanation);
+    const explanation = await this.runWithFallback(active, fallback, resolved, signal);
+    this.writeCache(active, resolved, explanation);
     return explanation;
   }
 
@@ -106,7 +112,7 @@ export class ExplainService {
   }
 
   private cacheKey(provider: SavedProvider, request: ExplainRequest): string {
-    return `${provider.type}|${provider.model}|${request.word}|${request.context ?? ''}|${request.language ?? ''}`;
+    return `${provider.type}|${provider.model}|${request.word}|${request.unit ?? ''}|${request.context ?? ''}|${request.sourceLanguage ?? ''}|${request.language ?? ''}`;
   }
 
   private readCache(provider: SavedProvider, request: ExplainRequest): Explanation | null {

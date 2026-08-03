@@ -47,6 +47,14 @@ const TOOLBAR_ACTIONS = [
 
 export type ToolbarActionId = (typeof TOOLBAR_ACTIONS)[number]['id'];
 
+/** Detail carried by the `avs-toolbar-action` event, including the selection context. */
+export interface ToolbarActionDetail {
+  action: ToolbarActionId;
+  text: string;
+  unit: SelectionUnit;
+  rect: ToolbarState['rect'];
+}
+
 /**
  * Classify a selection's text into a unit. Mirrors the existing `isPhrase`
  * heuristic but adds sentence/paragraph detection: a selection spanning more
@@ -131,8 +139,8 @@ export class SelectionToolbar {
         event.stopPropagation();
         if (this.state) {
           document.dispatchEvent(
-            new CustomEvent('avs-toolbar-action', {
-              detail: { action: action.id, text: this.state.text },
+            new CustomEvent<ToolbarActionDetail>('avs-toolbar-action', {
+              detail: { action: action.id, ...this.state },
             }),
           );
         }
