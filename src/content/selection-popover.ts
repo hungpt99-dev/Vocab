@@ -1,5 +1,6 @@
 import type { Explanation } from '@/shared/types/vocabulary';
 import { ICON_CLOSE } from './icons';
+import { sendMessage } from '@/shared/messaging/client';
 
 const POPOVER_ID = 'avs-popover';
 const OFFSET = 8;
@@ -160,7 +161,18 @@ function buildLoading(title: string, onClose: () => void): HTMLElement[] {
 function buildError(title: string, onClose: () => void, message: string): HTMLElement[] {
   const error = el('div', 'avs-popover-error', message);
   error.setAttribute('role', 'alert');
-  return [buildHeader(title, onClose), error];
+  const children: HTMLElement[] = [buildHeader(title, onClose), error];
+  // When no AI provider is configured, offer a direct path to Settings.
+  if (/no ai provider|provider is configured/i.test(message)) {
+    const button = el('button', 'avs-popover-action');
+    button.textContent = 'Open Settings';
+    button.addEventListener('click', () => {
+      void sendMessage({ type: 'open-options' });
+      onClose();
+    });
+    children.push(button);
+  }
+  return children;
 }
 
 function buildResult(title: string, onClose: () => void, result: PopoverResult): HTMLElement[] {

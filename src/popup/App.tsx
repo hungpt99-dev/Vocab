@@ -5,6 +5,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
+import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
 import { BookIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -83,7 +84,7 @@ function LibraryScreen() {
         });
         await update(entry.id, { explanation });
       } catch (cause) {
-        notify(cause instanceof Error ? cause.message : 'The AI request failed.', 'error');
+        notify(aiErrorMessage(cause), 'error');
       } finally {
         setExplainingId(null);
       }

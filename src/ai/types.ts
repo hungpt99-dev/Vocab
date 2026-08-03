@@ -89,3 +89,29 @@ export class AiError extends Error {
     this.name = 'AiError';
   }
 }
+
+/**
+ * Turn an AI failure into a human, actionable message for the UI.
+ * The common "nothing happens / blank toast" cases are auth/key/provider
+ * problems — tell the user exactly where to fix it instead of a cryptic line.
+ */
+export function aiErrorMessage(error: unknown): string {
+  if (error instanceof AiError) {
+    switch (error.code) {
+      case 'unknown_provider':
+        return 'No AI provider is configured. Add one in Settings → AI Provider, then try again.';
+      case 'missing_api_key':
+        return 'Your AI provider has no API key. Add it in Settings → AI Provider, then try again.';
+      case 'unauthorized':
+        return 'Your AI provider key was rejected. Check it in Settings → AI Provider, then try again.';
+      case 'rate_limited':
+        return 'The AI provider is rate-limiting requests. Wait a moment and try again.';
+      case 'network':
+        return 'Could not reach the AI provider. Check your connection and try again.';
+      default:
+        return error.message || 'The AI request failed.';
+    }
+  }
+  if (error instanceof Error) return error.message;
+  return 'The AI request failed.';
+}
