@@ -20,7 +20,7 @@ export function createChromeMock() {
     runtime: {
       id: 'test-extension-id',
       lastError: undefined as chrome.runtime.LastError | undefined,
-      sendMessage: vi.fn(async () => ({ ok: true })),
+      sendMessage: vi.fn<(...args: any[]) => Promise<any>>(async () => ({ ok: true })),
       onMessage: createEvent(),
       onInstalled: createEvent(),
       openOptionsPage: vi.fn(),
