@@ -15,12 +15,14 @@ import {
   readToolbarSelection,
   type SmartAssistActionId,
   type ToolbarActionId,
+  type ToolbarAnyActionId,
   type ToolbarState,
 } from './toolbar';
 import { ExplainPanel } from './explain-panel';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { translateCurrentPage } from './translate/translate';
+import { BilingualReader } from './reading/reader';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -28,6 +30,7 @@ const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
 const explainPanel = new ExplainPanel();
+const reader = new BilingualReader();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -38,6 +41,7 @@ registerMessageHandlers({
   'vocabulary-changed': () => void refresh(),
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
+  'toggle-bilingual-reading': () => void reader.toggle(),
 });
 
 void bootstrap();
@@ -123,7 +127,7 @@ function toolbarElement(): HTMLElement | null {
 
 /** Route a toolbar action to the existing message bus / handlers. */
 async function handleToolbarAction(
-  action: ToolbarActionId,
+  action: ToolbarAnyActionId,
   text: string,
   state?: ToolbarState,
 ): Promise<void> {
@@ -183,6 +187,12 @@ async function handleToolbarAction(
       } else {
         showToast('Select a word first, then choose Explain.', 'error');
       }
+      return;
+    }
+    case 'reading-mode': {
+      toolbar.hide();
+      const opened = await reader.toggle();
+      if (!opened) showToast('No article found on this page.', 'error');
       return;
     }
     default:
@@ -265,6 +275,7 @@ async function refresh(): Promise<void> {
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
+  reader.updateVocabulary(data.enabled ? matcher : null);
 
   removeHighlights();
   if (!data.enabled || matcher.size === 0) {

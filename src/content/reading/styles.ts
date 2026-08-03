@@ -98,6 +98,10 @@ export function injectReadingStyles(doc: Document = document): void {
       color: ${color.slate[400]};
       font-style: italic;
     }
+    .avs-reader[data-align='sentence'] .avs-block { grid-template-columns: 1fr; }
+    .avs-reader[data-align='sentence'] .avs-block-tgt { border-left: 0; padding-left: 0; }
+    .avs-reader[data-bilingual='off'] .avs-block-tgt { display: none; }
+    .avs-reader[data-bilingual='off'] .avs-block { grid-template-columns: 1fr; }
     .avs-chunk-error {
       margin-bottom: ${spacing.xl};
       padding: ${spacing.md} ${spacing.lg};

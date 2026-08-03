@@ -7,6 +7,7 @@ import {
   normalizeTag,
   normalizeTags,
   normalizeWord,
+  splitIntoSentences,
 } from './text';
 
 describe('normalizeWord', () => {
@@ -66,5 +67,45 @@ describe('extractSentence', () => {
 
   it('handles empty input', () => {
     expect(extractSentence('', 'word')).toBe('word');
+  });
+});
+
+describe('splitIntoSentences', () => {
+  it('splits on terminal punctuation', () => {
+    expect(splitIntoSentences('Hello world. Goodbye now! Really?')).toEqual([
+      'Hello world.',
+      'Goodbye now!',
+      'Really?',
+    ]);
+  });
+
+  it('handles empty or blank input', () => {
+    expect(splitIntoSentences('')).toEqual([]);
+    expect(splitIntoSentences('   ')).toEqual([]);
+  });
+
+  it('does not split on abbreviation periods', () => {
+    expect(splitIntoSentences('Dr. Smith is here. He left.')).toEqual([
+      'Dr. Smith is here.',
+      'He left.',
+    ]);
+  });
+
+  it('does not split on single-letter initials', () => {
+    expect(splitIntoSentences('J. R. Tolkien wrote it. True.')).toEqual([
+      'J. R. Tolkien wrote it.',
+      'True.',
+    ]);
+  });
+
+  it('does not split on decimal or version numbers', () => {
+    expect(splitIntoSentences('Pi is 3.14159. Roughly.')).toEqual([
+      'Pi is 3.14159.',
+      'Roughly.',
+    ]);
+  });
+
+  it('splits CJK sentences without spaces', () => {
+    expect(splitIntoSentences('你好。再见！')).toEqual(['你好。', '再见！']);
   });
 });

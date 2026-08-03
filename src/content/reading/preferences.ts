@@ -2,8 +2,17 @@ export const READING_PREFS_KEY = 'avs:reading';
 
 export type ReadingLayout = 'side-by-side' | 'original-first' | 'translation-first' | 'hover' | 'toggle';
 
+/**
+ * How a block is broken into rows:
+ *  - `paragraph`  — one row per article block (headings/paragraphs), the default.
+ *  - `sentence`   — bilingual-book: one row per sentence, English over its
+ *    translation on the facing line.
+ */
+export type ReadingAlignment = 'paragraph' | 'sentence';
+
 export interface ReadingPreferences {
   layout: ReadingLayout;
+  alignment: ReadingAlignment;
   /** Base font size of the reader body in px (clamped 12–24). */
   fontSize: number;
   highlightVocabulary: boolean;
@@ -11,6 +20,7 @@ export interface ReadingPreferences {
 
 export const DEFAULT_READING_PREFS: ReadingPreferences = {
   layout: 'side-by-side',
+  alignment: 'paragraph',
   fontSize: 16,
   highlightVocabulary: true,
 };

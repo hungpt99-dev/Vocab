@@ -1,13 +1,17 @@
 import { sendMessage } from '@/shared/messaging/client';
 import { settingsRepository } from '@/storage/settings-repository';
-import { highlightRoot, removeHighlights } from '../highlighter';
+import { splitIntoSentences } from '@/shared/lib/text';
+import { ICON_ALIGN_SENTENCE } from '../icons';
+import { HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from '../highlighter';
 import type { VocabularyMatcher } from '../matcher';
+import type { ToolbarState } from '../toolbar';
 import { extractArticle, type ArticleBlock } from './extract';
 import {
   DEFAULT_READING_PREFS,
   getReadingPreferences,
   setReadingPreferences,
   watchReadingPreferences,
+  type ReadingAlignment,
   type ReadingLayout,
   type ReadingPreferences,
 } from './preferences';
@@ -70,6 +74,9 @@ type RowState = 'pending' | 'loading' | 'done' | 'error';
 
 interface BlockRow {
   block: ArticleBlock;
+  /** Parent article block for sentence rows; same object for paragraph rows. */
+  group: ArticleBlock;
+  /** Source element minus the translation, used to keep sentence grouping. */
   section: HTMLElement;
   src: HTMLElement;
   tgt: HTMLElement;
@@ -96,11 +103,14 @@ export class BilingualReader {
   private observer: IntersectionObserver | null = null;
   private prefs: ReadingPreferences = DEFAULT_READING_PREFS;
   private language = 'English';
+  private bilingualMode = true;
+  private sourceBlocks: ArticleBlock[] = [];
   private matcher: VocabularyMatcher | null = null;
   private previouslyFocused: Element | null = null;
   private prefsListener: (() => void) | null = null;
   private toggleViewButton: HTMLButtonElement | null = null;
   private vocabButton: HTMLButtonElement | null = null;
+  private alignButton: HTMLButtonElement | null = null;
 
   get isOpen(): boolean {
     return !!this.root?.isConnected;
@@ -116,6 +126,8 @@ export class BilingualReader {
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.prefs = prefs;
     this.language = settings.targetLanguage || 'English';
+    this.bilingualMode = settings.bilingualMode;
+    this.sourceBlocks = blocks;
 
     const active = document.activeElement;
     if (active instanceof HTMLElement) this.previouslyFocused = active;
@@ -151,6 +163,7 @@ export class BilingualReader {
     this.chunkErrorEls.clear();
     this.sentinels = [];
     this.matcher = null;
+    this.sourceBlocks = [];
     if (this.previouslyFocused instanceof HTMLElement) this.previouslyFocused.focus();
     this.previouslyFocused = null;
   }
@@ -233,7 +246,7 @@ export class BilingualReader {
   }
 
   private buildDom(blocks: ArticleBlock[]): void {
-    this.rows = blocks.map((block) => this.createRow(block));
+    this.rows = this.buildRows(blocks);
 
     const overlay = el('div', 'avs-reader');
     overlay.setAttribute('role', 'dialog');
@@ -257,10 +270,43 @@ export class BilingualReader {
     this.body = body;
     this.content = content;
 
+    content.addEventListener('click', this.onContentClick);
+
+    this.applyAlignmentState();
     this.applyLayoutClass();
+    this.applyBilingualState();
     applyReaderFontSize(this.prefs.fontSize);
     this.updateToggleButton();
+    this.updateAlignButton();
   }
+
+  /**
+   * Clicking a highlighted vocabulary word opens the existing explain flow by
+   * dispatching the same toolbar action the selection toolbar emits.
+   */
+  private onContentClick = (event: MouseEvent): void => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const mark = target.closest(`.${HIGHLIGHT_CLASS}`);
+    if (!(mark instanceof HTMLElement)) return;
+    const text = mark.textContent?.trim() ?? '';
+    if (!text) return;
+
+    const section = mark.closest('.avs-block');
+    const sentence = section?.querySelector('.avs-block-src')?.textContent?.trim() ?? undefined;
+    const rect = mark.getBoundingClientRect();
+    const state: ToolbarState = {
+      text,
+      sentence,
+      unit: 'word',
+      rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+    };
+    document.dispatchEvent(
+      new CustomEvent('avs-toolbar-action', {
+        detail: { action: 'explain', text, state },
+      }),
+    );
+  };
 
   private buildToolbar(): HTMLElement {
     const bar = el('header', 'avs-reader-bar');
@@ -292,6 +338,17 @@ export class BilingualReader {
       void this.setPrefs({ fontSize: this.prefs.fontSize + 1 }),
     );
 
+    const alignButton = document.createElement('button');
+    alignButton.type = 'button';
+    alignButton.className = 'avs-reader-btn avs-reader-align';
+    alignButton.innerHTML = ICON_ALIGN_SENTENCE;
+    alignButton.addEventListener('click', () => {
+      const next: ReadingAlignment =
+        this.prefs.alignment === 'sentence' ? 'paragraph' : 'sentence';
+      void this.setPrefs({ alignment: next });
+    });
+    this.alignButton = alignButton;
+
     this.vocabButton = toolbarButton('Highlight', 'Toggle vocabulary highlighting', () =>
       void this.setPrefs({ highlightVocabulary: !this.prefs.highlightVocabulary }),
     );
@@ -309,6 +366,7 @@ export class BilingualReader {
       layoutSelect,
       fontDown,
       fontUp,
+      alignButton,
       this.vocabButton,
       translateAll,
       this.toggleViewButton,
@@ -317,8 +375,12 @@ export class BilingualReader {
     return bar;
   }
 
-  private createRow(block: ArticleBlock): BlockRow {
+  private createRow(block: ArticleBlock, group: ArticleBlock = block): BlockRow {
     const section = el('section', 'avs-block');
+    if (group !== block) {
+      section.dataset.align = 'sentence';
+      section.dataset.group = group.id;
+    }
 
     const srcCol = el('div', 'avs-block-col avs-block-src');
     const src = document.createElement(blockElementTag(block.tagName));
@@ -334,7 +396,28 @@ export class BilingualReader {
     tgtCol.append(tgt);
 
     section.append(srcCol, tgtCol);
-    return { block, section, src, tgt, state: 'pending' };
+    return { block, group, section, src, tgt, state: 'pending' };
+  }
+
+  /** Build one row per block, or one row per sentence in sentence alignment. */
+  private buildRows(blocks: ArticleBlock[]): BlockRow[] {
+    if (this.prefs.alignment !== 'sentence') return blocks.map((block) => this.createRow(block));
+
+    const rows: BlockRow[] = [];
+    for (const block of blocks) {
+      const sentences = splitIntoSentences(block.text);
+      if (sentences.length === 0) {
+        rows.push(this.createRow(block));
+        continue;
+      }
+      let index = 0;
+      for (const sentence of sentences) {
+        if (!sentence.trim()) continue;
+        rows.push(this.createRow({ ...block, id: `${block.id}#${index}`, text: sentence }, block));
+        index += 1;
+      }
+    }
+    return rows;
   }
 
   private sentinelFor(chunk: number): HTMLElement {
@@ -436,6 +519,59 @@ export class BilingualReader {
     this.root.className = `avs-reader avs-layout-${this.prefs.layout}`;
   }
 
+  /** Reflect alignment + bilingual mode on the overlay root for CSS and tests. */
+  private applyAlignmentState(): void {
+    if (!this.root) return;
+    this.root.dataset.align = this.prefs.alignment;
+    this.root.dataset.bilingual = this.bilingualMode ? 'on' : 'off';
+  }
+
+  /** Hide the translation column entirely when bilingual mode is disabled. */
+  private applyBilingualState(): void {
+    if (!this.root) return;
+    for (const col of this.root.querySelectorAll<HTMLElement>('.avs-block-tgt')) {
+      col.hidden = !this.bilingualMode;
+    }
+  }
+
+  private updateAlignButton(): void {
+    if (!this.alignButton || !this.root) return;
+    const sentence = this.prefs.alignment === 'sentence';
+    this.alignButton.setAttribute('aria-pressed', String(sentence));
+    this.alignButton.setAttribute(
+      'aria-label',
+      sentence ? 'Switch to paragraph view' : 'Switch to sentence pairs',
+    );
+    this.alignButton.title = sentence ? 'Switch to paragraph view' : 'Switch to sentence pairs';
+  }
+
+  /** Rebuild the rows/content after an alignment change. */
+  private rebuildForAlignment(): void {
+    if (!this.root || !this.content) return;
+    this.rows = this.buildRows(this.sourceBlocks);
+    this.translations.clear();
+    this.chunkState.clear();
+    for (const bar of this.chunkErrorEls.values()) bar.remove();
+    this.chunkErrorEls.clear();
+    this.content.replaceChildren();
+    this.sentinels = [];
+    this.observer?.disconnect();
+    this.observer = null;
+
+    for (let chunk = 0; chunk < this.chunkCount; chunk += 1) {
+      if (chunk > 0) this.content.append(this.sentinelFor(chunk));
+      for (const row of this.chunkRows(chunk)) this.content.append(row.section);
+    }
+    this.render();
+    this.applyBilingualState();
+    this.requestChunk(0);
+    if (typeof IntersectionObserver !== 'function') {
+      void this.translateAll();
+    } else {
+      this.observeSentinels();
+    }
+  }
+
   private async setPrefs(patch: Partial<ReadingPreferences>): Promise<void> {
     const next = await setReadingPreferences(patch);
     this.applyPrefs(next);
@@ -443,12 +579,19 @@ export class BilingualReader {
 
   private applyPrefs(prefs: ReadingPreferences): void {
     const fontSizeChanged = prefs.fontSize !== this.prefs.fontSize;
+    const alignmentChanged = prefs.alignment !== this.prefs.alignment;
     this.prefs = prefs;
     this.applyLayoutClass();
+    this.applyAlignmentState();
     if (fontSizeChanged) applyReaderFontSize(prefs.fontSize);
     this.vocabButton?.setAttribute('aria-pressed', String(prefs.highlightVocabulary));
     this.updateToggleButton();
-    if (this.content) this.applyHighlights();
+    this.updateAlignButton();
+    if (alignmentChanged) {
+      this.rebuildForAlignment();
+    } else if (this.content) {
+      this.applyHighlights();
+    }
   }
 
   private onKeydown = (event: KeyboardEvent): void => {
