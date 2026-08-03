@@ -67,6 +67,11 @@ export interface Settings {
   highlightColor: string;
   /** Ask the AI automatically the first time a word is saved. */
   autoExplainOnSave: boolean;
+  /** Bilingual mode: show translations/meanings inline in the user's language. */
+  bilingualMode: boolean;
+  /** Editable system-prompt template for explanations. Tokens:
+   *  {{language}} {{word}} {{context}} {{kind}} — empty falls back to built-in. */
+  explainPromptTemplate: string;
   /** Reading overlay presentation, applied live to open pages. */
   readingExperience: ReadingExperience;
 }

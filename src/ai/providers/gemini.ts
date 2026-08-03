@@ -26,7 +26,7 @@ export class GeminiProvider implements AiProvider {
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
     const content = await this.complete(
       config,
-      buildExplainSystemPrompt(request.kind),
+      buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
       'application/json',
     );

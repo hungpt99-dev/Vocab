@@ -12,6 +12,8 @@ export interface ExplainRequest {
   precedingText?: string;
   /** Target language for the explanation. */
   language?: string;
+  /** Optional user-editable system-prompt template (tokens: {{language}} {{word}} {{context}} {{kind}}). */
+  promptTemplate?: string;
   /** Which analysis to produce. Defaults to 'word'. */
   kind?: ExplainKind;
 }

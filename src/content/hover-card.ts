@@ -5,8 +5,8 @@ const OFFSET = 10;
 
 /** Which sections of the hover card are visible. */
 export interface HoverCardOptions {
-  showOriginal: boolean;
-  showTranslation: boolean;
+  showOriginal?: boolean;
+  showTranslation?: boolean;
 }
 
 const DEFAULT_OPTIONS: HoverCardOptions = { showOriginal: true, showTranslation: true };

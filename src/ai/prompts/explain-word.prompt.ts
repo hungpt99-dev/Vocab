@@ -24,7 +24,8 @@ export function buildContextLines(request: ExplainRequest): string[] {
 const JSON_SHAPE =
   '"meaning":string,"simpleExplanation":string,"translation":string,"partOfSpeech":string,' +
   '"pronunciation":string,"examples":string[],"synonyms":string[],"antonyms":string[],' +
-  '"relatedWords":string[],"collocations":string[],"grammar":string';
+  '"relatedWords":string[],"collocations":string[],"grammar":string,' +
+  '"register":string,"etymology":string,"relatedPhrases":string[]';
 
 export const EXPLAIN_WORD_SYSTEM_PROMPT = [
   'You are a concise bilingual lexicographer helping a language learner.',
@@ -38,7 +39,10 @@ export const EXPLAIN_WORD_SYSTEM_PROMPT = [
   'synonyms has up to 5 entries; antonyms has up to 5 opposites;',
   'relatedWords has up to 5 related terms (hypernyms, hyponyms, variants);',
   'collocations has up to 5 common word partners;',
-  'grammar briefly notes countability and irregular forms.',
+  'grammar briefly notes countability and irregular forms;',
+  'register notes whether the word is formal, informal or neutral and the typical context;',
+  'etymology is a one-line origin of the word;',
+  'relatedPhrases has up to 5 fixed expressions or collocations using the word.',
 ].join(' ');
 
 function buildSystemPrompt(persona: string, rules: string): string {
@@ -96,8 +100,30 @@ const EXPLAIN_KIND_SYSTEM_PROMPTS: Record<ExplainKind, string> = {
 export const EXPLAIN_WORD_SYSTEM_PROMPT_KIND = EXPLAIN_KIND_SYSTEM_PROMPTS.word;
 
 /** System prompt for a specific analysis kind. Defaults to the word prompt. */
-export function buildExplainSystemPrompt(kind: ExplainKind = 'word'): string {
+export function buildExplainSystemPrompt(kind: ExplainKind = 'word', template?: string): string {
+  if (template && template.trim()) {
+    return substituteTemplate(template, kind);
+  }
   return EXPLAIN_KIND_SYSTEM_PROMPTS[kind];
+}
+
+/**
+ * Substitute editor tokens in a user-supplied system-prompt template.
+ * Supported tokens: {{language}} {{word}} {{context}} {{kind}}.
+ * Unknown tokens are left untouched; this is plain string interpolation
+ * (never evaluated), so a user template cannot execute code.
+ */
+export function substituteTemplate(template: string, kind: ExplainKind = 'word', vars?: {
+  language?: string;
+  word?: string;
+  context?: string;
+}): string {
+  const ctx = vars?.context ?? '';
+  return template
+    .replace(/\{\{\s*language\s*\}\}/g, vars?.language ?? 'English')
+    .replace(/\{\{\s*word\s*\}\}/g, vars?.word ?? '')
+    .replace(/\{\{\s*context\s*\}\}/g, ctx)
+    .replace(/\{\{\s*kind\s*\}\}/g, kind);
 }
 
 /** Build the user turn for an explanation request, adapting to its kind. */

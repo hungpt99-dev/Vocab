@@ -28,4 +28,6 @@ export interface ExplainRequest {
   sourceLanguage?: string;
   /** Preferred (target) language for the explanation. */
   language?: string;
+  /** Optional user-editable system-prompt template (tokens: {{language}} {{word}} {{context}} {{kind}}). */
+  promptTemplate?: string;
 }

@@ -1,55 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EXPLAIN_WORD_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
-  buildExplainWordUserPrompt,
+  substituteTemplate,
 } from './explain-word.prompt';
 
-describe('buildExplainSystemPrompt', () => {
-  it('returns a distinct prompt for every kind', () => {
-    const kinds = ['word', 'sentence', 'grammar', 'vocabulary', 'simplify', 'summarize'] as const;
-    const prompts = kinds.map((kind) => buildExplainSystemPrompt(kind));
-    expect(new Set(prompts).size).toBe(kinds.length);
+describe('explain prompt template', () => {
+  it('uses the built-in prompt when no template is given', () => {
+    expect(buildExplainSystemPrompt('word')).toContain('bilingual lexicographer');
+    expect(buildExplainSystemPrompt('word', '')).toContain('bilingual lexicographer');
   });
 
-  it('keeps the word prompt stable for compatibility', () => {
-    expect(buildExplainSystemPrompt('word')).toBe(EXPLAIN_WORD_SYSTEM_PROMPT);
-  });
-
-  it('defaults to the word prompt when no kind is given', () => {
-    expect(buildExplainSystemPrompt()).toBe(EXPLAIN_WORD_SYSTEM_PROMPT);
-  });
-
-  it('instructs every kind to answer with the same JSON shape', () => {
-    const prompt = buildExplainSystemPrompt('simplify');
-    expect(prompt).toContain('"meaning":string');
-    expect(prompt).toContain('"grammar":string');
-  });
-});
-
-describe('buildExplainWordUserPrompt', () => {
-  it('labels the target as a word or phrase for the word kind', () => {
-    const prompt = buildExplainWordUserPrompt({ word: 'cake', language: 'Spanish' });
-    expect(prompt).toContain('Word or phrase: "cake"');
-    expect(prompt).toContain('Explain it in Spanish.');
-  });
-
-  it('labels the target as text for sentence-level kinds', () => {
-    const prompt = buildExplainWordUserPrompt({
-      word: 'The cat sat down.',
-      kind: 'summarize',
-      language: 'French',
+  it('substitutes tokens in a user template', () => {
+    const tpl = 'Explain {{word}} in {{language}} (kind={{kind}}). Context: {{context}}';
+    const out = substituteTemplate(tpl, 'sentence', {
+      language: 'Vietnamese',
+      word: 'serendipity',
+      context: 'the page text',
     });
-    expect(prompt).toContain('Text: "The cat sat down."');
-    expect(prompt).toContain('Use French for the explanation.');
+    expect(out).toBe('Explain serendipity in Vietnamese (kind=sentence). Context: the page text');
   });
 
-  it('includes the surrounding context when present', () => {
-    const prompt = buildExplainWordUserPrompt({
-      word: 'cat',
-      context: 'The cat sat on the mat.',
-      kind: 'grammar',
-    });
-    expect(prompt).toContain('It appeared in this context: "The cat sat on the mat."');
+  it('falls back to English and empty word when vars omitted', () => {
+    const out = substituteTemplate('Lang={{language}} Word={{word}}', 'word');
+    expect(out).toBe('Lang=English Word=');
+  });
+
+  it('defaults to English for the word prompt language', () => {
+    expect(buildExplainSystemPrompt('word')).toContain('"translation":string');
+    expect(buildExplainSystemPrompt('word')).toContain('"etymology":string');
   });
 });

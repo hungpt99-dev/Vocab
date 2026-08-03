@@ -53,7 +53,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
     const { content, model } = await this.complete(
       config,
-      buildExplainSystemPrompt(request.kind),
+      buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
     );
     return toExplanation(content, { provider: this.id, model });

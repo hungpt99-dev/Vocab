@@ -1,5 +1,5 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
-import { SETTINGS_KEY } from '@/storage/settings-repository';
+import { SETTINGS_KEY, settingsRepository } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import type { ExplainKind } from '@/shared/types/ai';
@@ -320,11 +320,16 @@ function isOwnNode(node: Node): boolean {
 }
 
 function attachHoverListeners(): void {
-  const openFor = (target: EventTarget | null): void => {
+  const openFor = async (target: EventTarget | null): Promise<void> => {
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
     if (!(mark instanceof HTMLElement)) return;
     const entry = entriesById.get(mark.getAttribute(HIGHLIGHT_ATTR) ?? '');
-    if (entry) hoverCard.show(mark, entry);
+    if (!entry) return;
+    const settings = await settingsRepository.get();
+    hoverCard.show(mark, entry, {
+      showOriginal: true,
+      showTranslation: settings.bilingualMode,
+    });
   };
   const closeFor = (target: EventTarget | null): void => {
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;

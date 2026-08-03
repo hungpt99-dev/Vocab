@@ -147,3 +147,30 @@ test('exports the vocabulary as a JSON backup', async ({ page, extensionId }) =>
   expect(file.suggestedFilename()).toMatch(/^ai-vocabulary-\d{4}-\d{2}-\d{2}\.json$/);
   await expect(page.getByText(/Exported 1 words?\./)).toBeVisible();
 });
+
+test('bilingual settings: language picker, toggle and editable prompt persist', async ({ page, extensionId }) => {
+  await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
+
+  // Target language picker (Bilingual mode section).
+  await page.getByLabel('Target language').selectOption('Vietnamese');
+  // Bilingual toggle.
+  await page.getByLabel(/Bilingual mode/).uncheck();
+  // Editable explain prompt.
+  const prompt = page.getByLabel('Explain prompt');
+  await expect(prompt).toBeVisible();
+  await prompt.fill('Explain {{word}} in {{language}}. Be concise.');
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
+
+  await expect(page.getByLabel('Target language')).toHaveValue('Vietnamese');
+  await expect(page.getByLabel(/Bilingual mode/)).not.toBeChecked();
+  await expect(page.getByLabel('Explain prompt')).toHaveValue(
+    'Explain {{word}} in {{language}}. Be concise.',
+  );
+
+  // Reset to default clears the template.
+  await page.getByRole('button', { name: 'Reset to default' }).click();
+  await expect(page.getByLabel('Explain prompt')).toHaveValue('');
+});

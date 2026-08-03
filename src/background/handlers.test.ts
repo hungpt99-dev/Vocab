@@ -197,6 +197,8 @@ describe('explainWord', () => {
       context: 'context',
       pageTitle: 'Page Title',
       precedingText: 'preceding',
+      language: 'English',
+      promptTemplate: '',
     });
   });
 
@@ -212,6 +214,8 @@ describe('explainWord', () => {
       word: 'a sentence.',
       context: 'context',
       kind: 'summarize',
+      language: 'English',
+      promptTemplate: '',
     });
   });
 });
@@ -272,6 +276,8 @@ describe('saveDifficultWords', () => {
       word: 'Nothing hard here.',
       context: 'Nothing hard here.',
       kind: 'vocabulary',
+      language: 'English',
+      promptTemplate: '',
     });
     expect(entries).toEqual([]);
     expect(await deps.vocabulary.count()).toBe(0);
@@ -385,6 +391,8 @@ describe('createHandlers', () => {
     expect(deps.explain.explain).toHaveBeenCalledWith({
       word: 'The cat sat down.',
       kind: 'simplify',
+      language: 'English',
+      promptTemplate: '',
     });
   });
 
