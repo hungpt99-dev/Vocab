@@ -50,8 +50,9 @@ tokens into its CSS string. One source, two renderers.
 | `brand.300` | `#a5b4fc` | | `brand.800` | `#3730a3` |
 | `brand.400` | `#818cf8` | | `brand.900` | `#312e81` |
 
-**Slate** — surfaces and text. Only the four shades actually used are defined:
-`slate.50` `#f8fafc`, `slate.400` `#94a3b8`, `slate.800` `#1e293b`, `slate.900` `#0f172a`.
+**Slate** — surfaces and text. Only the shades actually used are defined:
+`slate.50` `#f8fafc`, `slate.200` `#e2e8f0`, `slate.300` `#cbd5e1`, `slate.400` `#94a3b8`,
+`slate.800` `#1e293b`, `slate.900` `#0f172a`, `slate.950` `#020617`.
 
 **Status** — `status.success` `#15803d`, `status.danger` `#b91c1c`.
 
@@ -61,9 +62,17 @@ tokens into its CSS string. One source, two renderers.
 | --- | --- | --- |
 | `color.focusRing` | `brand.600` | Focus outlines |
 | `color.overlaySurface` | `slate.900` | Hover card background |
-| `color.overlaySurfaceAlt` | `slate.800` | Toast background |
+| `color.overlaySurfaceAlt` | `slate.800` | Toast background, hover fill for overlay controls |
+| `color.overlaySurfaceActive` | `slate.950` | Pressed state of overlay controls |
+| `color.overlayDivider` | `slate.400` at 30% alpha | Hairline dividers on dark overlay surfaces |
+| `color.overlaySurfaceLight` | `slate.50` | Light host theme counterpart of `overlaySurface` |
+| `color.overlaySurfaceAltLight` | `slate.200` | Light host theme counterpart of `overlaySurfaceAlt` |
+| `color.overlaySurfaceActiveLight` | `slate.300` | Light host theme counterpart of `overlaySurfaceActive` |
+| `color.overlayDividerLight` | `slate.400` at 40% alpha | Light host theme counterpart of `overlayDivider` |
 | `color.overlayText` | `slate.50` | Overlay text |
 | `color.overlayMuted` | `slate.400` | Overlay labels |
+| `color.overlayTextLight` | `slate.800` | Light host theme counterpart of `overlayText` |
+| `color.overlayMutedLight` | `slate.400` | Light host theme counterpart of `overlayMuted` |
 | `color.readingSurface` | `slate.50` | Reading-mode page background |
 | `color.readingHeader` | `brand.50` | Reading-mode header bar |
 | `color.readingText` | `slate.900` | Reading-mode article text |

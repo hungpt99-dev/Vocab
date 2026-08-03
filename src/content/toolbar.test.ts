@@ -201,6 +201,26 @@ describe('SelectionToolbar', () => {
     expect(moreButton.hasAttribute('aria-expanded')).toBe(false);
     toolbarUi.destroy();
   });
+
+  it('renders a divider before the More trigger and positions its menu', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show(makeState('hello'));
+
+    const divider = document.querySelector('.avs-toolbar-divider');
+    expect(divider).not.toBeNull();
+    expect(divider?.getAttribute('aria-hidden')).toBe('true');
+
+    const moreButton = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
+    expect(moreButton.getAttribute('aria-haspopup')).toBe('menu');
+
+    toolbarUi.toggleMenu();
+    const menu = document.getElementById('avs-toolbar-menu')!;
+    expect(menu.hidden).toBe(false);
+    expect(menu.style.top).toBe('8px');
+    expect(menu.style.left).toBe('8px');
+    toolbarUi.destroy();
+  });
 });
 
 describe('SelectionToolbar keyboard navigation', () => {

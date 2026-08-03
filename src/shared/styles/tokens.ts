@@ -33,9 +33,11 @@ export const brand = {
 export const slate = {
   50: '#f8fafc',
   200: '#e2e8f0',
+  300: '#cbd5e1',
   400: '#94a3b8',
   800: '#1e293b',
   900: '#0f172a',
+  950: '#020617',
 } as const;
 
 /** Semantic status colours, consumed via the `tint`/`text` helpers in tokens. */
@@ -62,21 +64,19 @@ export const color = {
   /** Inverted surface used by the hover card and toast on light and dark pages. */
   overlaySurface: slate[900],
   overlaySurfaceAlt: slate[800],
+  /** Pressed state of overlay controls — darker than the hover fill. */
+  overlaySurfaceActive: slate[950],
   overlayText: slate[50],
   overlayMuted: slate[400],
+  /** Hairline divider between overlay header and body, and in the toolbar. */
+  overlayDivider: `${slate[400]}4d`,
   /** Light-theme counterparts, applied when the host prefers a light scheme. */
   overlaySurfaceLight: slate[50],
   overlaySurfaceAltLight: slate[200],
+  overlaySurfaceActiveLight: slate[300],
   overlayTextLight: slate[800],
   overlayMutedLight: slate[400],
-  /** Reading-mode page surface: a light paper background with dark text. */
-  readingSurface: slate[50],
-  /** Reading-mode header bar. */
-  readingHeader: brand[50],
-  /** Reading-mode article text. */
-  readingText: slate[900],
-  /** Reading-mode labels and translations. */
-  readingMuted: slate[400],
+  overlayDividerLight: `${slate[400]}66`,
 } as const;
 
 /** Tailwind utility strings for semantic status colours (light + dark). */
@@ -140,8 +140,6 @@ export const typography = {
   overlayBody: `${reading.fontSize}px/${reading.spacing}`,
   overlayCompact: '13px/1.4',
   overlayLabel: '11px',
-  readingBody: '15px/1.6',
-  readingHeading: '17px/1.5',
 } as const;
 
 export const motion = {
@@ -159,8 +157,6 @@ export const zIndex = {
 
 export const layout = {
   overlayMaxWidth: `${reading.width}px`,
-  /** Comfortable measure for the reading-mode text column. */
-  readingMaxWidth: '720px',
   /** Narrowest supported popup width, asserted by an E2E test. */
   popupMinWidth: '320px',
   popupWidth: '384px',

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import tailwindConfig from '../../../tailwind.config';
 import { injectStyles } from '@/content/styles';
-import { brand, color, layout, typography } from './tokens';
+import { brand, color, DEFAULT_HIGHLIGHT_COLOR, layout, typography } from './tokens';
+
+/** Collect every hex-colour leaf value from a (possibly nested) token record. */
+function flattenColors(record: Record<string, unknown>): string[] {
+  return Object.values(record).flatMap((value) => {
+    if (typeof value === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)) return [value];
+    if (typeof value === 'object' && value !== null) return flattenColors(value as Record<string, unknown>);
+    return [];
+  });
+}
 
 /**
  * The popup/options UI is styled by Tailwind, while the content script injects
@@ -31,12 +40,9 @@ describe('design tokens', () => {
 
     // Every colour literal in the injected CSS must come from the token set.
     const known = new Set(
-      [
-        ...Object.values(brand),
-        ...Object.values(color.slate),
-        ...Object.values(color.status),
-        '#fde68a', // DEFAULT_HIGHLIGHT_COLOR
-      ].map((value) => value.toLowerCase()),
+      [...flattenColors(brand), ...flattenColors(color), DEFAULT_HIGHLIGHT_COLOR].map((value) =>
+        value.toLowerCase(),
+      ),
     );
 
     const used = [...css.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((match) => match[0].toLowerCase());
