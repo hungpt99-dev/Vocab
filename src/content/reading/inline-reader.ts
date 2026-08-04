@@ -27,6 +27,9 @@ export class InlineReader {
   private alignment: ReadingAlignment = 'sentence';
   private mode: ReadingMode = 'word';
   private active = false;
+  /** Monotonic token; bumped on every (re)inject or close so a stale in-flight
+   *  batch can tell it has been superseded and must not append nodes. */
+  private generation = 0;
 
   get isOpen(): boolean {
     return this.active;
@@ -49,6 +52,7 @@ export class InlineReader {
     this.alignment = prefs.alignment;
     this.mode = prefs.mode;
     this.active = true;
+    this.generation += 1;
 
     if (settings.bilingualMode) {
       await this.injectAll(blocks);
@@ -66,19 +70,22 @@ export class InlineReader {
   }
 
   close(): void {
+    this.active = false;
+    this.generation += 1;
     for (const nodes of this.injected.values()) {
       for (const node of nodes) node.remove();
     }
     this.injected.clear();
     this.control?.remove();
     this.control = null;
+    this.modeButton = null;
     this.prefsListener?.();
     this.prefsListener = null;
-    this.active = false;
   }
 
   /** Re-inject translations after a mode change (clears the old ones first). */
   private async rerender(blocks: ArticleBlock[]): Promise<void> {
+    this.generation += 1;
     for (const nodes of this.injected.values()) {
       for (const node of nodes) node.remove();
     }
@@ -87,6 +94,7 @@ export class InlineReader {
   }
 
   private async injectAll(blocks: ArticleBlock[]): Promise<void> {
+    const generation = this.generation;
     const items: Array<{ id: string; text: string; anchor: HTMLElement }> = [];
     for (const block of blocks) {
       const targets = this.resolveTargets(block);
@@ -96,6 +104,9 @@ export class InlineReader {
 
     if (this.mode === 'word') {
       const aligned = await this.alignItems(items);
+      // A close() or rerender() may have superseded this batch while we waited
+      // on the AI call; if so, discard rather than append stale duplicates.
+      if (this.generation !== generation) return;
       for (const item of items) {
         const result = aligned.get(item.id);
         if (!result) continue;
@@ -110,6 +121,7 @@ export class InlineReader {
 
     // Sentence mode: one full-block (or full-sentence) translation line each.
     const translated = await this.translateItems(items);
+    if (this.generation !== generation) return;
     for (const item of items) {
       const translation = translated.get(item.id);
       if (!translation) continue;
