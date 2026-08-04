@@ -3,6 +3,12 @@ import { AiError } from './types';
 import type { WordPair } from './types';
 import { extractJsonObject } from './parse';
 
+/** A parsed alignment for one paragraph: a full-sentence translation plus word pairs. */
+export interface ParsedAlign {
+  translation: string;
+  pairs: WordPair[];
+}
+
 /**
  * Parse a model response into paragraph translations. The model answers with
  * `{"translations":[...]}` but may wrap it in prose or code fences; we extract
@@ -27,38 +33,56 @@ export function parseTranslations(raw: string, expected: number): string[] {
 }
 
 /**
- * Parse a word-alignment model response into one ordered pair-list PER paragraph.
- * The model answers with `{"paragraphs":[{"pairs":[{"source","target"}]}]}` but
- * may wrap it in prose/fences; we extract the object and coerce the array.
+ * Parse a word-alignment model response into one result PER paragraph: a
+ * faithful full-sentence `translation` (in natural target word order — this is
+ * what the page renders) plus an ordered `pairs` list for the hover gloss.
  *
- * To stay robust when the model returns a single flat `{"pairs":[...]}` (older
- * shape) or fewer entries than paragraphs, we round-robin the available pair
- * lists across paragraphs instead of throwing — better to show imperfect glosses
- * than to drop the whole feature. A malformed reply yields empty lists.
+ * The model answers with `{"paragraphs":[{"translation","pairs":[...]}]}` but may
+ * wrap it in prose/fences; we extract the object and coerce the arrays.
+ *
+ * Robustness: if a paragraph entry lacks a `translation`, we fall back to joining
+ * its pairs' targets; if the model returns the older flat `{"pairs":[...]}` shape
+ * or fewer entries than paragraphs, we round-robin the available lists across
+ * paragraphs. A malformed reply yields empty results.
  */
-export function parseWordAlignments(raw: string, paragraphCount: number): WordPair[][] {
-  const parsed = extractJsonObject(raw) as Record<string, unknown>;
+export function parseWordAlignments(raw: string, paragraphCount: number): ParsedAlign[] {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = extractJsonObject(raw) as Record<string, unknown>;
+  } catch {
+    // Malformed reply: yield empty results rather than throwing, so the caller
+    // surfaces a single actionable error instead of a raw parse exception.
+    return Array.from({ length: paragraphCount }, () => ({ translation: '', pairs: [] }));
+  }
 
-  // Preferred shape: one pair-list per paragraph.
+  // Preferred shape: one result per paragraph.
   if (Array.isArray(parsed.paragraphs)) {
-    const lists: WordPair[][] = [];
+    const results: ParsedAlign[] = [];
     for (const entry of parsed.paragraphs) {
       if (!entry || typeof entry !== 'object') continue;
-      const pairs = (entry as Record<string, unknown>).pairs;
-      if (!Array.isArray(pairs)) continue;
-      const list = toPairs(pairs as unknown[]);
-      if (list.length > 0) lists.push(list);
+      const node = entry as Record<string, unknown>;
+      const pairs = Array.isArray(node.pairs) ? toPairs(node.pairs as unknown[]) : [];
+      const translation =
+        typeof node.translation === 'string' && node.translation.trim()
+          ? collapseWhitespace(node.translation)
+          : pairs.map((pair) => pair.target).join(' ').trim();
+      if (translation || pairs.length > 0) {
+        results.push({ translation, pairs });
+      }
     }
-    if (lists.length > 0) return distribute(lists, paragraphCount);
+    if (results.length > 0) return distribute(results, paragraphCount);
   }
 
   // Legacy shape: a single flat pair list for the whole batch.
   if (Array.isArray(parsed.pairs)) {
-    const single = toPairs(parsed.pairs as unknown[]);
-    if (single.length > 0) return distribute([single], paragraphCount);
+    const pairs = toPairs(parsed.pairs as unknown[]);
+    if (pairs.length > 0) {
+      const translation = pairs.map((pair) => pair.target).join(' ').trim();
+      return distribute([{ translation, pairs }], paragraphCount);
+    }
   }
 
-  return Array.from({ length: paragraphCount }, () => []);
+  return Array.from({ length: paragraphCount }, () => ({ translation: '', pairs: [] }));
 }
 
 function toPairs(values: unknown[]): WordPair[] {
@@ -74,13 +98,13 @@ function toPairs(values: unknown[]): WordPair[] {
   return pairs;
 }
 
-/** Spread the parsed pair-lists across `count` paragraphs, repeating if needed. */
-function distribute(lists: WordPair[][], count: number): WordPair[][] {
-  if (lists.length >= count) return lists.slice(0, count);
-  const out: WordPair[][] = [];
+/** Spread the parsed results across `count` paragraphs, repeating if needed. */
+function distribute(results: ParsedAlign[], count: number): ParsedAlign[] {
+  if (results.length >= count) return results.slice(0, count);
+  const out: ParsedAlign[] = [];
   for (let i = 0; i < count; i += 1) {
-    const list = lists[i % lists.length];
-    if (list) out.push(list);
+    const result = results[i % results.length];
+    if (result) out.push(result);
   }
   return out;
 }

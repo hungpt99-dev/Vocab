@@ -112,12 +112,12 @@ export class AnthropicProvider implements AiProvider {
     }
     const all = parseWordAlignments(content, request.paragraphs.length);
     return request.paragraphs.map((paragraph, index) => {
-      const pairs = all[index] ?? [];
+      const aligned = all[index] ?? { translation: '', pairs: [] };
       return {
         id: paragraph.id ?? '',
         text: paragraph.text,
-        pairs,
-        translation: pairs.map((pair) => pair.target).join(' '),
+        pairs: aligned.pairs,
+        translation: aligned.translation,
       };
     });
   }
