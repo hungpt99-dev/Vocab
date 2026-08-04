@@ -98,24 +98,25 @@ describe('InlineReader bilingual injection', () => {
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
-    // A fresh open() injects exactly one gloss per paragraph (no duplicates):
-    // two paragraphs → two sentence lines, and matched source words wrapped.
+    // A fresh open() in word mode wraps each source word in a gloss span and
+    // does NOT emit a separate translation line (that lives in the hover popover).
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
 
     reader.close();
   });
 
-  it('injects a single gloss per paragraph on a normal open', async () => {
+  it('injects a single gloss per paragraph on a normal open (word mode: no sentence line)', async () => {
     const reader = new InlineReader();
     resolveSend(glossResponse());
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    // Word mode wraps the source words but does not stack a translation line.
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
     reader.close();
   });

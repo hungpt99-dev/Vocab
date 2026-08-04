@@ -143,11 +143,9 @@ export class InlineReader {
         const result = aligned.get(item.id);
         if (!result) continue;
         this.applyWordGloss(item, result);
-        if (result.translation) {
-          const node = buildSentenceBlock(result.translation);
-          item.anchor.after(node);
-          this.track(item.id, node);
-        }
+        // In word mode the translation is shown per-word in the hover popover, so
+        // we intentionally do NOT also push a full sentence line beneath every
+        // paragraph — that would stack a duplicate translation on the page.
       }
       return;
     }
