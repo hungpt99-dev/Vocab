@@ -12,7 +12,9 @@ import { extractArticle, type ArticleBlock } from './extract';
 import { buildSentenceBlock, wrapWords } from './gloss';
 import { WordGlossPopover } from './word-gloss-popover';
 import type { WordAlignResult } from '@/ai/types';
+import { aiErrorMessage } from '@/ai/types';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
+import { showToast } from '../toast';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -33,6 +35,8 @@ export class InlineReader {
   /** Monotonic token; bumped on every (re)inject or close so a stale in-flight
    *  batch can tell it has been superseded and must not append nodes. */
   private generation = 0;
+  /** Last AI failure surfaced to the user, so we don't spam duplicate toasts. */
+  private lastError: string | null = null;
 
   get isOpen(): boolean {
     return this.active;
@@ -56,6 +60,7 @@ export class InlineReader {
     this.mode = prefs.mode;
     this.active = true;
     this.generation += 1;
+    this.lastError = null;
 
     if (settings.bilingualMode) {
       await this.injectAll(blocks);
@@ -134,6 +139,7 @@ export class InlineReader {
     }
     if (items.length === 0) return;
 
+    let injectedSomething = false;
     if (this.mode === 'word') {
       const aligned = await this.alignItems(items);
       // A close() or rerender() may have superseded this batch while we waited
@@ -153,26 +159,35 @@ export class InlineReader {
           item.anchor.after(node);
           this.track(item.id, node);
           lastText = result.translation;
+          injectedSomething = true;
         }
       }
-      return;
+    } else {
+      // Sentence mode: one full-block (or full-sentence) translation line each.
+      const translated = await this.translateItems(items);
+      if (this.generation !== generation) return;
+      let lastText: string | null = null;
+      for (const item of items) {
+        const translation = translated.get(item.id);
+        if (!translation) continue;
+        // Skip a line identical to the one we just injected so the page does not
+        // show the same translation stacked twice (e.g. when several sentences
+        // resolve to the same block element / repeated phrasing).
+        if (translation === lastText) continue;
+        lastText = translation;
+        const node = buildSentenceBlock(translation);
+        item.anchor.after(node);
+        this.track(item.id, node);
+        injectedSomething = true;
+      }
     }
 
-    // Sentence mode: one full-block (or full-sentence) translation line each.
-    const translated = await this.translateItems(items);
-    if (this.generation !== generation) return;
-    let lastText: string | null = null;
-    for (const item of items) {
-      const translation = translated.get(item.id);
-      if (!translation) continue;
-      // Skip a line identical to the one we just injected so the page does not
-      // show the same translation stacked twice (e.g. when several sentences
-      // resolve to the same block element / repeated phrasing).
-      if (translation === lastText) continue;
-      lastText = translation;
-      const node = buildSentenceBlock(translation);
-      item.anchor.after(node);
-      this.track(item.id, node);
+    // Fail loudly: if the AI call produced nothing (missing key, network, etc.)
+    // the page would otherwise stay fully monolingual and the feature looks
+    // broken. Tell the user exactly where to fix it.
+    if (!injectedSomething && this.lastError) {
+      showToast(this.lastError, 'error');
+      this.lastError = null;
     }
   }
 
@@ -203,8 +218,10 @@ export class InlineReader {
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
       });
       for (const result of results) out.set(result.id, result);
-    } catch {
-      /* leave empty; no glosses injected */
+    } catch (cause) {
+      // Record the failure so the caller can surface an actionable message
+      // instead of leaving the page silently monolingual.
+      this.lastError = aiErrorMessage(cause);
     }
     return out;
   }
@@ -221,8 +238,8 @@ export class InlineReader {
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
       });
       for (const item of result) out.set(item.id, item.translation);
-    } catch {
-      /* leave empty; no translations injected */
+    } catch (cause) {
+      this.lastError = aiErrorMessage(cause);
     }
     return out;
   }
