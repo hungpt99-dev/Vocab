@@ -224,6 +224,15 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         translation: result.translation,
       }));
     },
+    'align-words': async (message) => {
+      const results = await deps.translate.alignWords(message.payload.paragraphs, message.payload.language);
+      return results.map((result) => ({
+        id: result.id,
+        text: result.text,
+        pairs: result.pairs,
+        translation: result.translation,
+      }));
+    },
     'open-options': () => {
       void chrome.runtime.openOptionsPage();
     },

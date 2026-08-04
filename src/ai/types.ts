@@ -20,9 +20,15 @@ export interface ExplainRequest {
 
 export interface TranslateRequest {
   /** Paragraphs to translate, in order. */
-  paragraphs: Array<{ text: string }>;
+  paragraphs: TranslationParagraphLike[];
   /** Target language name, e.g. "Russian". */
   language: string;
+}
+
+/** A paragraph to translate, with an optional caller-owned id for alignment. */
+export interface TranslationParagraphLike {
+  id?: string;
+  text: string;
 }
 
 /** A paragraph the caller wants translated, with a stable caller-owned id. */
@@ -35,6 +41,22 @@ export interface TranslationParagraph {
 export interface TranslationResult {
   id: string;
   text: string;
+  translation: string;
+}
+
+/** A single source→target word alignment produced by the word-align mode. */
+export interface WordPair {
+  source: string;
+  target: string;
+}
+
+/** A paragraph translated with an optional word-by-word alignment. */
+export interface WordAlignResult {
+  id: string;
+  text: string;
+  /** Ordered source→target glosses, one per token. Empty when unavailable. */
+  pairs: WordPair[];
+  /** Full-sentence translation, used as a fallback when pairs are missing. */
   translation: string;
 }
 
@@ -62,6 +84,8 @@ export interface AiProvider {
   readonly requiresApiKey: boolean;
   explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation>;
   translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult>;
+  /** Word-by-word aligned translation: returns ordered source→target glosses. */
+  align(request: TranslateRequest, config: ProviderConfig): Promise<WordAlignResult[]>;
 }
 
 /** Provider-level translation response: one translation per input paragraph. */

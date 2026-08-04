@@ -2,13 +2,15 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
   TRANSLATE_SYSTEM_PROMPT,
+  ALIGN_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,
   buildTranslateUserPrompt,
+  buildAlignUserPrompt,
 } from '../prompts';
 import { toExplanation } from '../parse';
-import { parseTranslations } from '../parse-translation';
-import type { TranslateResult } from '../types';
+import { parseTranslations, parseWordPairs } from '../parse-translation';
+import type { TranslateResult, WordAlignResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface GeminiResponse {
@@ -70,6 +72,44 @@ export class GeminiProvider implements AiProvider {
         translation: translations[index] ?? '',
       })),
     };
+  }
+
+  async align(request: TranslateRequest, config: ProviderConfig): Promise<WordAlignResult[]> {
+    if (!config.apiKey) {
+      throw new AiError('missing_api_key', 'An API key is required for Google Gemini.');
+    }
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+
+    const data = await postJson<GeminiResponse>({
+      url: joinUrl(baseUrl, `models/${model}:generateContent`),
+      headers: { 'x-goog-api-key': config.apiKey },
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        systemInstruction: { parts: [{ text: ALIGN_SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: buildAlignUserPrompt(request) }] }],
+        generationConfig: {
+          temperature: config.temperature ?? 0.1,
+          ...(config.maxTokens !== undefined && config.maxTokens !== null
+            ? { maxOutputTokens: config.maxTokens }
+            : {}),
+          responseMimeType: 'application/json',
+        },
+      },
+    });
+
+    const content = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('');
+    if (!content) {
+      throw new AiError('bad_response', 'Gemini returned an empty response.');
+    }
+    const pairs = parseWordPairs(content);
+    return request.paragraphs.map((paragraph) => ({
+      id: paragraph.id ?? '',
+      text: paragraph.text,
+      pairs,
+      translation: pairs.map((pair) => pair.target).join(' '),
+    }));
   }
 
   /** Post one generateContent call with a system instruction and read the text. */

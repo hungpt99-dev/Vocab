@@ -139,6 +139,25 @@ describe('OpenAiCompatibleProvider', () => {
     ]);
   });
 
+  it('returns word-by-word alignment through the chat-completions endpoint', async () => {
+    const alignPayload = JSON.stringify({ pairs: [{ source: 'Hello', target: 'Xin chào' }, { source: 'World', target: 'Thế giới' }] });
+    const fetchMock = mockFetch({ choices: [{ message: { content: alignPayload } }] });
+    const result = await provider.align(
+      { paragraphs: [{ id: '0', text: 'Hello World' }], language: 'Vietnamese' },
+      config,
+    );
+
+    const [, init] = callAt(fetchMock, 0);
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain('interlinear');
+    const first = result[0]!;
+    expect(first.pairs).toEqual([
+      { source: 'Hello', target: 'Xin chào' },
+      { source: 'World', target: 'Thế giới' },
+    ]);
+    expect(first.translation).toBe('Xin chào Thế giới');
+  });
+
   it('requires an API key to translate when the preset demands one', async () => {
     await expect(
       provider.translate({ paragraphs: [{ text: 'Hello' }], language: 'Spanish' }, { ...config, apiKey: '' }),

@@ -8,7 +8,9 @@ import {
   type ReadingAlignment,
 } from './preferences';
 import { extractArticle, type ArticleBlock } from './extract';
-import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_ALIGN_SENTENCE } from '../icons';
+import { buildGlossBlock } from './gloss';
+import type { WordAlignResult } from '@/ai/types';
+import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_ALIGN_SENTENCE, ICON_LANGUAGES } from '../icons';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -75,16 +77,36 @@ export class InlineReader {
     }
     if (items.length === 0) return;
 
-    const translated = await this.translateItems(items.map((item) => ({ id: item.id, text: item.text })));
+    // Word-by-word alignment: gives interlinear glosses, with a full-sentence
+    // translation as a built-in fallback when the model skips alignment.
+    const aligned = await this.alignItems(items);
     for (const item of items) {
-      const translation = translated.get(item.id);
-      if (!translation) continue;
-      const node = this.makeTranslationNode(translation);
+      const result = aligned.get(item.id);
+      if (!result) continue;
+      const node = buildGlossBlock(result);
       item.anchor.after(node);
       const list = this.injected.get(item.id) ?? [];
       list.push(node);
       this.injected.set(item.id, list);
     }
+  }
+
+  private async alignItems(
+    items: Array<{ id: string; text: string }>,
+  ): Promise<Map<string, WordAlignResult>> {
+    const out = new Map<string, WordAlignResult>();
+    try {
+      const settings = await settingsRepository.get();
+      const language = settings.targetLanguage || 'English';
+      const results = await sendMessage({
+        type: 'align-words',
+        payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
+      });
+      for (const result of results) out.set(result.id, result);
+    } catch {
+      /* leave empty; no glosses injected */
+    }
+    return out;
   }
 
   /** Map a block to (sentence or paragraph) source anchors on the live page. */
@@ -123,46 +145,26 @@ export class InlineReader {
     return match instanceof HTMLElement ? match : null;
   }
 
-  private async translateItems(
-    items: Array<{ id: string; text: string }>,
-  ): Promise<Map<string, string>> {
-    const out = new Map<string, string>();
-    try {
-      const settings = await settingsRepository.get();
-      const language = settings.targetLanguage || 'English';
-      const result = await sendMessage({
-        type: 'translate-article',
-        payload: { paragraphs: items, language },
-      });
-      for (const item of result) out.set(item.id, item.translation);
-    } catch {
-      /* leave translations empty; nodes simply not injected */
-    }
-    return out;
-  }
-
-  private makeTranslationNode(translation: string): HTMLElement {
-    const span = document.createElement('span');
-    span.className = 'avs-inline-translation';
-    span.setAttribute('lang', '');
-    span.textContent = translation;
-    return span;
-  }
-
   private buildControl(visible: boolean): void {
     const control = document.createElement('div');
     control.className = 'avs-inline-control';
     control.hidden = !visible;
 
+    const label = document.createElement('span');
+    label.className = 'avs-inline-control-label';
+    label.innerHTML = `${ICON_LANGUAGES}<span>Bilingual</span>`;
+
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'avs-inline-btn';
     toggle.innerHTML = ICON_BOOK_OPEN;
-    toggle.title = 'Toggle inline translations';
-    toggle.setAttribute('aria-label', 'Toggle inline translations');
+    toggle.title = 'Show/hide translations';
+    toggle.setAttribute('aria-label', 'Show or hide translations');
+    toggle.setAttribute('aria-pressed', 'true');
     toggle.addEventListener('click', () => {
       const next = !control.dataset.on || control.dataset.on === 'false';
       control.dataset.on = String(next);
+      toggle.setAttribute('aria-pressed', String(next));
       for (const nodes of this.injected.values()) {
         for (const node of nodes) node.hidden = !next;
       }
@@ -188,7 +190,7 @@ export class InlineReader {
     close.setAttribute('aria-label', 'Close bilingual reading');
     close.addEventListener('click', () => this.close());
 
-    control.append(toggle, align, close);
+    control.append(label, toggle, align, close);
     document.body.append(control);
     this.control = control;
   }

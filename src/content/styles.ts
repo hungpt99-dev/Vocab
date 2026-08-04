@@ -487,20 +487,61 @@ export function injectStyles(doc: Document = document): void {
       font-style: italic;
     }
     .avs-inline-translation[hidden] { display: none; }
+    .avs-gloss-block {
+      display: block;
+      margin: 4px 0 8px;
+    }
+    .avs-gloss-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 2px 10px;
+      padding-left: 10px;
+      border-left: 2px solid var(--avs-overlay-divider);
+    }
+    .avs-gloss {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.2;
+    }
+    .avs-gloss-source {
+      font-size: 0.95em;
+      color: inherit;
+    }
+    .avs-gloss-target {
+      font-size: 0.8em;
+      color: var(--avs-overlay-muted);
+      font-style: italic;
+    }
     .avs-inline-control {
       position: fixed;
       right: 16px;
       bottom: 16px;
       z-index: ${zIndex.overlay};
       display: flex;
+      align-items: center;
       gap: 4px;
-      padding: 4px;
+      padding: 4px 6px;
       border-radius: ${radius.md};
       background: var(--avs-overlay-surface);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
     .avs-inline-control[hidden] { display: none; }
-    .avs-inline-btn {
+    .avs-inline-control-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 6px 0 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--avs-overlay-text);
+      border-right: 1px solid var(--avs-overlay-divider);
+      margin-right: 2px;
+    }
+    .avs-inline-control-label svg { width: 14px; height: 14px; }
+    .avs-inline-btn {\
+
       display: inline-flex;
       align-items: center;
       justify-content: center;
