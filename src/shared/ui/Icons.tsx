@@ -1,4 +1,4 @@
-import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload, Languages } from 'lucide-react';
+import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload, Languages, KeyRound, Database, Palette, SlidersHorizontal, Wand2 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 /**
@@ -38,3 +38,8 @@ export const SparklesIcon = build(Sparkles);
 export const LanguagesIcon = build(Languages);
 export const DownloadIcon = build(Download);
 export const UploadIcon = build(Upload);
+export const KeyIcon = build(KeyRound);
+export const DatabaseIcon = build(Database);
+export const PaletteIcon = build(Palette);
+export const SlidersIcon = build(SlidersHorizontal);
+export const WandIcon = build(Wand2);

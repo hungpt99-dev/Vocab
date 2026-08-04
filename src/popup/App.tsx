@@ -197,59 +197,81 @@ export function App() {
 
   return (
     <ToastProvider>
-      <div className="flex min-h-[420px] w-full min-w-[300px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-        <header className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+      <div className="flex min-h-[440px] w-full min-w-[300px] max-w-[400px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        {/* App bar */}
+        <header className="flex items-center justify-between gap-2 border-b border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+              <BookIcon size={16} />
+            </span>
+            <div className="leading-tight">
+              <h1 className="text-sm font-semibold tracking-tight">AI Vocabulary Saver</h1>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Read, save, learn</p>
+            </div>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
+            <SettingsIcon size={14} />
+            Settings
+          </Button>
+        </header>
+
+        <LibraryScreen />
+
+        {/* Bilingual reading card */}
+        <section
+          aria-labelledby="bilingual-card-heading"
+          className="m-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-white">
-                <SettingsIcon size={14} />
-              </span>
-              <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
+              <LanguagesIcon size={16} className="text-brand-600 dark:text-brand-400" aria-hidden="true" />
+              <h2 id="bilingual-card-heading" className="text-sm font-semibold">
+                Bilingual reading
+              </h2>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-              Settings
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <LanguagesIcon size={16} className="text-slate-500 dark:text-slate-400" aria-hidden="true" />
             <Switch
               checked={settings.bilingualMode}
               loading={activating}
               onChange={toggleBilingual}
               label="Bilingual mode"
             />
-            <div
-              className="flex items-center rounded-md border border-slate-200 bg-slate-100 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800"
-              role="group"
-              aria-label="Bilingual reading mode"
-            >
-              <button
-                type="button"
-                onClick={() => changeMode('word')}
-                aria-pressed={mode === 'word'}
-                title="Word-by-word gloss"
-                className={`flex items-center gap-1 rounded px-2 py-1 ${
-                  mode === 'word' ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-                }`}
-              >
-                <BookIcon size={13} aria-hidden="true" /> Word
-              </button>
-              <button
-                type="button"
-                onClick={() => changeMode('sentence')}
-                aria-pressed={mode === 'sentence'}
-                title="Sentence translation"
-                className={`flex items-center gap-1 rounded px-2 py-1 ${
-                  mode === 'sentence' ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-                }`}
-              >
-                <LanguagesIcon size={13} aria-hidden="true" /> Sentence
-              </button>
-            </div>
           </div>
-        </header>
-
-        <LibraryScreen />
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            Show translations inline and read in your language.
+          </p>
+          <div
+            className="mt-3 inline-flex w-full items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+            role="group"
+            aria-label="Bilingual reading mode"
+          >
+            <button
+              type="button"
+              onClick={() => changeMode('word')}
+              aria-pressed={mode === 'word'}
+              title="Word-by-word gloss"
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium transition ${
+                mode === 'word'
+                  ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+            >
+              <BookIcon size={13} aria-hidden="true" /> Word
+            </button>
+            <button
+              type="button"
+              onClick={() => changeMode('sentence')}
+              aria-pressed={mode === 'sentence'}
+              title="Sentence translation"
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium transition ${
+                mode === 'sentence'
+                  ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+            >
+              <LanguagesIcon size={13} aria-hidden="true" /> Sentence
+            </button>
+          </div>
+        </section>
       </div>
     </ToastProvider>
   );
