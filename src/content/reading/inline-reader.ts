@@ -6,11 +6,12 @@ import {
   setReadingPreferences,
   watchReadingPreferences,
   type ReadingAlignment,
+  type ReadingMode,
 } from './preferences';
 import { extractArticle, type ArticleBlock } from './extract';
-import { buildGlossBlock } from './gloss';
+import { buildGlossBlock, buildSentenceBlock } from './gloss';
 import type { WordAlignResult } from '@/ai/types';
-import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_ALIGN_SENTENCE, ICON_LANGUAGES } from '../icons';
+import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -21,8 +22,10 @@ import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_ALIGN_SENTENCE, ICON_LANGUAGES } from 
 export class InlineReader {
   private readonly injected = new Map<string, HTMLElement[]>();
   private control: HTMLElement | null = null;
+  private modeButton: HTMLButtonElement | null = null;
   private prefsListener: (() => void) | null = null;
   private alignment: ReadingAlignment = 'sentence';
+  private mode: ReadingMode = 'word';
   private active = false;
 
   get isOpen(): boolean {
@@ -44,6 +47,7 @@ export class InlineReader {
 
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.alignment = prefs.alignment;
+    this.mode = prefs.mode;
     this.active = true;
 
     if (settings.bilingualMode) {
@@ -52,6 +56,10 @@ export class InlineReader {
     this.buildControl(settings.bilingualMode);
     this.prefsListener = watchReadingPreferences((next) => {
       this.alignment = next.alignment;
+      if (next.mode !== this.mode) {
+        this.mode = next.mode;
+        void this.rerender(blocks);
+      }
       this.refreshControl();
     });
     return true;
@@ -69,6 +77,15 @@ export class InlineReader {
     this.active = false;
   }
 
+  /** Re-inject translations after a mode change (clears the old ones first). */
+  private async rerender(blocks: ArticleBlock[]): Promise<void> {
+    for (const nodes of this.injected.values()) {
+      for (const node of nodes) node.remove();
+    }
+    this.injected.clear();
+    await this.injectAll(blocks);
+  }
+
   private async injectAll(blocks: ArticleBlock[]): Promise<void> {
     const items: Array<{ id: string; text: string; anchor: HTMLElement }> = [];
     for (const block of blocks) {
@@ -77,13 +94,26 @@ export class InlineReader {
     }
     if (items.length === 0) return;
 
-    // Word-by-word alignment: gives interlinear glosses, with a full-sentence
-    // translation as a built-in fallback when the model skips alignment.
-    const aligned = await this.alignItems(items);
+    if (this.mode === 'word') {
+      const aligned = await this.alignItems(items);
+      for (const item of items) {
+        const result = aligned.get(item.id);
+        if (!result) continue;
+        const node = buildGlossBlock(result);
+        item.anchor.after(node);
+        const list = this.injected.get(item.id) ?? [];
+        list.push(node);
+        this.injected.set(item.id, list);
+      }
+      return;
+    }
+
+    // Sentence mode: one full-block (or full-sentence) translation line each.
+    const translated = await this.translateItems(items);
     for (const item of items) {
-      const result = aligned.get(item.id);
-      if (!result) continue;
-      const node = buildGlossBlock(result);
+      const translation = translated.get(item.id);
+      if (!translation) continue;
+      const node = buildSentenceBlock(translation);
       item.anchor.after(node);
       const list = this.injected.get(item.id) ?? [];
       list.push(node);
@@ -105,6 +135,24 @@ export class InlineReader {
       for (const result of results) out.set(result.id, result);
     } catch {
       /* leave empty; no glosses injected */
+    }
+    return out;
+  }
+
+  private async translateItems(
+    items: Array<{ id: string; text: string }>,
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    try {
+      const settings = await settingsRepository.get();
+      const language = settings.targetLanguage || 'English';
+      const result = await sendMessage({
+        type: 'translate-article',
+        payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
+      });
+      for (const item of result) out.set(item.id, item.translation);
+    } catch {
+      /* leave empty; no translations injected */
     }
     return out;
   }
@@ -174,12 +222,12 @@ export class InlineReader {
     const align = document.createElement('button');
     align.type = 'button';
     align.className = 'avs-inline-btn';
-    align.innerHTML = ICON_ALIGN_SENTENCE;
-    align.title = 'Toggle sentence/paragraph alignment';
-    align.setAttribute('aria-label', 'Toggle alignment');
+    align.innerHTML = this.mode === 'word' ? ICON_GLOSS_WORD : ICON_LANGUAGES;
+    align.title = this.mode === 'word' ? 'Word-by-word gloss (click for sentence)' : 'Sentence translation (click for word-by-word)';
+    align.setAttribute('aria-label', 'Switch bilingual mode: word-by-word or sentence');
     align.addEventListener('click', () => {
-      const next: ReadingAlignment = this.alignment === 'sentence' ? 'paragraph' : 'sentence';
-      void setReadingPreferences({ alignment: next });
+      const next: ReadingMode = this.mode === 'word' ? 'sentence' : 'word';
+      void setReadingPreferences({ mode: next });
     });
 
     const close = document.createElement('button');
@@ -193,9 +241,13 @@ export class InlineReader {
     control.append(label, toggle, align, close);
     document.body.append(control);
     this.control = control;
+    this.modeButton = align;
   }
 
   private refreshControl(): void {
-    /* alignment change is picked up on next open; control stays valid */
+    if (!this.modeButton) return;
+    this.modeButton.innerHTML = this.mode === 'word' ? ICON_GLOSS_WORD : ICON_LANGUAGES;
+    this.modeButton.title =
+      this.mode === 'word' ? 'Word-by-word gloss (click for sentence)' : 'Sentence translation (click for word-by-word)';
   }
 }
