@@ -175,24 +175,35 @@ test('bilingual settings: language picker, toggle and editable prompt persist', 
   await expect(page.getByLabel('Explain prompt')).toHaveValue('');
 });
 
-test('popup dashboard bilingual toggle reflects and changes setting', async ({ context, extensionId }) => {
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+test('popup bilingual switch activates the headbar on the page', async ({ context, extensionId, samplePageUrl }) => {
+  // A content page that should react to the bilingual setting.
+  const content = await context.newPage();
+  await content.goto(samplePageUrl);
+  await content.waitForTimeout(300);
 
-  const toggle = page.getByRole('button', { name: /Bilingual mode/ });
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+
+  const toggle = popup.getByRole('switch', { name: /Bilingual mode/ });
   await expect(toggle).toBeVisible();
 
-  // Read current state from the aria-pressed attribute (icon dashboard control).
-  const before = await toggle.getAttribute('aria-pressed');
-  await toggle.click();
-  const after = await toggle.getAttribute('aria-pressed');
-  expect(after).not.toBe(before);
-
-  // Persists across a popup reload (settings written to storage).
-  await page.reload();
-  await expect(page.getByRole('button', { name: /Bilingual mode/ })).toHaveAttribute(
-    'aria-pressed',
-    after ?? '',
+  // Flip to a known state: ensure it ends ON.
+  const isOn = (await toggle.getAttribute('aria-checked')) === 'true';
+  if (!isOn) await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(popup.getByRole('switch', { name: /Bilingual mode/ })).not.toHaveAttribute(
+    'aria-busy',
+    'true',
   );
-  await page.close();
+
+  // Content page must now show the bilingual headbar.
+  await expect(content.locator('.avs-bilingual-bar')).toBeVisible({ timeout: 10_000 });
+
+  // Toggle OFF -> headbar hidden.
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(content.locator('.avs-bilingual-bar')).toBeHidden({ timeout: 10_000 });
+
+  await popup.close();
+  await content.close();
 });
