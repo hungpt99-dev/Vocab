@@ -152,10 +152,14 @@ export class InlineReader {
         this.applyWordGloss(item, result);
         // Word mode keeps the page readable (gloss revealed on hover) but ALSO
         // shows a full-sentence translation line per paragraph so the reader sees
-        // the translation immediately without hovering. Skip a line identical to
-        // the previous one so repeated blocks don't stack duplicates.
-        if (result.translation && result.translation !== lastText) {
-          const node = buildSentenceBlock(result.translation);
+        // the translation immediately without hovering. Prefer the model's
+        // full-sentence `translation`; fall back to the joined word glosses if it
+        // came back empty (so a blank reply doesn't drop the line entirely).
+        // Skip a line identical to the previous one so repeated blocks don't
+        // stack duplicates.
+        const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
+        if (line && line !== lastText) {
+          const node = buildSentenceBlock(line);
           item.anchor.after(node);
           this.track(item.id, node);
           lastText = result.translation;

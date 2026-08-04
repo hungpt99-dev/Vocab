@@ -62,11 +62,35 @@ function collectBlocks(root: Element, out: ArticleBlock[]): void {
   for (const child of root.children) {
     if (SKIPPED_TAGS.has(child.tagName)) continue;
 
-    const text = collapseWhitespace(child.textContent ?? '');
-    if (BLOCK_TAGS.has(child.tagName) && text && isVisible(child)) {
-      out.push({ id: createId(), text, tagName: child.tagName, element: child });
+    // Known block tags (p, headings, li, …) are collected directly.
+    if (BLOCK_TAGS.has(child.tagName)) {
+      const text = collapseWhitespace(child.textContent ?? '');
+      if (text && isVisible(child)) {
+        out.push({ id: createId(), text, tagName: child.tagName, element: child });
+      }
       continue;
     }
-    collectBlocks(child, out);
+
+    // Not a known block tag: if it wraps a nested block (e.g. a <div> holding a
+    // <p>), recurse so we keep the shallowest block. Otherwise, if it carries
+    // direct text, treat the container itself as a block — this is how modern
+    // SPA/docs sites (React, Next.js, Docusaurus, …) render prose, so skipping
+    // it would leave whole passages untranslated.
+    if (containsBlockTag(child)) {
+      collectBlocks(child, out);
+      continue;
+    }
+    const text = collapseWhitespace(child.textContent ?? '');
+    if (text && isVisible(child)) {
+      out.push({ id: createId(), text, tagName: child.tagName, element: child });
+    }
   }
+}
+
+/** True when any descendant (excluding the element itself) is a known block tag. */
+function containsBlockTag(element: Element): boolean {
+  for (const tag of BLOCK_TAGS) {
+    if (element.querySelector(tag)) return true;
+  }
+  return false;
 }

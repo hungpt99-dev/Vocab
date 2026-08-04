@@ -51,7 +51,7 @@ describe('BilingualReader', () => {
   });
 
   it('opens nothing and reports false when there is no article content', async () => {
-    document.body.innerHTML = '<div>no blocks here</div>';
+    document.body.innerHTML = '<div></div><nav>only nav</nav><script>void 0;</script>';
     const reader = new BilingualReader();
     expect(await reader.open()).toBe(false);
     expect(document.querySelector('.avs-reader')).toBeNull();

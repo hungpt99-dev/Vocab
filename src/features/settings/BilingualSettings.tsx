@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import type { Settings } from '@/shared/types/settings';
 import { LANGUAGES } from '@/storage/settings-repository';
-import { Select } from '@/shared/ui/Select';
+import { TextField } from '@/shared/ui/TextField';
 import { Checkbox } from '@/shared/ui/Checkbox';
 import { Button } from '@/shared/ui/Button';
 
@@ -10,13 +10,12 @@ export interface BilingualSettingsProps {
   onChange: (patch: Partial<Settings>) => Promise<void>;
 }
 
-const LANGUAGE_OPTIONS = LANGUAGES.map((language) => ({ value: language, label: language }));
-
 const DEFAULT_PROMPT_HINT =
   'Tokens: {{language}} {{word}} {{context}} {{kind}}. Leave blank to use the built-in prompt.';
 
 export function BilingualSettings({ settings, onChange }: BilingualSettingsProps) {
   const textareaId = useId();
+  const languageListId = useId();
 
   return (
     <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
@@ -26,12 +25,19 @@ export function BilingualSettings({ settings, onChange }: BilingualSettingsProps
       </p>
 
       <div className="mt-4 flex flex-col gap-4">
-        <Select
+        <TextField
           label="Target language"
-          options={LANGUAGE_OPTIONS}
           value={settings.targetLanguage}
+          list={languageListId}
+          placeholder="e.g. Vietnamese, Spanish, Korean…"
+          hint="Any language works — pick a suggestion or type your own."
           onChange={(event) => void onChange({ targetLanguage: event.target.value })}
         />
+        <datalist id={languageListId}>
+          {LANGUAGES.map((language) => (
+            <option key={language} value={language} />
+          ))}
+        </datalist>
 
         <Checkbox
           label="Bilingual mode (show translations inline)"
