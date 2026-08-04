@@ -8,6 +8,7 @@ import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { takePendingExplain } from '@/content/pending-explain';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
+import { getReadingPreferences, setReadingPreferences, type ReadingMode } from '@/content/reading/preferences';
 import { Button } from '@/shared/ui/Button';
 import { BookIcon, LanguagesIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
@@ -171,6 +172,11 @@ function LibraryScreen() {
 export function App() {
   const { settings, update } = useSettings();
   const [activating, setActivating] = useState(false);
+  const [mode, setMode] = useState<ReadingMode>('word');
+
+  useEffect(() => {
+    void getReadingPreferences().then((prefs) => setMode(prefs.mode));
+  }, []);
 
   const toggleBilingual = useCallback(
     async (next: boolean) => {
@@ -184,17 +190,27 @@ export function App() {
     [update],
   );
 
+  const changeMode = useCallback((next: ReadingMode) => {
+    setMode(next);
+    void setReadingPreferences({ mode: next });
+  }, []);
+
   return (
     <ToastProvider>
-      <div className="flex min-h-[420px] w-full min-w-[320px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-        <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-white">
-              <SettingsIcon size={14} />
-            </span>
-            <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
+      <div className="flex min-h-[420px] w-full min-w-[300px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+        <header className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-white">
+                <SettingsIcon size={14} />
+              </span>
+              <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
+              Settings
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <LanguagesIcon size={16} className="text-slate-500 dark:text-slate-400" aria-hidden="true" />
             <Switch
               checked={settings.bilingualMode}
@@ -202,9 +218,34 @@ export function App() {
               onChange={toggleBilingual}
               label="Bilingual mode"
             />
-            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-              Settings
-            </Button>
+            <div
+              className="flex items-center rounded-md border border-slate-200 bg-slate-100 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+              role="group"
+              aria-label="Bilingual reading mode"
+            >
+              <button
+                type="button"
+                onClick={() => changeMode('word')}
+                aria-pressed={mode === 'word'}
+                title="Word-by-word gloss"
+                className={`flex items-center gap-1 rounded px-2 py-1 ${
+                  mode === 'word' ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                }`}
+              >
+                <BookIcon size={13} aria-hidden="true" /> Word
+              </button>
+              <button
+                type="button"
+                onClick={() => changeMode('sentence')}
+                aria-pressed={mode === 'sentence'}
+                title="Sentence translation"
+                className={`flex items-center gap-1 rounded px-2 py-1 ${
+                  mode === 'sentence' ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                }`}
+              >
+                <LanguagesIcon size={13} aria-hidden="true" /> Sentence
+              </button>
+            </div>
           </div>
         </header>
 

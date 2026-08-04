@@ -5,6 +5,7 @@
  * into the host page. */
 import {
   AlignVerticalJustifyStart,
+  AlignHorizontalSpaceBetween,
   Book,
   Bookmark,
   BookOpen,
@@ -45,3 +46,5 @@ export const ICON_MINIMIZE = icon(Minimize2);
 export const ICON_FILE = icon(FileText);
 /** Bilingual-book sentence alignment toggle (stacked facing lines). */
 export const ICON_ALIGN_SENTENCE = icon(AlignVerticalJustifyStart);
+/** Word-by-word interlinear gloss mode (two facing columns). */
+export const ICON_GLOSS_WORD = icon(AlignHorizontalSpaceBetween);

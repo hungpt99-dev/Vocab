@@ -207,7 +207,27 @@ test('popup bilingual switch activates the headbar on the page', async ({ contex
   // Content page must now show the bilingual headbar.
   await expect(content.locator('.avs-bilingual-bar')).toBeVisible({ timeout: 10_000 });
 
-  // Toggle OFF -> headbar hidden.
+  // The popup exposes two bilingual depth modes: Word and Sentence.
+  const wordBtn = popup.getByRole('button', { name: /Word/ });
+  const sentenceBtn = popup.getByRole('button', { name: /Sentence/ });
+  await expect(wordBtn).toBeVisible();
+  await expect(sentenceBtn).toBeVisible();
+
+  // Switching to Sentence persists the mode into reading prefs and re-renders
+  // the page using the sentence path (no interlinear word gloss).
+  await sentenceBtn.click();
+  await expect(sentenceBtn).toHaveAttribute('aria-pressed', 'true');
+  await expect(wordBtn).toHaveAttribute('aria-pressed', 'false');
+  // The reader applies the chosen mode: no word glosses are injected, and the
+  // inline control reflects the Sentence mode (provider-independent check).
+  await expect(content.locator('.avs-gloss-block')).toHaveCount(0);
+  await expect(content.locator('.avs-inline-control button[title*="Sentence"]')).toBeVisible({
+    timeout: 10_000,
+  });
+
+  // Toggle back to Word (the default) and restore OFF.
+  await wordBtn.click();
+
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await expect(content.locator('.avs-bilingual-bar')).toBeHidden({ timeout: 10_000 });

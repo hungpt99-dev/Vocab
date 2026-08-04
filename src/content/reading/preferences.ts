@@ -10,9 +10,19 @@ export type ReadingLayout = 'side-by-side' | 'original-first' | 'translation-fir
  */
 export type ReadingAlignment = 'paragraph' | 'sentence';
 
+/**
+ * Bilingual translation depth shown under the original text:
+ *  - `word`     — interlinear word-by-word gloss (source token over its translation).
+ *  - `sentence` — a full-sentence (or full-block) translation line.
+ * Orthogonal to `alignment`, which controls row granularity (per sentence vs per block).
+ */
+export type ReadingMode = 'word' | 'sentence';
+
 export interface ReadingPreferences {
   layout: ReadingLayout;
   alignment: ReadingAlignment;
+  /** Bilingual translation depth: word-by-word gloss or full-sentence. */
+  mode: ReadingMode;
   /** Base font size of the reader body in px (clamped 12–24). */
   fontSize: number;
   highlightVocabulary: boolean;
@@ -21,6 +31,7 @@ export interface ReadingPreferences {
 export const DEFAULT_READING_PREFS: ReadingPreferences = {
   layout: 'side-by-side',
   alignment: 'paragraph',
+  mode: 'word',
   fontSize: 16,
   highlightVocabulary: true,
 };
