@@ -10,6 +10,7 @@ import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
 import { BookIcon, LanguagesIcon, SettingsIcon } from '@/shared/ui/Icons';
+import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
@@ -169,6 +170,20 @@ function LibraryScreen() {
 
 export function App() {
   const { settings, update } = useSettings();
+  const [activating, setActivating] = useState(false);
+
+  const toggleBilingual = useCallback(
+    async (next: boolean) => {
+      if (next) setActivating(true);
+      try {
+        await update({ bilingualMode: next });
+      } finally {
+        if (next) setActivating(false);
+      }
+    },
+    [update],
+  );
+
   return (
     <ToastProvider>
       <div className="flex min-h-[420px] w-full min-w-[320px] max-w-[420px] flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -179,20 +194,14 @@ export function App() {
             </span>
             <h1 className="text-sm font-semibold">AI Vocabulary Saver</h1>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => void update({ bilingualMode: !settings.bilingualMode })}
-              aria-pressed={settings.bilingualMode}
-              title={settings.bilingualMode ? 'Bilingual mode on' : 'Bilingual mode off'}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                settings.bilingualMode
-                  ? 'bg-brand-600 text-white'
-                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-              }`}
-            >
-              <LanguagesIcon size={16} aria-hidden="true" />
-            </button>
+          <div className="flex items-center gap-2">
+            <LanguagesIcon size={16} className="text-slate-500 dark:text-slate-400" aria-hidden="true" />
+            <Switch
+              checked={settings.bilingualMode}
+              loading={activating}
+              onChange={toggleBilingual}
+              label="Bilingual mode"
+            />
             <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
               Settings
             </Button>

@@ -22,6 +22,7 @@ import { setPendingExplain } from './pending-explain';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
+import { BilingualBar } from './bilingual-bar';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -29,6 +30,7 @@ const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
 const reader = new InlineReader();
+const bilingualBar = new BilingualBar();
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -256,6 +258,10 @@ async function refresh(): Promise<void> {
     return;
   }
 
+  // Bilingual (inline) reading is independent of word highlighting: sync it first
+  // so the headbar + inline translations appear even when no words are saved.
+  syncBilingual(data.bilingualMode, data.targetLanguage);
+
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
@@ -268,6 +274,20 @@ async function refresh(): Promise<void> {
 
   scan(document.body);
   startObserving();
+}
+
+function syncBilingual(enabled: boolean, targetLanguage: string): void {
+  if (enabled) {
+    bilingualBar.show(targetLanguage, () => {
+      void settingsRepository.update({ bilingualMode: false });
+    });
+    document.body.classList.add('avs-bilingual-on');
+    if (!reader.isOpen) void reader.open();
+  } else {
+    bilingualBar.hide();
+    document.body.classList.remove('avs-bilingual-on');
+    if (reader.isOpen) reader.close();
+  }
 }
 
 function scan(root: Node | null): void {

@@ -10,6 +10,7 @@ const entry: HighlightEntry = {
   createdAt: Date.UTC(2026, 0, 15),
   meaning: 'A fortunate accident.',
   pronunciation: '',
+  explanation: null,
 };
 
 beforeEach(() => {

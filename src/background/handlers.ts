@@ -77,6 +77,8 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
   return {
     enabled: settings.highlightEnabled,
     color: settings.highlightColor,
+    bilingualMode: settings.bilingualMode,
+    targetLanguage: settings.targetLanguage,
     readingExperience: settings.readingExperience,
     entries: entries.map((entry) => ({
       id: entry.id,
@@ -86,6 +88,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
       createdAt: entry.createdAt,
       meaning: entry.explanation?.meaning ?? '',
       pronunciation: entry.explanation?.pronunciation ?? '',
+      explanation: entry.explanation ?? null,
     })),
   };
 }

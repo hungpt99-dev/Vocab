@@ -129,11 +129,32 @@ function renderContent(entry: HighlightEntry, explaining: boolean, options: Hove
     nodes.push(word);
   }
 
-  if (entry.pronunciation) nodes.push(row('Pronunciation', entry.pronunciation));
-  // The "translation" section is the meaning/explanation of the entry.
-  if (options.showTranslation) {
+  const explanation = entry.explanation;
+  if (explanation) {
+    if (explanation.pronunciation) nodes.push(row('Pronunciation', explanation.pronunciation));
+    if (explanation.partOfSpeech || explanation.grammar) {
+      const bits = [explanation.partOfSpeech, explanation.grammar].filter(Boolean).join(' · ');
+      nodes.push(row('Grammar', bits));
+    }
+    if (options.showTranslation) {
+      nodes.push(row('Meaning', explanation.meaning || '—'));
+    }
+    if (explanation.simpleExplanation && explanation.simpleExplanation !== explanation.meaning) {
+      nodes.push(row('In short', explanation.simpleExplanation));
+    }
+    if (explanation.translation) nodes.push(row('Translation', explanation.translation));
+    if (explanation.register) nodes.push(row('Register', explanation.register));
+    if (explanation.etymology) nodes.push(row('Etymology', explanation.etymology));
+    if (explanation.examples?.length) nodes.push(list('Examples', explanation.examples));
+    if (explanation.synonyms?.length) nodes.push(list('Synonyms', explanation.synonyms));
+    if (explanation.antonyms?.length) nodes.push(list('Antonyms', explanation.antonyms));
+    if (explanation.collocations?.length) nodes.push(list('Collocations', explanation.collocations));
+    if (explanation.relatedPhrases?.length) nodes.push(list('Related phrases', explanation.relatedPhrases));
+  } else if (options.showTranslation) {
+    if (entry.pronunciation) nodes.push(row('Pronunciation', entry.pronunciation));
     nodes.push(row('Meaning', entry.meaning || 'No explanation yet — use AI explain below.'));
   }
+
   if (entry.note) nodes.push(row('Note', entry.note));
   nodes.push(row('Saved', formatSavedDate(entry.createdAt)));
 
@@ -155,6 +176,23 @@ function renderContent(entry: HighlightEntry, explaining: boolean, options: Hove
   nodes.push(explain);
 
   return nodes;
+}
+
+function list(label: string, items: string[]): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'avs-card-row';
+  const labelEl = document.createElement('div');
+  labelEl.className = 'avs-card-label';
+  labelEl.textContent = label;
+  const valueEl = document.createElement('ul');
+  valueEl.className = 'avs-card-list';
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.textContent = item;
+    valueEl.append(li);
+  }
+  wrapper.append(labelEl, valueEl);
+  return wrapper;
 }
 
 function row(label: string, value: string): HTMLElement {

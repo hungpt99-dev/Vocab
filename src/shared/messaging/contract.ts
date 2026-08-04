@@ -74,11 +74,17 @@ export type MessageType = Message['type'];
 export interface HighlightData {
   enabled: boolean;
   color: string;
+  /** Whether bilingual (inline) reading is enabled; the content script shows the
+   * headbar and injects translations on the page when this is true. */
+  bilingualMode: boolean;
+  /** Target language for inline translations. */
+  targetLanguage: string;
   /** Reading overlay presentation, applied live via CSS custom properties. */
   readingExperience: ReadingExperience;
   entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt'> & {
     meaning: string;
     pronunciation: string;
+    explanation: VocabularyEntry['explanation'];
   }>;
 }
 
