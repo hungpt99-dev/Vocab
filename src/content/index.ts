@@ -278,11 +278,17 @@ async function refresh(): Promise<void> {
 
 function syncBilingual(enabled: boolean, targetLanguage: string): void {
   if (enabled) {
+    // Show the bar immediately in a loading state, then clear it once the inline
+    // translations have been injected (or quickly, if there is nothing to inject).
     bilingualBar.show(targetLanguage, () => {
       void settingsRepository.update({ bilingualMode: false });
-    });
+    }, true);
     document.body.classList.add('avs-bilingual-on');
-    if (!reader.isOpen) void reader.open();
+    if (!reader.isOpen) {
+      void reader.open().finally(() => bilingualBar.setLoading(false));
+    } else {
+      bilingualBar.setLoading(false);
+    }
   } else {
     bilingualBar.hide();
     document.body.classList.remove('avs-bilingual-on');
@@ -329,7 +335,9 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains('avs-toast') ||
     element.classList.contains('avs-toolbar') ||
     element.classList.contains('avs-assist-menu') ||
-    element.classList.contains('avs-panel')
+    element.classList.contains('avs-panel') ||
+    element.classList.contains('avs-inline-translation') ||
+    element.classList.contains('avs-inline-control')
   );
 }
 
