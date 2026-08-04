@@ -188,7 +188,7 @@ test('popup AI explain with no valid provider shows an actionable toast', async 
   await expect(toast).toHaveText(/Settings|API key|provider/i);
 });
 
-test('on-page explain shows an actionable error (not a dummy toast) with no provider', async ({
+test('on-page explain hands the word to the popup (no dummy toast) with no provider', async ({
   page,
   samplePageUrl,
 }) => {
@@ -213,10 +213,8 @@ test('on-page explain shows an actionable error (not a dummy toast) with no prov
   await expect(explainBtn).toBeVisible({ timeout: 10_000 });
   await explainBtn.click();
 
-  // The explain action must surface a real, actionable error (API key / provider),
-  // never the old dummy "explain: <word>" toast.
-  const toast = page.locator('[role="status"]').last();
-  await expect(toast).toBeVisible({ timeout: 15_000 });
-  await expect(toast).toHaveText(/API key|provider|Settings/i);
-  await expect(toast).not.toHaveText(/^explain: /);
+  // The explain action now consolidates into the popup (single surface): it must
+  // NEVER show the old dummy "explain: <word>" toast on the page.
+  const dummy = page.locator('[role="status"]', { hasText: /^explain: / });
+  await expect(dummy).toHaveCount(0);
 });

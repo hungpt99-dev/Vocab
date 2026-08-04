@@ -174,3 +174,25 @@ test('bilingual settings: language picker, toggle and editable prompt persist', 
   await page.getByRole('button', { name: 'Reset to default' }).click();
   await expect(page.getByLabel('Explain prompt')).toHaveValue('');
 });
+
+test('popup dashboard bilingual toggle reflects and changes setting', async ({ context, extensionId }) => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+
+  const toggle = page.getByRole('button', { name: /Bilingual mode/ });
+  await expect(toggle).toBeVisible();
+
+  // Read current state from the aria-pressed attribute (icon dashboard control).
+  const before = await toggle.getAttribute('aria-pressed');
+  await toggle.click();
+  const after = await toggle.getAttribute('aria-pressed');
+  expect(after).not.toBe(before);
+
+  // Persists across a popup reload (settings written to storage).
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Bilingual mode/ })).toHaveAttribute(
+    'aria-pressed',
+    after ?? '',
+  );
+  await page.close();
+});
