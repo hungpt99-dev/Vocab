@@ -2,6 +2,7 @@ import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation, NewVocabularyEntry, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { ReadingExperience } from '@/shared/types/settings';
 import type { SelectionUnit } from '@/shared/lib/selection';
+import type { WordAlignResult } from '@/ai/types';
 
 /** Payload the content script reports about the current selection. */
 export interface SelectionPayload {
@@ -62,6 +63,7 @@ export type Message =
   | { type: 'get-highlight-data' }
   | { type: 'translate-blocks'; payload: { blocks: string[] } }
   | { type: 'translate-article'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
+  | { type: 'align-words'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
   | { type: 'toggle-bilingual-reading' }
   | { type: 'open-options' }
   | { type: 'vocabulary-changed' }
@@ -100,6 +102,7 @@ export interface ResponseMap {
   /** One translated string per input block; null marks a per-block failure. */
   'translate-blocks': Array<string | null>;
   'translate-article': TranslatedParagraphPayload[];
+  'align-words': WordAlignResult[];
   'toggle-bilingual-reading': void;
   'open-options': void;
   'vocabulary-changed': void;

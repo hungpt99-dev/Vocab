@@ -2,13 +2,15 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
   TRANSLATE_SYSTEM_PROMPT,
+  ALIGN_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,
   buildTranslateUserPrompt,
+  buildAlignUserPrompt,
 } from '../prompts';
 import { toExplanation } from '../parse';
-import { parseTranslations } from '../parse-translation';
-import type { TranslateResult } from '../types';
+import { parseTranslations, parseWordPairs } from '../parse-translation';
+import type { TranslateResult, WordAlignResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface AnthropicResponse {
@@ -74,6 +76,47 @@ export class AnthropicProvider implements AiProvider {
         translation: translations[index] ?? '',
       })),
     };
+  }
+
+  async align(request: TranslateRequest, config: ProviderConfig): Promise<WordAlignResult[]> {
+    if (!config.apiKey) {
+      throw new AiError('missing_api_key', 'An API key is required for Anthropic.');
+    }
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+
+    const data = await postJson<AnthropicResponse>({
+      url: joinUrl(baseUrl, 'messages'),
+      headers: {
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        model,
+        max_tokens: config.maxTokens ?? 4096,
+        temperature: config.temperature ?? 0.1,
+        system: ALIGN_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: buildAlignUserPrompt(request) }],
+      },
+    });
+
+    const content = data.content
+      ?.filter((block) => block.type === 'text' || block.text)
+      .map((block) => block.text ?? '')
+      .join('');
+    if (!content) {
+      throw new AiError('bad_response', 'Anthropic returned an empty response.');
+    }
+    const pairs = parseWordPairs(content);
+    return request.paragraphs.map((paragraph) => ({
+      id: paragraph.id ?? '',
+      text: paragraph.text,
+      pairs,
+      translation: pairs.map((pair) => pair.target).join(' '),
+    }));
   }
 
   /** Post one Messages API call with a system prompt and read the text. */

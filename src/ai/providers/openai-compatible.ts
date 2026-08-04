@@ -3,13 +3,15 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import { joinUrl, postJson } from '../http';
 import {
   TRANSLATE_SYSTEM_PROMPT,
+  ALIGN_SYSTEM_PROMPT,
   buildExplainSystemPrompt,
   buildExplainWordUserPrompt,
   buildTranslateUserPrompt,
+  buildAlignUserPrompt,
 } from '../prompts';
 import { toExplanation } from '../parse';
-import { parseTranslations } from '../parse-translation';
-import type { TranslateResult } from '../types';
+import { parseTranslations, parseWordPairs } from '../parse-translation';
+import type { TranslateResult, WordAlignResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
 interface ChatCompletionResponse {
@@ -98,6 +100,47 @@ export class OpenAiCompatibleProvider implements AiProvider {
         translation: translations[index] ?? '',
       })),
     };
+  }
+
+  async align(request: TranslateRequest, config: ProviderConfig): Promise<WordAlignResult[]> {
+    if (this.requiresApiKey && !config.apiKey) {
+      throw new AiError('missing_api_key', `An API key is required for ${this.label}.`);
+    }
+
+    const model = config.model || this.defaultModel;
+    const baseUrl = config.baseUrl || this.defaultBaseUrl;
+    const headers: Record<string, string> = { ...this.preset.extraHeaders };
+    if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+
+    const data = await postJson<ChatCompletionResponse>({
+      url: joinUrl(baseUrl, 'chat/completions'),
+      headers,
+      signal: config.signal,
+      timeoutMs: config.timeoutMs,
+      body: {
+        model,
+        messages: [
+          { role: 'system', content: ALIGN_SYSTEM_PROMPT },
+          { role: 'user', content: buildAlignUserPrompt(request) },
+        ],
+        temperature: config.temperature ?? 0.1,
+        ...(config.maxTokens !== undefined && config.maxTokens !== null
+          ? { max_tokens: config.maxTokens }
+          : { max_tokens: 4096 }),
+      },
+    });
+
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new AiError('bad_response', `${this.label} returned an empty response.`);
+    }
+    const pairs = parseWordPairs(content);
+    return request.paragraphs.map((paragraph) => ({
+      id: paragraph.id ?? '',
+      text: paragraph.text,
+      pairs,
+      translation: pairs.map((pair) => pair.target).join(' '),
+    }));
   }
 
   /** Post one chat-completions call with a system + user turn and extract the text. */

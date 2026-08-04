@@ -10,3 +10,4 @@ export {
   buildExplainUserPrompt,
 } from './explain-selection.prompt';
 export { TRANSLATE_SYSTEM_PROMPT, buildTranslateUserPrompt } from './translate.prompt';
+export { ALIGN_SYSTEM_PROMPT, buildAlignUserPrompt } from './translate.prompt';

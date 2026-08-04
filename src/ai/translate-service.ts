@@ -2,7 +2,7 @@ import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
 import { getProvider } from './registry';
 import { runActiveWithFallback } from './run-with-fallback';
-import type { TranslateRequest, TranslationParagraph, TranslationResult } from './types';
+import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
 import { sharedRateLimiter } from './rate-limiter';
@@ -26,6 +26,7 @@ interface CacheEntry {
  */
 export class TranslateService {
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly alignCache = new Map<string, { results: WordAlignResult[]; expiresAt: number }>();
   private readonly cacheTtlMs: number;
 
   constructor(
@@ -66,6 +67,37 @@ export class TranslateService {
     return results;
   }
 
+  /** Word-by-word aligned translation: returns ordered source→target glosses. */
+  async alignWords(
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<WordAlignResult[]> {
+    const settings = await this.settings.get();
+    return this.alignWith(settings, paragraphs, language, signal);
+  }
+
+  async alignWith(
+    settings: Settings,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<WordAlignResult[]> {
+    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
+    if (!active) {
+      throw new AiError('unknown_provider', 'No active AI provider is configured.');
+    }
+    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
+
+    const results: WordAlignResult[] = [];
+    for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
+      const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
+      const chunkResults = await this.alignChunk(active, fallback, chunk, language, signal);
+      results.push(...chunkResults);
+    }
+    return results;
+  }
+
   private async translateChunk(
     active: SavedProvider,
     fallback: SavedProvider | undefined,
@@ -100,6 +132,59 @@ export class TranslateService {
       active,
       fallback,
     );
+  }
+
+  private async alignChunk(
+    active: SavedProvider,
+    fallback: SavedProvider | undefined,
+    chunk: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<WordAlignResult[]> {
+    const cached = this.readAlignCache(active, chunk, language);
+    const results = cached ?? (await this.runAlignChunk(active, fallback, chunk, language, signal));
+    if (!cached) this.writeAlignCache(active, chunk, language, results);
+    return results;
+  }
+
+  private async runAlignChunk(
+    active: SavedProvider,
+    fallback: SavedProvider | undefined,
+    chunk: readonly TranslationParagraph[],
+    language: string,
+    signal?: AbortSignal,
+  ): Promise<WordAlignResult[]> {
+    const request: TranslateRequest = {
+      paragraphs: chunk.map(({ id, text }) => ({ id, text })),
+      language,
+    };
+    return runActiveWithFallback(
+      (provider) => this.runAlignOnce(provider, request, signal),
+      active,
+      fallback,
+    );
+  }
+
+  private async runAlignOnce(
+    provider: SavedProvider,
+    request: TranslateRequest,
+    signal?: AbortSignal,
+  ): Promise<WordAlignResult[]> {
+    const adapter = getProvider(provider.type);
+    await sharedRateLimiter.acquire(signal);
+    const result = await withRetry(
+      () => adapter.align(request, {
+        apiKey: provider.apiKey,
+        model: provider.model,
+        baseUrl: provider.baseUrl,
+        temperature: provider.temperature,
+        maxTokens: provider.maxTokens,
+        signal,
+        timeoutMs: provider.timeoutMs,
+      }),
+      { ...RETRY_OPTIONS, signal },
+    );
+    return result;
   }
 
   private async runOnce(
@@ -154,6 +239,39 @@ export class TranslateService {
   ): void {
     this.cache.set(this.cacheKey(provider, paragraphs, language), {
       translations: [...translations],
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
+  }
+
+  private alignCacheKey(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+  ): string {
+    const body = paragraphs.map(({ text }) => text).join('␞');
+    return `align|${provider.type}|${provider.model}|${language}|${body}`;
+  }
+
+  private readAlignCache(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+  ): WordAlignResult[] | null {
+    const key = this.alignCacheKey(provider, paragraphs, language);
+    const entry = this.alignCache.get(key);
+    if (entry && entry.expiresAt > Date.now()) return entry.results;
+    this.alignCache.delete(key);
+    return null;
+  }
+
+  private writeAlignCache(
+    provider: SavedProvider,
+    paragraphs: readonly TranslationParagraph[],
+    language: string,
+    results: readonly WordAlignResult[],
+  ): void {
+    this.alignCache.set(this.alignCacheKey(provider, paragraphs, language), {
+      results: results.map((r) => ({ ...r, pairs: [...r.pairs] })),
       expiresAt: Date.now() + this.cacheTtlMs,
     });
   }

@@ -214,4 +214,48 @@ describe('HoverCard', () => {
 
     card.destroy();
   });
+
+  it('keeps the card open after a deferred hide until the timer fires', () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = '<mark id="m">serendipity</mark>';
+      const anchor = document.getElementById('m') as HTMLElement;
+      const card = new HoverCard();
+      card.show(anchor, entry);
+      expect((document.getElementById('avs-hover-card') as HTMLElement).hidden).toBe(false);
+
+      // Simulate cursor leaving the word: the card should NOT vanish instantly.
+      card.scheduleHide();
+      vi.advanceTimersByTime(100);
+      expect((document.getElementById('avs-hover-card') as HTMLElement).hidden).toBe(false);
+
+      // Only after the grace period elapses does it close.
+      vi.advanceTimersByTime(100);
+      expect((document.getElementById('avs-hover-card') as HTMLElement).hidden).toBe(true);
+
+      card.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels a pending hide when shown again', () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = '<mark id="m">serendipity</mark>';
+      const anchor = document.getElementById('m') as HTMLElement;
+      const card = new HoverCard();
+      card.show(anchor, entry);
+      card.scheduleHide();
+      vi.advanceTimersByTime(50);
+      // Re-entering the anchor cancels the pending hide.
+      card.show(anchor, entry);
+      vi.advanceTimersByTime(300);
+      expect((document.getElementById('avs-hover-card') as HTMLElement).hidden).toBe(false);
+
+      card.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
