@@ -9,6 +9,20 @@ import type { WordAlignResult, WordPair } from '@/ai/types';
  * `root` is mutated in place. Callers must keep the original `innerHTML` so the
  * wrap can be undone when bilingual reading is turned off or re-rendered.
  */
+/**
+ * Matches a single "word-like" token: a run of letters (any script, incl.
+ * accents via \p{L}), numbers and internal apostrophes. Crucially we keep
+ * internal separators `.` and `-` so `Node.js`, `self-contained` and
+ * `State-of-the-art` stay as one token instead of being split apart — this is
+ * what lets them match their AI-alignment key (e.g. `node.js`).
+ *
+ * We deliberately avoid `\b`: JavaScript's `\b` is ASCII-only even with the `u`
+ * flag, so accented words (Vietnamese, etc.) would never be recognised as word
+ * boundaries and would be skipped. We instead split on a negated character set
+ * (anything that is NOT part of a token) and keep the tokens in the result.
+ */
+const TOKEN = /([\p{L}\p{N}][\p{L}\p{N}'.-]*[\p{L}\p{N}]|\p{L}|\p{N})/gu;
+
 export function wrapWords(root: HTMLElement, result: WordAlignResult): void {
   if (result.pairs.length === 0) return;
 
@@ -25,8 +39,8 @@ export function wrapWords(root: HTMLElement, result: WordAlignResult): void {
 
   for (const textNode of textNodes) {
     const text = textNode.textContent ?? '';
-    // Split on word boundaries but keep the words so we can re-wrap them.
-    const parts = text.split(/(\b[\p{L}\p{N}']+\b)/u);
+    // Split on the non-token gaps but capture the tokens so we can re-wrap them.
+    const parts = text.split(TOKEN);
     if (parts.length <= 1) continue;
 
     const fragment = document.createDocumentFragment();

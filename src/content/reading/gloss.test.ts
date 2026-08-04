@@ -63,4 +63,42 @@ describe('word gloss wrapping', () => {
     expect(line.className).toBe('avs-inline-translation');
     expect(line.textContent).toBe('Bonjour');
   });
+
+  it('keeps words with internal separators intact (Node.js, self-contained)', () => {
+    const root = document.createElement('p');
+    root.textContent = 'Build scalable Node.js server-side apps';
+    const result: WordAlignResult = {
+      id: '0',
+      text: 'Build scalable Node.js server-side apps',
+      pairs: [
+        { source: 'Node.js', target: 'Node.js' },
+        { source: 'scalable', target: 'có thể mở rộng' },
+      ],
+      translation: '',
+    };
+    wrapWords(root, result);
+
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    // "Node.js" must be ONE token, not "Node" + "js".
+    expect(words.length).toBe(2);
+    const node = Array.from(words).find((w) => w.textContent === 'Node.js');
+    expect(node).toBeDefined();
+    expect(node?.dataset.avsGloss).toBe('Node.js');
+  });
+
+  it('highlights accented words (Vietnamese) using Unicode letters', () => {
+    const root = document.createElement('p');
+    root.textContent = 'Học sinh giỏi';
+    const result: WordAlignResult = {
+      id: '0',
+      text: 'Học sinh giỏi',
+      pairs: [{ source: 'Học', target: 'study' }],
+      translation: '',
+    };
+    wrapWords(root, result);
+
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    expect(words.length).toBe(1);
+    expect(words[0]?.textContent).toBe('Học');
+  });
 });

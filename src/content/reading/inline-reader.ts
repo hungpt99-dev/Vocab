@@ -155,9 +155,15 @@ export class InlineReader {
     // Sentence mode: one full-block (or full-sentence) translation line each.
     const translated = await this.translateItems(items);
     if (this.generation !== generation) return;
+    let lastText: string | null = null;
     for (const item of items) {
       const translation = translated.get(item.id);
       if (!translation) continue;
+      // Skip a line identical to the one we just injected so the page does not
+      // show the same translation stacked twice (e.g. when several sentences
+      // resolve to the same block element / repeated phrasing).
+      if (translation === lastText) continue;
+      lastText = translation;
       const node = buildSentenceBlock(translation);
       item.anchor.after(node);
       this.track(item.id, node);
@@ -241,14 +247,24 @@ export class InlineReader {
   private findSentenceAnchor(parent: HTMLElement, sentence: string): HTMLElement | null {
     const normalized = sentence.trim().slice(0, 24).replace(/"/g, '');
     if (!normalized) return null;
-    const match = document.evaluate(
+    // The shortest element that uniquely contains this sentence text — not the
+    // block itself, which contains every sentence and would cause every
+    // sentence line to stack at the same node.
+    const candidates = document.evaluate(
       `.//*[contains(normalize-space(.), "${normalized}")]`,
       parent,
       null,
-      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
       null,
-    ).singleNodeValue;
-    return match instanceof HTMLElement ? match : null;
+    );
+    let best: HTMLElement | null = null;
+    for (let i = 0; i < candidates.snapshotLength; i += 1) {
+      const el = candidates.snapshotItem(i);
+      if (!(el instanceof HTMLElement)) continue;
+      if (el === parent) continue;
+      if (!best || el.textContent!.length < best.textContent!.length) best = el;
+    }
+    return best;
   }
 
   private buildControl(visible: boolean): void {
