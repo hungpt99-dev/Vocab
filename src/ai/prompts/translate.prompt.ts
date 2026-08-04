@@ -35,13 +35,14 @@ export function buildTranslateUserPrompt({ paragraphs, language }: TranslateRequ
  */
 export const ALIGN_SYSTEM_PROMPT = [
   'You are a professional translator producing an interlinear (word-by-word) bilingual edition.',
-  'For each paragraph, return an ordered list of glosses — one entry per token in the source,',
+  'For EACH paragraph, return an ordered list of glosses — one entry per token in the source,',
   'in the same order, with no omissions and no added words.',
   'Keep proper nouns, numbers, units and technical terms natural in the target language.',
   'Always answer with a single JSON object and nothing else — no prose, no markdown fences.',
-  'The JSON must match this shape exactly:',
-  '{"pairs":[{"source":"Original token","target":"Target gloss"}, ...]}',
-  'Rules: the pairs array must have exactly one entry per source token, in order;',
+  'The JSON must match this shape exactly, with one entry per input paragraph in order:',
+  '{"paragraphs":[{"pairs":[{"source":"Original token","target":"Target gloss"}]}]}',
+  'Rules: the paragraphs array must have exactly one entry per input paragraph, in order;',
+  'each pairs array must have one entry per source token, in order;',
   'the source field repeats the original token verbatim;',
   'the target field is its translation in the target language.',
 ].join(' ');

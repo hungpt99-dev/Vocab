@@ -9,7 +9,7 @@ import {
   buildAlignUserPrompt,
 } from '../prompts';
 import { toExplanation } from '../parse';
-import { parseTranslations, parseWordPairs } from '../parse-translation';
+import { parseTranslations, parseWordAlignments } from '../parse-translation';
 import type { TranslateResult, WordAlignResult } from '../types';
 import { AiError, type AiProvider, type ExplainRequest, type ProviderConfig, type TranslateRequest } from '../types';
 
@@ -110,13 +110,16 @@ export class AnthropicProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Anthropic returned an empty response.');
     }
-    const pairs = parseWordPairs(content);
-    return request.paragraphs.map((paragraph) => ({
-      id: paragraph.id ?? '',
-      text: paragraph.text,
-      pairs,
-      translation: pairs.map((pair) => pair.target).join(' '),
-    }));
+    const all = parseWordAlignments(content, request.paragraphs.length);
+    return request.paragraphs.map((paragraph, index) => {
+      const pairs = all[index] ?? [];
+      return {
+        id: paragraph.id ?? '',
+        text: paragraph.text,
+        pairs,
+        translation: pairs.map((pair) => pair.target).join(' '),
+      };
+    });
   }
 
   /** Post one Messages API call with a system prompt and read the text. */
