@@ -48,6 +48,7 @@ export function computePosition(
 export class HoverCard {
   private element: HTMLElement | null = null;
   private explaining = false;
+  private hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   private ensureElement(): HTMLElement {
     if (this.element?.isConnected) return this.element;
@@ -59,10 +60,16 @@ export class HoverCard {
     card.hidden = true;
     document.body.append(card);
     this.element = card;
+
+    // Keep the card open while the cursor is over it, and defer closing when it
+    // leaves so the user can cross the gap to reach the card before it vanishes.
+    card.addEventListener('mouseenter', () => this.cancelHide());
+    card.addEventListener('mouseleave', () => this.scheduleHide());
     return card;
   }
 
   show(anchor: HTMLElement, entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
+    this.cancelHide();
     this.explaining = false;
 
     const card = this.ensureElement();
@@ -108,7 +115,20 @@ export class HoverCard {
     if (this.element) this.element.hidden = true;
   }
 
+  scheduleHide(delay = 160): void {
+    this.cancelHide();
+    this.hideTimer = setTimeout(() => this.hide(), delay);
+  }
+
+  private cancelHide(): void {
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = undefined;
+    }
+  }
+
   destroy(): void {
+    this.cancelHide();
     this.element?.remove();
     this.element = null;
   }

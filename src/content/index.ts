@@ -353,15 +353,15 @@ function attachHoverListeners(): void {
       showTranslation: settings.bilingualMode,
     });
   };
-  const closeFor = (target: EventTarget | null): void => {
-    const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
-    hoverCard.hide(mark instanceof HTMLElement ? mark : undefined);
+  const closeFor = (): void => {
+    // Defer closing so the user can move the cursor across the gap onto the card.
+    hoverCard.scheduleHide();
   };
 
   document.addEventListener('mouseover', (event) => openFor(event.target));
-  document.addEventListener('mouseout', (event) => closeFor(event.target));
+  document.addEventListener('mouseout', () => closeFor());
   document.addEventListener('focusin', (event) => openFor(event.target));
-  document.addEventListener('focusout', (event) => closeFor(event.target));
+  document.addEventListener('focusout', () => closeFor());
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hoverCard.hide();
   });

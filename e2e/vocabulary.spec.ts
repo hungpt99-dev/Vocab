@@ -90,6 +90,14 @@ test('highlights saved words on a web page with a hover card', async ({ page, co
   await expect(card).toBeVisible();
   await expect(card).toContainText('serendipity');
   await expect(card).toContainText('a lucky find');
+
+  // Regression: the card must stay open when the cursor crosses the gap onto it
+  // (it used to close instantly on mouseout before the user could reach it).
+  const box = await card.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(card).toBeVisible();
+  }
 });
 
 test('options page persists settings and toggles highlighting', async ({ page, extensionId }) => {
