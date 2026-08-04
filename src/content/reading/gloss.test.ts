@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildGlossBlock, buildSentenceBlock } from './gloss';
+import { wrapWords, buildSentenceBlock } from './gloss';
 import type { WordAlignResult } from '@/ai/types';
 
-describe('interlinear gloss rendering', () => {
-  it('renders word-by-word glosses when pairs are present', () => {
+describe('word gloss wrapping', () => {
+  it('wraps matched source words in hoverable gloss spans', () => {
+    const root = document.createElement('p');
+    root.textContent = 'I am a student';
     const result: WordAlignResult = {
       id: '0',
       text: 'I am a student',
@@ -15,27 +17,45 @@ describe('interlinear gloss rendering', () => {
       ],
       translation: 'Tôi là một học sinh',
     };
-    const block = buildGlossBlock(result);
-    expect(block.className).toBe('avs-gloss-block');
+    wrapWords(root, result);
 
-    const glosses = block.querySelectorAll('.avs-gloss');
-    expect(glosses.length).toBe(4);
-    expect(glosses[0]!.querySelector('.avs-gloss-source')?.textContent).toBe('I');
-    expect(glosses[0]!.querySelector('.avs-gloss-target')?.textContent).toBe('Tôi');
-    expect(glosses[3]!.querySelector('.avs-gloss-target')?.textContent).toBe('học sinh');
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    expect(words.length).toBe(4);
+    expect(words[0]?.textContent).toBe('I');
+    expect(words[0]?.dataset.avsGloss).toBe('Tôi');
+    expect(words[3]?.textContent).toBe('student');
+    expect(words[3]?.dataset.avsGloss).toBe('học sinh');
   });
 
-  it('falls back to a sentence block when no pairs are returned', () => {
+  it('leaves unmatched words untouched and only wraps known words', () => {
+    const root = document.createElement('p');
+    root.textContent = 'Hello world example';
     const result: WordAlignResult = {
       id: '0',
-      text: 'I am a student',
-      pairs: [],
-      translation: 'Tôi là một học sinh',
+      text: 'Hello world example',
+      pairs: [{ source: 'Hello', target: 'Xin' }],
+      translation: 'Xin chào',
     };
-    const block = buildGlossBlock(result);
-    const line = block.querySelector('.avs-inline-translation');
-    expect(line).not.toBeNull();
-    expect(line?.textContent).toBe('Tôi là một học sinh');
+    wrapWords(root, result);
+
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    expect(words.length).toBe(1);
+    expect(words[0]?.textContent).toBe('Hello');
+    expect(root.textContent).toContain('world');
+    expect(root.textContent).toContain('example');
+  });
+
+  it('does nothing when there are no pairs', () => {
+    const root = document.createElement('p');
+    root.textContent = 'Nothing to align';
+    const result: WordAlignResult = {
+      id: '0',
+      text: 'Nothing to align',
+      pairs: [],
+      translation: '',
+    };
+    wrapWords(root, result);
+    expect(root.querySelectorAll('.avs-gloss-word').length).toBe(0);
   });
 
   it('builds a standalone sentence block', () => {

@@ -487,30 +487,36 @@ export function injectStyles(doc: Document = document): void {
       font-style: italic;
     }
     .avs-inline-translation[hidden] { display: none; }
-    .avs-gloss-block {
-      display: block;
-      margin: 4px 0 8px;
+    .avs-gloss-word {
+      cursor: help;
+      border-bottom: 1px dotted var(--avs-overlay-divider);
+      transition: background-color ${motion.fast} ${motion.easing};
     }
-    .avs-gloss-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 2px 10px;
-      padding-left: 10px;
-      border-left: 2px solid var(--avs-overlay-divider);
+    .avs-gloss-word:hover {
+      background-color: var(--avs-overlay-surface-alt);
+      border-bottom-color: var(--avs-overlay-muted);
     }
-    .avs-gloss {
+    .avs-word-gloss {
+      position: fixed;
+      z-index: ${zIndex.overlay};
       display: inline-flex;
       flex-direction: column;
-      align-items: center;
-      line-height: 1.2;
+      gap: 2px;
+      padding: 6px 10px;
+      border-radius: ${radius.md};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
+      box-shadow: ${elevation.overlay};
+      font-size: 12px;
+      line-height: 1.3;
+      pointer-events: auto;
     }
-    .avs-gloss-source {
-      font-size: 0.95em;
-      color: inherit;
+    .avs-word-gloss[hidden] { display: none; }
+    .avs-word-gloss-word {
+      font-weight: 600;
+      color: var(--avs-overlay-text);
     }
-    .avs-gloss-target {
-      font-size: 0.8em;
+    .avs-word-gloss-target {
       color: var(--avs-overlay-muted);
       font-style: italic;
     }

@@ -218,9 +218,10 @@ test('popup bilingual switch activates the headbar on the page', async ({ contex
   await sentenceBtn.click();
   await expect(sentenceBtn).toHaveAttribute('aria-pressed', 'true');
   await expect(wordBtn).toHaveAttribute('aria-pressed', 'false');
-  // The reader applies the chosen mode: no word glosses are injected, and the
-  // inline control reflects the Sentence mode (provider-independent check).
-  await expect(content.locator('.avs-gloss-block')).toHaveCount(0);
+  // The reader applies the sentence mode: no source words are wrapped in gloss
+  // spans (the full-sentence line is provider-gated, so we assert the wrapping
+  // absence and that the inline control reflects Sentence mode).
+  await expect(content.locator('.avs-gloss-word')).toHaveCount(0);
   await expect(content.locator('.avs-inline-control button[title*="Sentence"]')).toBeVisible({
     timeout: 10_000,
   });

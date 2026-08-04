@@ -337,7 +337,9 @@ function isOwnNode(node: Node): boolean {
     element.classList.contains('avs-assist-menu') ||
     element.classList.contains('avs-panel') ||
     element.classList.contains('avs-inline-translation') ||
-    element.classList.contains('avs-inline-control')
+    element.classList.contains('avs-inline-control') ||
+    element.classList.contains('avs-gloss-word') ||
+    element.classList.contains('avs-word-gloss')
   );
 }
 
