@@ -9,7 +9,8 @@ import {
   type ReadingMode,
 } from './preferences';
 import { extractArticle, type ArticleBlock } from './extract';
-import { buildGlossBlock, buildSentenceBlock } from './gloss';
+import { buildSentenceBlock, wrapWords } from './gloss';
+import { WordGlossPopover } from './word-gloss-popover';
 import type { WordAlignResult } from '@/ai/types';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
 
@@ -24,6 +25,8 @@ export class InlineReader {
   private control: HTMLElement | null = null;
   private modeButton: HTMLButtonElement | null = null;
   private prefsListener: (() => void) | null = null;
+  private readonly popover = new WordGlossPopover();
+  private readonly hostOriginal = new Map<HTMLElement, string>();
   private alignment: ReadingAlignment = 'sentence';
   private mode: ReadingMode = 'word';
   private active = false;
@@ -66,12 +69,34 @@ export class InlineReader {
       }
       this.refreshControl();
     });
+    document.body.addEventListener('mouseover', this.onWordHover);
+    document.body.addEventListener('mouseout', this.onWordLeave);
     return true;
   }
+
+  private readonly onWordHover = (event: MouseEvent): void => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (this.popover.contains(target)) return;
+    const word = target.closest<HTMLElement>('.avs-gloss-word');
+    if (word) this.popover.show(word);
+    else this.popover.scheduleHide();
+  };
+
+  private readonly onWordLeave = (event: MouseEvent): void => {
+    const related = event.relatedTarget;
+    if (related instanceof Node && this.popover.contains(related)) return;
+    this.popover.scheduleHide();
+  };
 
   close(): void {
     this.active = false;
     this.generation += 1;
+    document.body.removeEventListener('mouseover', this.onWordHover);
+    document.body.removeEventListener('mouseout', this.onWordLeave);
+    this.popover.destroy();
+    for (const [element, html] of this.hostOriginal) element.innerHTML = html;
+    this.hostOriginal.clear();
     for (const nodes of this.injected.values()) {
       for (const node of nodes) node.remove();
     }
@@ -86,11 +111,18 @@ export class InlineReader {
   /** Re-inject translations after a mode change (clears the old ones first). */
   private async rerender(blocks: ArticleBlock[]): Promise<void> {
     this.generation += 1;
+    this.restoreHost();
     for (const nodes of this.injected.values()) {
       for (const node of nodes) node.remove();
     }
     this.injected.clear();
     await this.injectAll(blocks);
+  }
+
+  /** Undo any word wrapping we applied to the host page. */
+  private restoreHost(): void {
+    for (const [element, html] of this.hostOriginal) element.innerHTML = html;
+    this.hostOriginal.clear();
   }
 
   private async injectAll(blocks: ArticleBlock[]): Promise<void> {
@@ -110,11 +142,12 @@ export class InlineReader {
       for (const item of items) {
         const result = aligned.get(item.id);
         if (!result) continue;
-        const node = buildGlossBlock(result);
-        item.anchor.after(node);
-        const list = this.injected.get(item.id) ?? [];
-        list.push(node);
-        this.injected.set(item.id, list);
+        this.applyWordGloss(item, result);
+        if (result.translation) {
+          const node = buildSentenceBlock(result.translation);
+          item.anchor.after(node);
+          this.track(item.id, node);
+        }
       }
       return;
     }
@@ -127,10 +160,23 @@ export class InlineReader {
       if (!translation) continue;
       const node = buildSentenceBlock(translation);
       item.anchor.after(node);
-      const list = this.injected.get(item.id) ?? [];
-      list.push(node);
-      this.injected.set(item.id, list);
+      this.track(item.id, node);
     }
+  }
+
+  /** Wrap matched source words in hoverable gloss spans (saved for undo). */
+  private applyWordGloss(item: { id: string; text: string; anchor: HTMLElement }, result: WordAlignResult): void {
+    const source = item.anchor;
+    if (!this.hostOriginal.has(source)) {
+      this.hostOriginal.set(source, source.innerHTML);
+    }
+    wrapWords(source, result);
+  }
+
+  private track(id: string, node: HTMLElement): void {
+    const list = this.injected.get(id) ?? [];
+    list.push(node);
+    this.injected.set(id, list);
   }
 
   private async alignItems(

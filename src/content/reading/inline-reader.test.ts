@@ -33,6 +33,15 @@ function glossResponse(): WordAlignResult[] {
       ],
       translation: 'Xin chào',
     },
+    {
+      id: '1',
+      text: 'Goodbye world',
+      pairs: [
+        { source: 'Goodbye', target: 'Tạm biệt' },
+        { source: 'world', target: 'chào' },
+      ],
+      translation: 'Tạm biệt chào',
+    },
   ];
 }
 
@@ -86,13 +95,16 @@ describe('InlineReader bilingual injection', () => {
     await flush();
 
     // … but the stale batch must have been discarded, not appended.
-    expect(document.querySelectorAll('.avs-gloss-block').length).toBe(0);
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
-    // A fresh open() injects exactly one gloss per paragraph (no duplicates).
+    // A fresh open() injects exactly one gloss per paragraph (no duplicates):
+    // two paragraphs → two sentence lines, and matched source words wrapped.
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-gloss-block').length).toBe(2);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
 
     reader.close();
   });
@@ -103,7 +115,8 @@ describe('InlineReader bilingual injection', () => {
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-gloss-block').length).toBe(2);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
     reader.close();
   });
 });
