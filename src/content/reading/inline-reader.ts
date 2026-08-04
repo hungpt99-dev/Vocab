@@ -139,13 +139,21 @@ export class InlineReader {
       // A close() or rerender() may have superseded this batch while we waited
       // on the AI call; if so, discard rather than append stale duplicates.
       if (this.generation !== generation) return;
+      let lastText: string | null = null;
       for (const item of items) {
         const result = aligned.get(item.id);
         if (!result) continue;
         this.applyWordGloss(item, result);
-        // In word mode the translation is shown per-word in the hover popover, so
-        // we intentionally do NOT also push a full sentence line beneath every
-        // paragraph — that would stack a duplicate translation on the page.
+        // Word mode keeps the page readable (gloss revealed on hover) but ALSO
+        // shows a full-sentence translation line per paragraph so the reader sees
+        // the translation immediately without hovering. Skip a line identical to
+        // the previous one so repeated blocks don't stack duplicates.
+        if (result.translation && result.translation !== lastText) {
+          const node = buildSentenceBlock(result.translation);
+          item.anchor.after(node);
+          this.track(item.id, node);
+          lastText = result.translation;
+        }
       }
       return;
     }
