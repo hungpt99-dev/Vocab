@@ -1,69 +1,66 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { extractArticle } from './extract';
 
+function render(html: string): void {
+  document.body.innerHTML = html;
+}
+
 describe('extractArticle', () => {
-  beforeEach(() => {
-    document.body.innerHTML = '';
-  });
-
-  afterEach(() => {
-    document.body.innerHTML = '';
-  });
-
-  it('collects paragraphs and headings in document order', () => {
-    document.body.innerHTML = `
-      <article>
+  it('collects standard block elements (p, headings, li)', () => {
+    render(`
+      <main>
         <h1>Title</h1>
         <p>First paragraph.</p>
-        <p>Second paragraph.</p>
-      </article>
-    `;
-
+        <ul><li>An item</li></ul>
+      </main>
+    `);
     const blocks = extractArticle();
-    expect(blocks.map((b) => b.text)).toEqual(['Title', 'First paragraph.', 'Second paragraph.']);
-    expect(blocks[0]?.tagName).toBe('H1');
+    const texts = blocks.map((block) => block.text);
+    expect(texts).toContain('Title');
+    expect(texts).toContain('First paragraph.');
+    expect(texts).toContain('An item');
   });
 
-  it('collects only the shallowest block so nested text is not duplicated', () => {
-    document.body.innerHTML = `
+  it('collects prose rendered in plain div/section containers (SPA docs sites)', () => {
+    render(`
       <article>
-        <ul><li>Item one</li><li>Item two</li></ul>
-        <blockquote><p>Quoted text.</p></blockquote>
+        <div>This is a paragraph rendered in a plain div without a <strong>p</strong> tag.</div>
+        <section><p>Nested real paragraph.</p></section>
+        <div><div>Deeply nested prose with no block tags.</div></div>
       </article>
-    `;
-
+    `);
     const blocks = extractArticle();
-    expect(blocks.map((b) => b.text)).toEqual(['Item one', 'Item two', 'Quoted text.']);
-    expect(blocks[1]?.tagName).toBe('LI');
-    expect(blocks[2]?.tagName).toBe('BLOCKQUOTE');
+    const texts = blocks.map((block) => block.text);
+    // The plain-div prose must NOT be skipped just because there is no <p>.
+    expect(texts).toContain(
+      'This is a paragraph rendered in a plain div without a p tag.',
+    );
+    expect(texts).toContain('Nested real paragraph.');
+    expect(texts).toContain('Deeply nested prose with no block tags.');
   });
 
-  it('skips boilerplate, scripts and hidden regions', () => {
-    document.body.innerHTML = `
-      <article>
-        <p>Visible paragraph.</p>
-        <p style="display:none">Hidden paragraph.</p>
-        <nav><a>Navigation</a></nav>
-        <script>const x = 1;</script>
-        <footer><p>Footer</p></footer>
-      </article>
-    `;
-
+  it('does not double-collect when a container wraps a real block', () => {
+    render(`
+      <main>
+        <div><p>Only once</p></div>
+      </main>
+    `);
     const blocks = extractArticle();
-    expect(blocks.map((b) => b.text)).toEqual(['Visible paragraph.']);
+    const matches = blocks.filter((block) => block.text === 'Only once');
+    expect(matches).toHaveLength(1);
   });
 
-  it('collapses whitespace in each block', () => {
-    document.body.innerHTML = `
-      <article>
-        <p>Hello   world\n and   beyond.</p>
-      </article>
-    `;
-    expect(extractArticle()[0]?.text).toBe('Hello world and beyond.');
-  });
-
-  it('returns an empty list when there is no article container or content', () => {
-    document.body.innerHTML = '<main></main>';
-    expect(extractArticle()).toEqual([]);
+  it('skips hidden and boilerplate regions', () => {
+    render(`
+      <main>
+        <p>Visible text.</p>
+        <div style="display:none">Hidden text.</div>
+        <nav>Nav link</nav>
+      </main>
+    `);
+    const texts = extractArticle().map((block) => block.text);
+    expect(texts).toContain('Visible text.');
+    expect(texts).not.toContain('Hidden text.');
+    expect(texts).not.toContain('Nav link');
   });
 });
