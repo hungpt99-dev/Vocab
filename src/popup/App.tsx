@@ -215,9 +215,7 @@ export function App() {
           </Button>
         </header>
 
-        <LibraryScreen />
-
-        {/* Bilingual reading card */}
+        {/* Bilingual reading card — top of the dashboard */}
         <section
           aria-labelledby="bilingual-card-heading"
           className="m-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
@@ -272,6 +270,8 @@ export function App() {
             </button>
           </div>
         </section>
+
+        <LibraryScreen />
       </div>
     </ToastProvider>
   );
