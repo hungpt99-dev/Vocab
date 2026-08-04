@@ -515,7 +515,7 @@ export function injectStyles(doc: Document = document): void {
     .avs-inline-btn:hover { background: var(--avs-overlay-surface-alt); }
     .avs-inline-btn svg { width: 16px; height: 16px; }
     .avs-bilingual-bar {
-      position: fixed;
+      position: sticky;
       top: 0;
       left: 0;
       right: 0;
@@ -524,7 +524,7 @@ export function injectStyles(doc: Document = document): void {
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      height: 32px;
+      min-height: 32px;
       padding: 0 8px 0 12px;
       background: var(--avs-overlay-surface);
       color: var(--avs-overlay-text);
@@ -553,7 +553,18 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-bilingual-bar-close:hover { background: var(--avs-overlay-surface-alt); }
     .avs-bilingual-bar-close svg { width: 14px; height: 14px; }
-    body.avs-bilingual-on { padding-top: 32px; }
+    .avs-bilingual-bar--loading { opacity: 0.85; }
+    .avs-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--avs-overlay-muted);
+      border-top-color: var(--avs-overlay-text);
+      border-radius: 9999px;
+      animation: avs-spin 0.7s linear infinite;
+      flex: none;
+    }
+    @keyframes avs-spin { to { transform: rotate(360deg); } }
+    body.avs-bilingual-on { /* reserved hook; bar uses sticky layout, no padding needed */ }
   `;
   (doc.head ?? doc.documentElement).append(style);
 }
