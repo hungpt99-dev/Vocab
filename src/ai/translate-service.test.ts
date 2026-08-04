@@ -50,7 +50,7 @@ describe('TranslateService', () => {
     ]);
   });
 
-  it('surfaces a missing key as an AiError', async () => {
+  it('falls back to the keyless endpoint when the active provider needs a key but has none', async () => {
     const settings = new SettingsRepository();
     await settings.update({
       providers: [
@@ -58,9 +58,75 @@ describe('TranslateService', () => {
       ],
       activeProviderId: 'p1',
     });
-    await expect(new TranslateService(settings).translate([{ id: 'a', text: 'Hi' }], 'Spanish')).rejects.toMatchObject(
-      { code: 'missing_api_key' },
+
+    // Emulate the no-key Google endpoint (ISO code in `tl`, gtx response shape).
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = new URL(url);
+      const q = u.searchParams.get('q') ?? '';
+      const tl = u.searchParams.get('tl') ?? 'en';
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [[[`[${tl}]${q}`]]],
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new TranslateService(settings).translate(
+      [
+        { id: 'a', text: 'Hello' },
+        { id: 'b', text: 'World' },
+      ],
+      'Vietnamese',
     );
+
+    // The provider path must NOT have been used (it would post to chat/completions).
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('chat/completions'))).toBe(false);
+    // The keyless endpoint was hit with the ISO code, not the display name.
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('tl=vi'))).toBe(true);
+    expect(result).toEqual([
+      { id: 'a', text: 'Hello', translation: '[vi]Hello' },
+      { id: 'b', text: 'World', translation: '[vi]World' },
+    ]);
+  });
+
+  it('uses the configured provider when a key is present (no keyless fallback)', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [
+        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'sk-test', baseUrl: '', model: '', enabled: true },
+      ],
+      activeProviderId: 'p1',
+    });
+
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = init?.body as string;
+      const count = (body.match(/Translate the (\d+) paragraph/) ?? [])[1] ?? '1';
+      const translations = Array.from({ length: Number(count) }, (_, i) => `T${i + 1}`);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify({ translations }) } }] }),
+        text: async () => '',
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new TranslateService(settings).translate(
+      [
+        { id: 'a', text: 'Hello' },
+        { id: 'b', text: 'World' },
+      ],
+      'Spanish',
+    );
+
+    expect((fetchMock.mock.calls[0]![1]!.headers as Record<string, string>)['Authorization']).toBe('Bearer sk-test');
+    // The keyless endpoint must NOT have been used.
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('translate.googleapis.com'))).toBe(false);
+    expect(result).toEqual([
+      { id: 'a', text: 'Hello', translation: 'T1' },
+      { id: 'b', text: 'World', translation: 'T2' },
+    ]);
   });
 
   it('chunks long articles across multiple provider calls in order', async () => {
