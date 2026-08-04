@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InlineReader } from './inline-reader';
 import { sendMessage } from '@/shared/messaging/client';
 import { settingsRepository } from '@/storage/settings-repository';
+import { showToast } from '../toast';
 import type { WordAlignResult } from '@/ai/types';
 
 vi.mock('@/shared/messaging/client', () => ({
@@ -9,6 +10,9 @@ vi.mock('@/shared/messaging/client', () => ({
 }));
 vi.mock('@/storage/settings-repository', () => ({
   settingsRepository: { get: vi.fn() },
+}));
+vi.mock('../toast', () => ({
+  showToast: vi.fn(),
 }));
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -99,11 +103,12 @@ describe('InlineReader bilingual injection', () => {
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
     // A fresh open() in word mode wraps each source word in a gloss span and
-    // emits a translation line per paragraph (deduped when identical).
+    // emits one translation line per paragraph. The two paragraphs differ, so
+    // two distinct lines appear (dedup only suppresses identical neighbours).
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(1);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
 
     reader.close();
@@ -116,9 +121,67 @@ describe('InlineReader bilingual injection', () => {
     await flush();
     await flush();
     // Word mode wraps source words and emits one translation line per paragraph
-    // (deduped when two paragraphs share the same text).
+    // (the two test paragraphs are different, so two distinct lines appear).
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
+    reader.close();
+  });
+
+  it('dedupes consecutive identical translation lines (same paragraph text repeated)', async () => {
+    document.body.innerHTML =
+      '<article><p>Hello world</p><p>Hello world</p></article>';
+    defer();
+    stubSettings();
+    vi.mocked(sendMessage).mockImplementation(async (message) => {
+      if (message.type === 'align-words') {
+        const paragraphs = message.payload.paragraphs as Array<{ id: string; text: string }>;
+        const data = (await sendDeferred) as WordAlignResult[];
+        return paragraphs.map((paragraph, index) => ({
+          id: paragraph.id,
+          text: paragraph.text,
+          pairs: data[index]?.pairs ?? [],
+          translation: data[index]?.translation ?? '',
+        })) as never;
+      }
+      return [] as never;
+    });
+
+    const reader = new InlineReader();
+    // Both paragraphs are "Hello world"; force the mock to return the same
+    // translation for both so we exercise the consecutive-dedup guard.
+    resolveSend([
+      { id: '0', text: 'Hello world', pairs: [{ source: 'Hello', target: 'Xin' }, { source: 'world', target: 'chào' }], translation: 'Xin chào' },
+      { id: '1', text: 'Hello world', pairs: [{ source: 'Hello', target: 'Xin' }, { source: 'world', target: 'chào' }], translation: 'Xin chào' },
+    ] as WordAlignResult[]);
+    await reader.open();
+    await flush();
+    await flush();
+    // Two identical paragraphs resolve to the same translation; the guard keeps
+    // only one visible line instead of stacking a duplicate.
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(1);
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
+    reader.close();
+  });
+
+  it('surfaces an actionable toast when the AI call fails (no silent monolingual page)', async () => {
+    vi.mocked(sendMessage).mockImplementation(async (message) => {
+      if (message.type === 'align-words') throw Object.assign(new Error('An API key is required.'), { code: 'missing_api_key' });
+      return [] as never;
+    });
+
+    const reader = new InlineReader();
+    await reader.open();
+    await flush();
+    await flush();
+
+    // Nothing injected, but the failure must be reported — not swallowed.
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
+    expect(vi.mocked(showToast)).toHaveBeenCalledWith(
+      expect.stringContaining('API key'),
+      'error',
+    );
+
     reader.close();
   });
 });
