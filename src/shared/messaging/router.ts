@@ -53,11 +53,37 @@ function isMessage(value: unknown): value is Message {
 
 /**
  * Register a handler map on `chrome.runtime.onMessage`.
- * Returns true synchronously so Chrome keeps the response channel open.
+ *
+ * MV3 correctness: a listener that wants to reply asynchronously MUST `return
+ * true` AND call `sendResponse` exactly once. If the sender's channel closes
+ * first (tab navigates/unloads, or a fire-and-forget caller), calling
+ * `sendResponse` afterwards logs "the message channel closed before a response
+ * was received". We guard against both: respond once, and ignore a late/closed
+ * channel so Chrome never warns.
  */
 export function registerMessageHandlers(handlers: HandlerMap): void {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    void dispatch(handlers, message, sender).then(sendResponse);
+    let settled = false;
+    const reply = (result: MessageResult<MessageType>): void => {
+      if (settled) return;
+      settled = true;
+      try {
+        sendResponse(result);
+      } catch {
+        // Channel already closed (sender gone) — nothing to deliver; safe to ignore.
+      }
+    };
+
+    dispatch(handlers, message, sender)
+      .then(reply)
+      .catch((error: unknown) => {
+        const like = error as ErrorLike;
+        reply({
+          ok: false,
+          error: typeof like?.message === 'string' ? like.message : 'Unexpected error.',
+        });
+      });
+
     return true;
   });
 }

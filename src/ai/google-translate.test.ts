@@ -72,9 +72,8 @@ describe('googleTranslate (keyless fallback)', () => {
     expect(out[0]!.pairs[1]).toEqual({ source: 'world', target: '[vi]world' });
   });
 
-  it('returns the source text unchanged when the fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));
-    const out = await googleTranslate.translate(['Hello'], 'Vietnamese');
-    expect(out[0]).toBe('Hello');
+  it('throws (not silently returns source) when the network is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+    await expect(googleTranslate.translate(['Hello'], 'Vietnamese')).rejects.toThrow(/network/i);
   });
 });

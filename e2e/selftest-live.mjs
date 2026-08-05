@@ -32,6 +32,11 @@ const ctx = await chromium.launchPersistentContext('', {
 
 const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker'));
 const extId = new URL(sw.url()).host;
+sw.on('console', (m) => { if (m.text().toLowerCase().includes('channel closed') || m.type() === 'error') console.log('SW>', m.type(), m.text()); });
+sw.on('pageerror', (e) => console.log('SWERR>', e.message));
+const consoleAll = [];
+ctx.on('console', (m) => { consoleAll.push(`${m.type()}: ${m.text()}`); });
+const channelWarnings = consoleAll.filter((t) => /channel closed/i.test(t));
 sw.on('console', (m) => { if (m.text().includes('[fb]')) console.log('SW>', m.text()); });
 sw.on('pageerror', (e) => console.log('SWERR>', e.message));
 
@@ -67,6 +72,6 @@ const out = await page.evaluate(() => {
 });
 
 console.log('=== SELFTEST RESULT ===');
-console.log(JSON.stringify({ gtxCount, gtxOk, gtxFail, target: TARGET_LANG, page: TARGET_PAGE, ...out, pageErrors: errors.slice(0, 10) }, null, 1));
+console.log(JSON.stringify({ gtxCount, gtxOk, gtxFail, target: TARGET_LANG, page: TARGET_PAGE, channelWarnings: channelWarnings.length, ...out, pageErrors: errors.slice(0, 10) }, null, 1));
 
 await ctx.close();
