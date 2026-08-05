@@ -160,8 +160,8 @@ test('bilingual settings: language picker, toggle and editable prompt persist', 
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
   await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
 
-  // Target language picker (Bilingual mode section).
-  await page.getByLabel('Target language').selectOption('Vietnamese');
+  // Target language picker (Bilingual mode section) — free-text field with datalist.
+  await page.getByLabel('Target language').fill('Vietnamese');
   // Bilingual toggle.
   await page.getByLabel(/Bilingual mode/).uncheck();
   // Editable explain prompt.
