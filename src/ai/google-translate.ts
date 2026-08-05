@@ -44,8 +44,13 @@ async function translateText(text: string, target: string, source = 'auto'): Pro
     const chunks = (data[0] ?? []).map((segment) => segment[0] ?? '').join('');
     return chunks || text;
   } catch (err) {
-    console.warn('[google-translate fallback] fetch failed:', err instanceof Error ? err.message : String(err));
-    return text;
+    // Network/blocked failure: surface it so the caller can tell the user, rather
+    // than silently returning the source text (which makes bilingual look broken
+    // with no explanation). A clean 200 that returned empty still falls back to
+    // the source above.
+    throw err instanceof Error
+      ? new Error(`Keyless translation failed to reach the network: ${err.message}`)
+      : new Error('Keyless translation failed to reach the network.');
   }
 }
 

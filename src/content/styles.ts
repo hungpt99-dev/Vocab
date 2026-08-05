@@ -611,6 +611,44 @@ export function injectStyles(doc: Document = document): void {
       flex: none;
     }
     @keyframes avs-spin { to { transform: rotate(360deg); } }
+    .avs-bilingual-banner {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: ${zIndex.overlay};
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: min(680px, calc(100vw - 24px));
+      padding: 10px 12px;
+      border-radius: ${radius.md};
+      border: 1px solid var(--avs-overlay-border);
+      border-left: 4px solid var(--avs-overlay-border);
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .avs-bilingual-banner-icon { display: inline-flex; color: var(--avs-overlay-muted); flex: none; }
+    .avs-bilingual-banner-icon svg { width: 16px; height: 16px; }
+    .avs-bilingual-banner-text { flex: 1 1 auto; }
+    .avs-bilingual-banner-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      flex: none;
+      border: none;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: var(--avs-overlay-text);
+      cursor: pointer;
+    }
+    .avs-bilingual-banner-close:hover { background: var(--avs-overlay-surface-alt); }
+    .avs-bilingual-banner-close svg { width: 14px; height: 14px; }
     body.avs-bilingual-on { /* reserved hook; bar uses sticky layout, no padding needed */ }
   `;
   (doc.head ?? doc.documentElement).append(style);
