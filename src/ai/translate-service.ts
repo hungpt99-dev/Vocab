@@ -1,6 +1,7 @@
 import type { Settings, SavedProvider } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
 import { getProvider } from './registry';
+import { googleTranslate } from './google-translate';
 import { runActiveWithFallback } from './run-with-fallback';
 import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult } from './types';
 import { AiError } from './types';
@@ -56,6 +57,23 @@ export class TranslateService {
     if (!active) {
       throw new AiError('unknown_provider', 'No active AI provider is configured.');
     }
+    // Keyless fallback: if the active provider needs an API key but has none, the
+    // configured AI path cannot run. Rather than leave the page silently
+    // monolingual, fall back to the no-key translation endpoint so bilingual
+    // reading works out of the box. A configured provider (with a key, or a local
+    // one like Ollama/LM Studio that needs no key) always takes precedence.
+    const adapter = getProvider(active.type);
+    if (adapter.requiresApiKey && !active.apiKey) {
+      const translations = await googleTranslate.translate(
+        paragraphs.map((p) => p.text),
+        language,
+      );
+      return paragraphs.map((paragraph, index) => ({
+        id: paragraph.id,
+        text: paragraph.text,
+        translation: translations[index] ?? '',
+      }));
+    }
     const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
     const results: TranslationResult[] = [];
@@ -86,6 +104,17 @@ export class TranslateService {
     const active = settings.providers.find((p) => p.id === settings.activeProviderId);
     if (!active) {
       throw new AiError('unknown_provider', 'No active AI provider is configured.');
+    }
+    // Keyless fallback (same rationale as translateWith): a provider that needs a
+    // key but has none cannot produce word alignments, so use the no-key endpoint,
+    // which returns both a faithful full-sentence translation and single-word
+    // glosses per token.
+    const alignAdapter = getProvider(active.type);
+    if (alignAdapter.requiresApiKey && !active.apiKey) {
+      return googleTranslate.align(
+        paragraphs.map((p) => ({ id: p.id, text: p.text })),
+        language,
+      );
     }
     const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
