@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InlineReader } from './inline-reader';
 import { sendMessage } from '@/shared/messaging/client';
 import { settingsRepository } from '@/storage/settings-repository';
-import { showToast } from '../toast';
 import type { WordAlignResult } from '@/ai/types';
 
 vi.mock('@/shared/messaging/client', () => ({
@@ -10,9 +9,6 @@ vi.mock('@/shared/messaging/client', () => ({
 }));
 vi.mock('@/storage/settings-repository', () => ({
   settingsRepository: { get: vi.fn() },
-}));
-vi.mock('../toast', () => ({
-  showToast: vi.fn(),
 }));
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -163,7 +159,7 @@ describe('InlineReader bilingual injection', () => {
     reader.close();
   });
 
-  it('surfaces an actionable toast when the AI call fails (no silent monolingual page)', async () => {
+  it('shows a persistent banner when the AI call fails (no silent monolingual page)', async () => {
     vi.mocked(sendMessage).mockImplementation(async (message) => {
       if (message.type === 'align-words') throw Object.assign(new Error('An API key is required.'), { code: 'missing_api_key' });
       return [] as never;
@@ -177,11 +173,11 @@ describe('InlineReader bilingual injection', () => {
     // Nothing injected, but the failure must be reported — not swallowed.
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
-    expect(vi.mocked(showToast)).toHaveBeenCalledWith(
-      expect.stringContaining('API key'),
-      'error',
-    );
 
+    const banner = document.querySelector('.avs-bilingual-banner');
+    expect(banner).not.toBeNull();
+    expect(banner!.textContent).toContain('API key');
     reader.close();
+    expect(document.querySelector('.avs-bilingual-banner')).toBeNull();
   });
 });

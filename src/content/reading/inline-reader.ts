@@ -14,7 +14,6 @@ import { WordGlossPopover } from './word-gloss-popover';
 import type { WordAlignResult } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
-import { showToast } from '../toast';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -27,6 +26,7 @@ export class InlineReader {
   private control: HTMLElement | null = null;
   private modeButton: HTMLButtonElement | null = null;
   private prefsListener: (() => void) | null = null;
+  private banner: HTMLElement | null = null;
   private readonly popover = new WordGlossPopover();
   private readonly hostOriginal = new Map<HTMLElement, string>();
   private alignment: ReadingAlignment = 'sentence';
@@ -106,6 +106,8 @@ export class InlineReader {
       for (const node of nodes) node.remove();
     }
     this.injected.clear();
+    this.banner?.remove();
+    this.banner = null;
     this.control?.remove();
     this.control = null;
     this.modeButton = null;
@@ -186,13 +188,47 @@ export class InlineReader {
       }
     }
 
-    // Fail loudly: if the AI call produced nothing (missing key, network, etc.)
-    // the page would otherwise stay fully monolingual and the feature looks
-    // broken. Tell the user exactly where to fix it.
+    // Fail loudly: if the AI call produced nothing (missing key, network block,
+    // etc.) the page would otherwise stay fully monolingual and the feature looks
+    // broken. Show a persistent banner with the exact reason so it's unmissable.
     if (!injectedSomething && this.lastError) {
-      showToast(this.lastError, 'error');
+      this.showBanner(this.lastError);
       this.lastError = null;
+    } else if (injectedSomething) {
+      this.hideBanner();
     }
+  }
+
+  /** Render a persistent, dismissable banner explaining why nothing translated. */
+  private showBanner(message: string): void {
+    this.hideBanner();
+    const banner = document.createElement('div');
+    banner.className = 'avs-bilingual-banner';
+    banner.setAttribute('role', 'alert');
+
+    const icon = document.createElement('span');
+    icon.className = 'avs-bilingual-banner-icon';
+    icon.innerHTML = ICON_LANGUAGES;
+
+    const text = document.createElement('span');
+    text.className = 'avs-bilingual-banner-text';
+    text.textContent = message;
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'avs-bilingual-banner-close';
+    close.innerHTML = ICON_CLOSE;
+    close.setAttribute('aria-label', 'Dismiss');
+    close.addEventListener('click', () => this.hideBanner());
+
+    banner.append(icon, text, close);
+    document.body.append(banner);
+    this.banner = banner;
+  }
+
+  private hideBanner(): void {
+    this.banner?.remove();
+    this.banner = null;
   }
 
   /** Wrap matched source words in hoverable gloss spans (saved for undo). */
