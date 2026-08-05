@@ -160,6 +160,7 @@ export class TranslateService {
       (provider) => this.runOnce(provider, request, signal),
       active,
       fallback,
+      { kind: 'translate', language, paragraphs: chunk.map(({ text }) => text) },
     );
   }
 
@@ -191,6 +192,7 @@ export class TranslateService {
       (provider) => this.runAlignOnce(provider, request, signal),
       active,
       fallback,
+      { kind: 'align', language, pairs: chunk.map(({ id, text }) => ({ id, text })) },
     );
   }
 

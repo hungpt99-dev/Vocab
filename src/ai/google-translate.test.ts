@@ -44,7 +44,27 @@ describe('googleTranslate (keyless fallback)', () => {
     expect(out[0]).toBe('[vi]Hello');
   });
 
-  it('align returns a faithful translation plus one single-word gloss per token', async () => {
+  it('align returns a faithful translation plus one exact gloss per token (2 calls/paragraph, no per-word explosion)', async () => {
+    const SEP = '\n';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = new URL(url);
+        const q = u.searchParams.get('q') ?? '';
+        const tl = u.searchParams.get('tl') ?? 'en';
+        // Paragraph request -> whole-sentence translation. Token request -> each
+        // token translated, joined by the delimiter (mimics the real endpoint
+        // preserving the separator through translation).
+        let translated: string;
+        if (q.includes(SEP)) {
+          translated = q.split(SEP).map((t) => `[${tl}]${t}`).join(SEP);
+        } else {
+          translated = `[${tl}]${q}`;
+        }
+        const body = JSON.stringify([[[translated]]]);
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }),
+    );
     const out = await googleTranslate.align([{ id: '1', text: 'Hello world' }], 'Vietnamese');
     expect(out[0]!.translation).toBe('[vi]Hello world');
     expect(out[0]!.pairs).toHaveLength(2);

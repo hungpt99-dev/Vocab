@@ -4,9 +4,9 @@
  * Bilingual reading is unusable out of the box when no AI provider key is
  * configured (the default OpenAI provider ships with an empty key). Rather than
  * leave the page silently monolingual, we fall back to this no-key endpoint so
- * the feature works immediately. It is used ONLY when the user has not
- * configured an AI provider with an API key. When a provider IS configured, the
- * AI path (with word-level alignment and glosses) always wins.
+ * the feature works immediately. It is used when the user has not configured an
+ * AI provider with a working API key; a configured provider (with a key, or a
+ * local Ollama/LM Studio that needs no key) always takes precedence.
  *
  * The endpoint is the same one the Google Translate web widget uses; it requires
  * no API key. We call it over HTTPS from the background service worker.
@@ -18,6 +18,14 @@ const GTX_BASE = 'https://translate.googleapis.com/translate_a/single';
 interface GtxResponse {
   0?: Array<[string] | [string, string]>;
 }
+
+/**
+ * Separator used to batch per-word gloss translation into a single request.
+ * Google Translate preserves line breaks, so joining source tokens with a newline
+ * and splitting the result on newlines recovers one gloss per source token,
+ * aligned by position.
+ */
+const SEP = '\n';
 
 /** Translate a single string. Returns the source text unchanged on failure. */
 async function translateText(text: string, target: string, source = 'auto'): Promise<string> {
@@ -49,9 +57,11 @@ export const googleTranslate = {
   },
 
   /**
-   * Word alignment fallback: a faithful full-sentence `translation` per paragraph
-   * plus ONE single-word gloss per source token (built by translating each token
-   * individually, so no token ever absorbs a whole phrase).
+   * Word alignment fallback. TWO requests per paragraph: the whole sentence (used
+   * as the translation line) plus all source tokens joined by a delimiter (so
+   * each token gets its exact single-word gloss back, aligned by position). This
+   * avoids the per-word call explosion (hundreds of requests) that made the page
+   * look empty for 10+ seconds, while still giving a correct gloss per word.
    */
   async align(
     paragraphs: Array<{ id: string; text: string }>,
@@ -62,10 +72,17 @@ export const googleTranslate = {
       paragraphs.map(async (paragraph) => {
         const translation = await translateText(paragraph.text, code);
         const tokens = paragraph.text.match(/([\p{L}\p{N}][\p{L}\p{N}'.-]*[\p{L}\p{N}]|\p{L}|\p{N})/gu) ?? [];
-        const targets = await Promise.all(tokens.map((token) => translateText(token, code)));
-        const pairs = tokens.map((source, i) => ({ source, target: targets[i] ?? '' }));
+        const joined = tokens.join(SEP);
+        const joinedTranslation = tokens.length ? await translateText(joined, code) : '';
+        const tokenTargets = joinedTranslation.split(SEP).map((t) => t.trim());
+        const pairs = tokens.map((source, i) => {
+          const tgt = tokenTargets[i] ?? '';
+          // Drop a gloss that is identical to the source (untranslated token).
+          return { source, target: tgt.toLowerCase() === source.toLowerCase() ? '' : tgt };
+        });
         return { id: paragraph.id, text: paragraph.text, pairs, translation };
       }),
     );
   },
 };
+
