@@ -10,7 +10,7 @@ import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { getReadingPreferences, setReadingPreferences, type ReadingMode } from '@/content/reading/preferences';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, LanguagesIcon, SettingsIcon } from '@/shared/ui/Icons';
+import { BookIcon, LanguagesIcon, SettingsIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -20,6 +20,8 @@ import { SaveForm } from '@/features/capture/SaveForm';
 import { TranslatePanel } from '@/features/capture/TranslatePanel';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
+import { ExplanationView } from '@/features/library/ExplanationView';
+import type { Explanation } from '@/shared/types/vocabulary';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
 
@@ -28,6 +30,13 @@ function LibraryScreen() {
   const [filters, setFilters] = useState<LibraryFilters>(EMPTY_FILTERS);
   const [saving, setSaving] = useState(false);
   const [explainingId, setExplainingId] = useState<string | null>(null);
+  // Inline enrich for the highlighted word: held in the popup until the word is
+  // saved, so the rich AI data is attached on save (no separate popup window).
+  const [enrich, setEnrich] = useState<{ word: string; explanation: Explanation } | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  // The word the user is working with: from a page highlight OR typed into the
+  // form. Either way it can be enriched inline before saving.
+  const [word, setWord] = useState('');
   const { notify } = useToast();
 
   const debouncedSearch = useDebouncedValue(filters.search, 250);
@@ -45,19 +54,29 @@ function LibraryScreen() {
   const { entries, tags, loading, error, reload, update, remove, toggleFavorite } = useVocabulary(query);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        setSelection(await sendMessage({ type: 'get-selection' }));
-      } catch {
-        setSelection(null);
-      }
-    })();
+    const readSelection = (): void => {
+      void (async () => {
+        try {
+          setSelection(await sendMessage({ type: 'get-selection' }));
+        } catch {
+          setSelection(null);
+        }
+      })();
+    };
+    readSelection();
+    // Re-read the page selection whenever the popup regains focus, so it always
+    // reflects the word the user just highlighted before opening the popup.
+    window.addEventListener('focus', readSelection);
+    return () => window.removeEventListener('focus', readSelection);
   }, []);
 
   const handleSave = useCallback(
     async ({ word, note, tags: newTags }: { word: string; note: string; tags: string[] }) => {
       setSaving(true);
       try {
+        // Attach any inline enrich data for the highlighted word when it matches.
+        const explanation =
+          enrich && enrich.word.toLowerCase() === word.toLowerCase() ? enrich.explanation : null;
         await vocabularyRepository.save({
           word,
           note,
@@ -66,7 +85,9 @@ function LibraryScreen() {
           sourceUrl: selection?.sourceUrl ?? '',
           sourceTitle: selection?.sourceTitle ?? '',
           sourceLanguage: selection?.sourceLanguage ?? '',
+          explanation,
         });
+        if (explanation) setEnrich(null);
         notify(`Saved “${word}”.`, 'success');
         await reload();
       } catch (cause) {
@@ -75,8 +96,27 @@ function LibraryScreen() {
         setSaving(false);
       }
     },
-    [reload, selection, notify],
+    [reload, selection, notify, enrich],
   );
+
+  const enrichWord = selection?.word ?? word;
+
+  const handleEnrich = useCallback(async () => {
+    const target = enrichWord;
+    if (!target) return;
+    setEnriching(true);
+    try {
+      const explanation = await sendMessage({
+        type: 'explain',
+        payload: { word: target, context: selection?.sentence, pageTitle: selection?.sourceTitle },
+      });
+      setEnrich({ word: target, explanation });
+    } catch (cause) {
+      notify(aiErrorMessage(cause), 'error');
+    } finally {
+      setEnriching(false);
+    }
+  }, [enrichWord, selection, notify]);
 
   const handleExplain = useCallback(
     async (entry: VocabularyEntry) => {
@@ -130,8 +170,38 @@ function LibraryScreen() {
 
   return (
     <>
-      <SaveForm selection={selection} saving={saving} onSave={handleSave} />
+      <SaveForm
+        selection={selection}
+        saving={saving}
+        word={word}
+        onWordChange={setWord}
+        onSave={handleSave}
+      />
       <TranslatePanel selection={selection} />
+
+      {enrichWord && (
+        <div className="border-b border-slate-200 p-3 dark:border-slate-700">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {enrichWord}
+            </p>
+            <Button size="sm" variant="secondary" disabled={enriching} onClick={() => void handleEnrich()}>
+              <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
+              {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
+            </Button>
+          </div>
+          {selection?.word === enrichWord && selection.sentence && (
+            <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
+              “{selection.sentence}”
+            </p>
+          )}
+          {enrich?.word === enrichWord && (
+            <div className="mt-2">
+              <ExplanationView explanation={enrich.explanation} />
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <p role="alert" className={`px-3 py-1.5 text-xs ${tints.dangerText}`}>

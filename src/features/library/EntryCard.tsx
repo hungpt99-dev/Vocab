@@ -7,7 +7,7 @@ import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
 import { Badge } from '@/shared/ui/Badge';
 import { Dialog } from '@/shared/ui/Dialog';
-import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon, SparklesIcon } from '@/shared/ui/Icons';
+import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from './ExplanationView';
 
 export interface EntryCardProps {
@@ -29,6 +29,7 @@ export function EntryCard({
 }: EntryCardProps) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [showEnrich, setShowEnrich] = useState(false);
   const [draft, setDraft] = useState({ word: entry.word, note: entry.note, tags: entry.tags });
 
   const startEditing = (): void => {
@@ -115,7 +116,18 @@ export function EntryCard({
           )}
 
           {entry.explanation ? (
-            <ExplanationView explanation={entry.explanation} />
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowEnrich((value) => !value)}
+                aria-expanded={showEnrich}
+                className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                {showEnrich ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+                {showEnrich ? 'Hide enrich data' : 'Show enrich data'}
+              </button>
+              {showEnrich && <ExplanationView explanation={entry.explanation} />}
+            </div>
           ) : explaining ? (
             <div className="mt-2">
               <Spinner label="Asking your AI…" />

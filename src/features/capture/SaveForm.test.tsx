@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SaveForm } from './SaveForm';
@@ -14,7 +15,8 @@ const selection = {
 
 describe('SaveForm', () => {
   it('prefills from the current selection', () => {
-    render(<SaveForm selection={selection} saving={false} onSave={vi.fn()} />);
+    const onWordChange = vi.fn();
+    render(<SaveForm selection={selection} saving={false} word="serendipity" onWordChange={onWordChange} onSave={vi.fn()} />);
 
     expect(screen.getByLabelText('Word or phrase')).toHaveValue('serendipity');
     expect(screen.getByText(/Pure serendipity struck\./)).toBeInTheDocument();
@@ -22,7 +24,11 @@ describe('SaveForm', () => {
 
   it('submits the trimmed word with note and tags', async () => {
     const onSave = vi.fn(async () => undefined);
-    render(<SaveForm selection={null} saving={false} onSave={onSave} />);
+    const Harness = () => {
+      const [w, setW] = useState('');
+      return <SaveForm selection={null} saving={false} word={w} onWordChange={setW} onSave={onSave} />;
+    };
+    render(<Harness />);
 
     await userEvent.type(screen.getByLabelText('Word or phrase'), '  ephemeral  ');
     await userEvent.type(screen.getByLabelText('Note'), 'short-lived');
@@ -38,7 +44,7 @@ describe('SaveForm', () => {
 
   it('validates an empty word', async () => {
     const onSave = vi.fn();
-    render(<SaveForm selection={null} saving={false} onSave={onSave} />);
+    render(<SaveForm selection={null} saving={false} word="" onWordChange={vi.fn()} onSave={onSave} />);
 
     await userEvent.click(screen.getByRole('button', { name: /save to vocabulary/i }));
 
@@ -47,7 +53,7 @@ describe('SaveForm', () => {
   });
 
   it('disables the button while saving', () => {
-    render(<SaveForm selection={null} saving onSave={vi.fn()} />);
+    render(<SaveForm selection={null} saving word="" onWordChange={vi.fn()} onSave={vi.fn()} />);
     expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
   });
 });

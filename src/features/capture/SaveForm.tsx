@@ -7,19 +7,20 @@ import { TextField } from '@/shared/ui/TextField';
 export interface SaveFormProps {
   selection: SelectionPayload | null;
   saving: boolean;
+  word: string;
+  onWordChange: (word: string) => void;
   onSave: (input: { word: string; note: string; tags: string[] }) => Promise<void>;
 }
 
 /** Save the current page selection, or a manually typed word. */
-export function SaveForm({ selection, saving, onSave }: SaveFormProps) {
-  const [word, setWord] = useState('');
+export function SaveForm({ selection, saving, word, onWordChange, onSave }: SaveFormProps) {
   const [note, setNote] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (selection?.word) setWord(selection.word);
-  }, [selection?.word]);
+    if (selection?.word) onWordChange(selection.word);
+  }, [selection?.word, onWordChange]);
 
   const submit = async (): Promise<void> => {
     if (!word.trim()) {
@@ -43,7 +44,7 @@ export function SaveForm({ selection, saving, onSave }: SaveFormProps) {
       <TextField
         label="Word or phrase"
         value={word}
-        onChange={(event) => setWord(event.target.value)}
+        onChange={(event) => onWordChange(event.target.value)}
         placeholder="Select text on the page, or type it here"
         error={error}
         autoFocus

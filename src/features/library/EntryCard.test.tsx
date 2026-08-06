@@ -94,7 +94,8 @@ describe('EntryCard', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Asking your AI');
   });
 
-  it('renders a cached explanation and offers a refresh', () => {
+  it('collapses enrich data behind a dropdown by default, then expands on click', async () => {
+    const user = userEvent.setup();
     setup({
       explanation: {
         meaning: 'A fortunate accident.',
@@ -113,6 +114,13 @@ describe('EntryCard', () => {
       },
     });
 
+    // Collapsed: meaning is hidden until the dropdown is opened.
+    expect(screen.queryByText('A fortunate accident.')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /show enrich data/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('A fortunate accident.')).toBeInTheDocument();
     expect(screen.getByText('What serendipity!')).toBeInTheDocument();
     expect(screen.getByText('luck')).toBeInTheDocument();
