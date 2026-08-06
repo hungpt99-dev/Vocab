@@ -86,6 +86,57 @@ describe('word gloss wrapping', () => {
     expect(node?.dataset.avsGloss).toBe('Node.js');
   });
 
+  it('wraps a two-word phrase as a single gloss unit', () => {
+    const root = document.createElement('p');
+    root.textContent = 'I love ice cream';
+    const result: WordAlignResult = {
+      id: '0',
+      text: 'I love ice cream',
+      pairs: [
+        { source: 'I', target: 'Tôi' },
+        { source: 'love', target: 'yêu' },
+        { source: 'ice cream', target: 'kem' },
+      ],
+      translation: '',
+    };
+    wrapWords(root, result);
+
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    // "ice cream" must be ONE gloss, not "ice" + "cream".
+    expect(words.length).toBe(3);
+    const phrase = Array.from(words).find((w) => w.textContent === 'ice cream');
+    expect(phrase).toBeDefined();
+    expect(phrase?.dataset.avsGloss).toBe('kem');
+  });
+
+  it('glosses a word next to symbols (C#, parentheses, em dash)', () => {
+    const root = document.createElement('p');
+    root.textContent = 'use C# (language) hello—world';
+    const result: WordAlignResult = {
+      id: '0',
+      text: 'use C# (language) hello—world',
+      pairs: [
+        { source: 'C#', target: 'C#' },
+        { source: 'language', target: 'ngôn ngữ' },
+        { source: 'hello', target: 'xin chào' },
+        { source: 'world', target: 'thế giới' },
+      ],
+      translation: '',
+    };
+    wrapWords(root, result);
+
+    const words = root.querySelectorAll<HTMLElement>('.avs-gloss-word');
+    // C# is one token; parentheses are separators; hello—world splits into two.
+    expect(words.length).toBe(4);
+    const c = Array.from(words).find((w) => w.textContent === 'C#');
+    expect(c).toBeDefined();
+    expect(c?.dataset.avsGloss).toBe('C#');
+    const hello = Array.from(words).find((w) => w.textContent === 'hello');
+    const world = Array.from(words).find((w) => w.textContent === 'world');
+    expect(hello).toBeDefined();
+    expect(world).toBeDefined();
+  });
+
   it('highlights accented words (Vietnamese) using Unicode letters', () => {
     const root = document.createElement('p');
     root.textContent = 'Học sinh giỏi';

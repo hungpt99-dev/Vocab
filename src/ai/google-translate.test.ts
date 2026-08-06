@@ -66,12 +66,14 @@ describe('googleTranslate (keyless fallback)', () => {
       }),
     );
     const out = await googleTranslate.align([{ id: '1', text: 'Hello world' }], 'Vietnamese');
-    // Two requests: one for the sentence line, one for the joined tokens.
+    // Two requests: one for the sentence line, one for the joined tokens
+    // (which now also includes the "Hello world" two-word phrase).
     expect(requestCount).toBe(2);
     expect(out[0]!.translation).toBe('[vi]Hello world');
-    expect(out[0]!.pairs).toHaveLength(2);
+    expect(out[0]!.pairs).toHaveLength(3);
     expect(out[0]!.pairs[0]).toEqual({ source: 'Hello', target: '[vi]Hello' });
     expect(out[0]!.pairs[1]).toEqual({ source: 'world', target: '[vi]world' });
+    expect(out[0]!.pairs[2]).toEqual({ source: 'Hello world', target: '[vi]Hello world' });
   });
 
   it('batches many paragraphs into a constant ~2 requests (no per-paragraph explosion)', async () => {
