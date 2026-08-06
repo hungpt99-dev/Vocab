@@ -8,7 +8,6 @@ import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { takePendingExplain } from '@/content/pending-explain';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
-import { getReadingPreferences, setReadingPreferences, type ReadingMode } from '@/content/reading/preferences';
 import { Button } from '@/shared/ui/Button';
 import { BookIcon, LanguagesIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
@@ -172,11 +171,6 @@ function LibraryScreen() {
 export function App() {
   const { settings, update } = useSettings();
   const [activating, setActivating] = useState(false);
-  const [mode, setMode] = useState<ReadingMode>('word');
-
-  useEffect(() => {
-    void getReadingPreferences().then((prefs) => setMode(prefs.mode));
-  }, []);
 
   const toggleBilingual = useCallback(
     async (next: boolean) => {
@@ -189,11 +183,6 @@ export function App() {
     },
     [update],
   );
-
-  const changeMode = useCallback((next: ReadingMode) => {
-    setMode(next);
-    void setReadingPreferences({ mode: next });
-  }, []);
 
   return (
     <ToastProvider>
@@ -237,38 +226,6 @@ export function App() {
           <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             Show translations inline and read in your language.
           </p>
-          <div
-            className="mt-3 inline-flex w-full items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800"
-            role="group"
-            aria-label="Bilingual reading mode"
-          >
-            <button
-              type="button"
-              onClick={() => changeMode('word')}
-              aria-pressed={mode === 'word'}
-              title="Word-by-word gloss"
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium transition ${
-                mode === 'word'
-                  ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-              }`}
-            >
-              <BookIcon size={13} aria-hidden="true" /> Word
-            </button>
-            <button
-              type="button"
-              onClick={() => changeMode('sentence')}
-              aria-pressed={mode === 'sentence'}
-              title="Sentence translation"
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium transition ${
-                mode === 'sentence'
-                  ? 'bg-white text-brand-600 shadow-sm dark:bg-slate-900'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-              }`}
-            >
-              <LanguagesIcon size={13} aria-hidden="true" /> Sentence
-            </button>
-          </div>
         </section>
 
         <LibraryScreen />
