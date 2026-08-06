@@ -44,32 +44,62 @@ describe('googleTranslate (keyless fallback)', () => {
     expect(out[0]).toBe('[vi]Hello');
   });
 
-  it('align returns a faithful translation plus one exact gloss per token (2 calls/paragraph, no per-word explosion)', async () => {
-    const SEP = '\n';
+  it('align batches a chunk into ~2 requests and returns exact glosses per token', async () => {
+    let requestCount = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
+        requestCount += 1;
         const u = new URL(url);
         const q = u.searchParams.get('q') ?? '';
         const tl = u.searchParams.get('tl') ?? 'en';
-        // Paragraph request -> whole-sentence translation. Token request -> each
-        // token translated, joined by the delimiter (mimics the real endpoint
-        // preserving the separator through translation).
-        let translated: string;
-        if (q.includes(SEP)) {
-          translated = q.split(SEP).map((t) => `[${tl}]${t}`).join(SEP);
-        } else {
-          translated = `[${tl}]${q}`;
+        // Sentence request uses '\n\n'; token request uses '\n'.
+        if (q.includes('\n\n')) {
+          const translated = q.split('\n\n').map((s) => `[${tl}]${s}`).join('\n\n');
+          return new Response(JSON.stringify([[[translated]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
-        const body = JSON.stringify([[[translated]]]);
-        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
+        if (q.includes('\n')) {
+          const translated = q.split('\n').map((t) => `[${tl}]${t}`).join('\n');
+          return new Response(JSON.stringify([[[translated]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }),
     );
     const out = await googleTranslate.align([{ id: '1', text: 'Hello world' }], 'Vietnamese');
+    // Two requests: one for the sentence line, one for the joined tokens.
+    expect(requestCount).toBe(2);
     expect(out[0]!.translation).toBe('[vi]Hello world');
     expect(out[0]!.pairs).toHaveLength(2);
     expect(out[0]!.pairs[0]).toEqual({ source: 'Hello', target: '[vi]Hello' });
     expect(out[0]!.pairs[1]).toEqual({ source: 'world', target: '[vi]world' });
+  });
+
+  it('batches many paragraphs into a constant ~2 requests (no per-paragraph explosion)', async () => {
+    let requestCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        requestCount += 1;
+        const u = new URL(url);
+        const q = u.searchParams.get('q') ?? '';
+        const tl = u.searchParams.get('tl') ?? 'en';
+        if (q.includes('\n\n')) {
+          const translated = q.split('\n\n').map((s) => `[${tl}]${s}`).join('\n\n');
+          return new Response(JSON.stringify([[[translated]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (q.includes('\n')) {
+          const translated = q.split('\n').map((t) => `[${tl}]${t}`).join('\n');
+          return new Response(JSON.stringify([[[translated]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }),
+    );
+    const paragraphs = Array.from({ length: 12 }, (_, i) => ({ id: String(i), text: `Sentence number ${i} here` }));
+    const out = await googleTranslate.align(paragraphs, 'Vietnamese');
+    // Still just 2 requests for the whole chunk, not 24.
+    expect(requestCount).toBe(2);
+    expect(out).toHaveLength(12);
+    expect(out[11]!.translation).toBe('[vi]Sentence number 11 here');
   });
 
   it('keeps gloss positions correct when a token translates to multiple words (drift fallback)', async () => {
@@ -79,23 +109,19 @@ describe('googleTranslate (keyless fallback)', () => {
         const u = new URL(url);
         const q = u.searchParams.get('q') ?? '';
         const tl = u.searchParams.get('tl') ?? 'en';
+        if (q.includes('\n\n')) {
+          return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         if (q.includes('\n')) {
           // "world" -> "thế giới" (two target words), so the joined result has
-          // MORE lines than source tokens. The index-based split would misplace
-          // glosses; the fallback must re-translate per token instead.
+          // MORE lines than source tokens. The fallback re-translates per token.
           const translated = q
             .split('\n')
             .map((t) => (t === 'world' ? `[${tl}]thế giới` : `[${tl}]${t}`))
             .join('\n');
-          return new Response(JSON.stringify([[[translated]]]), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
+          return new Response(JSON.stringify([[[translated]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
-        return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }),
     );
     const out = await googleTranslate.align([{ id: '1', text: 'Hello world' }], 'Vietnamese');
