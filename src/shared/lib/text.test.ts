@@ -113,7 +113,7 @@ describe('splitIntoSentences', () => {
 
 describe('tokenizeWords', () => {
   it('keeps typographic apostrophes inside words (it’s stays whole)', () => {
-    expect(tokenizeWords('it’s a test')).toEqual(['it’s', 'a', 'test']);
+    expect(tokenizeWords('it’s a test')).toEqual(['it’s', 'a', 'test', 'it’s a', 'a test']);
   });
 
   it('keeps hyphenated compounds and dotted abbreviations whole', () => {
@@ -124,11 +124,21 @@ describe('tokenizeWords', () => {
   });
 
   it('keeps accented/combining-mark letters whole (naïve, résumé)', () => {
-    expect(tokenizeWords('naïve résumé')).toEqual(['naïve', 'résumé']);
+    expect(tokenizeWords('naïve résumé')).toEqual(['naïve', 'résumé', 'naïve résumé']);
   });
 
-  it('keeps en/em dashes and Node.js-style tokens', () => {
-    expect(tokenizeWords('hello—world Node.js')).toEqual(['hello—world', 'Node.js']);
+  it('treats en/em dashes as word separators (not internal)', () => {
+    // "—" and "–" must split words, otherwise the merged token matches nothing.
+    expect(tokenizeWords('hello—world Node.js')).toEqual(['hello', 'world', 'Node.js', 'hello world', 'world Node.js']);
+  });
+
+  it('emits adjacent two-word phrases as well as single words', () => {
+    expect(tokenizeWords('ice cream soda')).toEqual(['ice', 'cream', 'soda', 'ice cream', 'cream soda']);
+  });
+
+  it('keeps attaching symbols part of the term (C#, C++, key=value, word@domain)', () => {
+    expect(tokenizeWords('use C# and C++')).toEqual(['use', 'C#', 'and', 'C++', 'use C#', 'C# and', 'and C++']);
+    expect(tokenizeWords('key=value word@domain')).toEqual(['key=value', 'word@domain', 'key=value word@domain']);
   });
 
   it('splits on boundary punctuation, not word-internal marks', () => {

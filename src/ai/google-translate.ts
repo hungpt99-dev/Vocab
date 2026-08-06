@@ -63,32 +63,86 @@ export const googleTranslate = {
   },
 
   /**
-   * Word alignment fallback. TWO requests per paragraph: the whole sentence (used
-   * as the translation line) plus all source tokens joined by a delimiter (so
-   * each token gets its exact single-word gloss back, aligned by position). This
-   * avoids the per-word call explosion (hundreds of requests) that made the page
-   * look empty for 10+ seconds, while still giving a correct gloss per word.
+   * Word alignment fallback. Batches the WHOLE chunk into just two requests:
+   * one for the full-sentence translation lines (paragraphs joined by a blank
+   * line, split back out) and one for every source token joined by a delimiter
+   * (all tokens of all paragraphs in a single blob). This avoids the per-paragraph
+   * (or per-token) request explosion that made bilingual reading painfully slow.
+   *
+   * The joined token blob can drift — a token like "world" may translate to
+   * *several* target words, or Google may merge/reorder the delimiter lines — so
+   * the split-by-delimiter index no longer lines up with the source tokens and
+   * glosses land on the wrong word. When the token counts don't match we fall
+   * back to translating each token individually (bounded concurrency) so every
+   * source word maps to its own exact translation, aligned by position.
    */
   async align(
     paragraphs: Array<{ id: string; text: string }>,
     target: string,
   ): Promise<Array<{ id: string; text: string; pairs: Array<{ source: string; target: string }>; translation: string }>> {
     const code = toLanguageCode(target);
-    return Promise.all(
-      paragraphs.map(async (paragraph) => {
-        const translation = await translateText(paragraph.text, code);
-        const tokens = tokenizeWords(paragraph.text);
-        const joined = tokens.join(SEP);
-        const joinedTranslation = tokens.length ? await translateText(joined, code) : '';
-        const tokenTargets = joinedTranslation.split(SEP).map((t) => t.trim());
-        const pairs = tokens.map((source, i) => {
-          const tgt = tokenTargets[i] ?? '';
-          // Drop a gloss that is identical to the source (untranslated token).
-          return { source, target: tgt.toLowerCase() === source.toLowerCase() ? '' : tgt };
-        });
-        return { id: paragraph.id, text: paragraph.text, pairs, translation };
-      }),
-    );
+    if (paragraphs.length === 0) return [];
+
+    // 1) Full-sentence translation lines: join paragraphs with a blank line so a
+    //    single request covers the whole chunk, then split back out by paragraph.
+    const joinedSentences = paragraphs.map((p) => p.text).join(PARA_SEP);
+    const joinedSentenceTranslation = await translateText(joinedSentences, code);
+    const sentenceLines = splitByParagraph(joinedSentenceTranslation);
+    // Pad/trim so every paragraph gets a line even if the separator was dropped.
+    while (sentenceLines.length < paragraphs.length) sentenceLines.push('');
+    const translations = sentenceLines.slice(0, paragraphs.length);
+
+    // 2) Word glosses: gather every token of every paragraph, translate them all
+    //    in one blob, then redistribute by the known per-paragraph token counts.
+    const perParagraphTokens = paragraphs.map((p) => tokenizeWords(p.text));
+    const allTokens = perParagraphTokens.flat();
+    let allTargets: string[];
+
+    if (allTokens.length === 0) {
+      allTargets = [];
+    } else {
+      const joinedTokens = allTokens.join(SEP);
+      const joinedTokenTranslation = await translateText(joinedTokens, code);
+      const split = joinedTokenTranslation.split(SEP).map((t) => t.trim());
+      allTargets = split.length === allTokens.length ? split : await translateTokensIndividually(allTokens, code);
+    }
+
+    // 3) Distribute the flattened targets back into per-paragraph pairs.
+    let cursor = 0;
+    return paragraphs.map((paragraph, pi) => {
+      const tokens = perParagraphTokens[pi] ?? [];
+      const pairs = tokens.map((source) => {
+        const tgt = allTargets[cursor] ?? '';
+        cursor += 1;
+        // Drop a gloss that is identical to the source (untranslated token).
+        return { source, target: tgt.toLowerCase() === source.toLowerCase() ? '' : tgt };
+      });
+      return { id: paragraph.id, text: paragraph.text, pairs, translation: translations[pi] ?? '' };
+    });
   },
 };
+
+/** Blank-line separator between paragraphs (Google Translate preserves it). */
+const PARA_SEP = '\n\n';
+
+/** Split a joined translation back into per-paragraph lines on blank lines. */
+function splitByParagraph(text: string): string[] {
+  return text.split(PARA_SEP).map((line) => line.trim());
+}
+
+/**
+ * Translate each token separately (bounded concurrency) so every source word
+ * maps to its own translation, aligned by position. Used only when the joined
+ * fast path drifts — see `align` above.
+ */
+async function translateTokensIndividually(tokens: string[], code: string): Promise<string[]> {
+  const out: string[] = [];
+  const CONCURRENCY = 5;
+  for (let i = 0; i < tokens.length; i += CONCURRENCY) {
+    const slice = tokens.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(slice.map((token) => translateText(token, code)));
+    out.push(...results.map((r) => r.trim()));
+  }
+  return out;
+}
 

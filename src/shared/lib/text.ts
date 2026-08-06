@@ -37,20 +37,57 @@ export function escapeRegExp(input: string): string {
  *
  * A token starts and ends with a letter/number, and may contain letters,
  * numbers, Unicode combining marks (so accented letters like naïve/résumé stay
- * whole), and the common word-internal punctuation: apostrophe `'`, curly
- * quotes `‘’`, en/em dashes `– —`, hyphen `-`, period `.` (abbreviations like
- * `U.S.A.`, `e.g.`) and middle dot `·`. Curly quotes/dashes are included
- * because real web text uses them (e.g. "it's" with a typographic apostrophe
- * would otherwise split into "it" + "s").
+ * whole), and word-internal punctuation: apostrophe `'`, curly quotes `‘’`,
+ * hyphen `-` (so `self-contained`, `state-of-the-art` stay whole), period `.`
+ * (abbreviations like `U.S.A.`, `e.g.`), and the common "attaching" symbols
+ * `# $ % & * + = @ ~ _` (so `C#`, `C++`, `key=value`, `word@domain` stay one
+ * term instead of being split by the symbol).
  *
- * Punctuation that is NOT word-internal (`:`, `,`, `(`, `“` at a boundary) is
- * correctly excluded, so "read: this" yields two tokens.
+ * Deliberately EXCLUDED from the internal set: em/en dashes `– —` and middle dot
+ * `·`. Real text uses them between words ("hello—world", "section·item"), and
+ * treating them as internal would wrongly merge two words into one token (and
+ * then fail to match either word, dropping both glosses). They are separators.
+ *
+ * Punctuation that is NOT word-internal (`:`, `,`, `(`, `“`, etc.) is excluded,
+ * so "read: this" and "(note)" yield separate word tokens.
  */
-export const WORD_TOKEN = /([\p{L}\p{N}][\p{L}\p{N}\p{M}'\-’‘–—.·]*[\p{L}\p{N}]|\p{L}|\p{N})/gu;
+export const WORD_TOKEN = /([\p{L}\p{N}][\p{L}\p{N}\p{M}'’‘.#$%&*+=@~_-]*(?:[\p{L}\p{N}]|[#$%&*+=@~_]+)|[\p{L}]|[\p{N}])/gu;
 
-/** Split text into word-like tokens, preserving order and position boundaries. */
+/**
+ * Split text into word-like tokens, including adjacent two-word phrases.
+ *
+ * A single word is always emitted. In addition, when two word tokens sit next
+ * to each other separated by exactly one space, the two-word phrase is also
+ * emitted (e.g. "ice cream", "break down") so the bilingual reader can translate
+ * and gloss a short phrase as one unit, not just isolated words.
+ */
 export function tokenizeWords(text: string): string[] {
-  return text.match(WORD_TOKEN) ?? [];
+  const matches = [...text.matchAll(WORD_TOKEN)];
+  const singles = matches.map((m) => m[0]);
+  const positions = matches.map((m) => m.index ?? 0);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (token: string): void => {
+    const key = token.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(token);
+    }
+  };
+  for (const word of singles) add(word);
+  for (let i = 0; i < singles.length - 1; i += 1) {
+    const current = singles[i];
+    const next = singles[i + 1];
+    if (!current || !next) continue;
+    const curPos = positions[i];
+    const nextPos = positions[i + 1];
+    if (curPos === undefined || nextPos === undefined) continue;
+    // Adjacent only when exactly one space separates the two tokens.
+    if (nextPos === curPos + current.length + 1) {
+      add(`${current} ${next}`);
+    }
+  }
+  return out;
 }
 
 /** Matches terminal punctuation that can end a sentence. */
