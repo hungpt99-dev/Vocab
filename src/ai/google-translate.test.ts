@@ -72,6 +72,37 @@ describe('googleTranslate (keyless fallback)', () => {
     expect(out[0]!.pairs[1]).toEqual({ source: 'world', target: '[vi]world' });
   });
 
+  it('keeps gloss positions correct when a token translates to multiple words (drift fallback)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = new URL(url);
+        const q = u.searchParams.get('q') ?? '';
+        const tl = u.searchParams.get('tl') ?? 'en';
+        if (q.includes('\n')) {
+          // "world" -> "thế giới" (two target words), so the joined result has
+          // MORE lines than source tokens. The index-based split would misplace
+          // glosses; the fallback must re-translate per token instead.
+          const translated = q
+            .split('\n')
+            .map((t) => (t === 'world' ? `[${tl}]thế giới` : `[${tl}]${t}`))
+            .join('\n');
+          return new Response(JSON.stringify([[[translated]]]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify([[[`[${tl}]${q}`]]]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+    const out = await googleTranslate.align([{ id: '1', text: 'Hello world' }], 'Vietnamese');
+    expect(out[0]!.pairs[0]).toEqual({ source: 'Hello', target: '[vi]Hello' });
+    expect(out[0]!.pairs[1]).toEqual({ source: 'world', target: '[vi]thế giới' });
+  });
+
   it('throws (not silently returns source) when the network is unreachable', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
     await expect(googleTranslate.translate(['Hello'], 'Vietnamese')).rejects.toThrow(/network/i);

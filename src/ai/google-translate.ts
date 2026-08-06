@@ -63,11 +63,14 @@ export const googleTranslate = {
   },
 
   /**
-   * Word alignment fallback. TWO requests per paragraph: the whole sentence (used
-   * as the translation line) plus all source tokens joined by a delimiter (so
-   * each token gets its exact single-word gloss back, aligned by position). This
-   * avoids the per-word call explosion (hundreds of requests) that made the page
-   * look empty for 10+ seconds, while still giving a correct gloss per word.
+   * Word alignment fallback. Fast path: translate the whole sentence (translation
+   * line) plus all source tokens joined by a delimiter (so each token gets its
+   * gloss back in one request). BUT the joined result can drift — a source token
+   * like "world" may translate to *multiple* target words, and Google may merge or
+   * reorder the delimiter-separated lines — so the split-by-delimiter index no
+   * longer lines up with the source tokens and glosses land on the wrong word.
+   * When the token counts don't match we re-translate each token individually
+   * (bounded concurrency) so every source word maps to its own exact translation.
    */
   async align(
     paragraphs: Array<{ id: string; text: string }>,
@@ -78,9 +81,21 @@ export const googleTranslate = {
       paragraphs.map(async (paragraph) => {
         const translation = await translateText(paragraph.text, code);
         const tokens = tokenizeWords(paragraph.text);
+        if (tokens.length === 0) {
+          return { id: paragraph.id, text: paragraph.text, pairs: [], translation };
+        }
+
         const joined = tokens.join(SEP);
-        const joinedTranslation = tokens.length ? await translateText(joined, code) : '';
-        const tokenTargets = joinedTranslation.split(SEP).map((t) => t.trim());
+        const joinedTranslation = await translateText(joined, code);
+        let tokenTargets = joinedTranslation.split(SEP).map((t) => t.trim());
+
+        // Drift detected: a token translated to several words (or lines were
+        // merged/reordered), so index alignment would misplace the glosses.
+        // Re-translate each token on its own so positions stay exact.
+        if (tokenTargets.length !== tokens.length) {
+          tokenTargets = await translateTokensIndividually(tokens, code);
+        }
+
         const pairs = tokens.map((source, i) => {
           const tgt = tokenTargets[i] ?? '';
           // Drop a gloss that is identical to the source (untranslated token).
@@ -91,4 +106,20 @@ export const googleTranslate = {
     );
   },
 };
+
+/**
+ * Translate each token separately (bounded concurrency) so every source word
+ * maps to its own translation, aligned by position. Used only when the joined
+ * fast path drifts — see `align` above.
+ */
+async function translateTokensIndividually(tokens: string[], code: string): Promise<string[]> {
+  const out: string[] = [];
+  const CONCURRENCY = 5;
+  for (let i = 0; i < tokens.length; i += CONCURRENCY) {
+    const slice = tokens.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(slice.map((token) => translateText(token, code)));
+    out.push(...results.map((r) => r.trim()));
+  }
+  return out;
+}
 
