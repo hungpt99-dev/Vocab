@@ -83,26 +83,29 @@ export const googleTranslate = {
     const code = toLanguageCode(target);
     if (paragraphs.length === 0) return [];
 
-    // 1) Full-sentence translation lines: join paragraphs with a blank line so a
-    //    single request covers the whole chunk, then split back out by paragraph.
+    // Gather tokens synchronously so both network requests can fire in parallel.
+    const perParagraphTokens = paragraphs.map((p) => tokenizeWords(p.text));
+    const allTokens = perParagraphTokens.flat();
     const joinedSentences = paragraphs.map((p) => p.text).join(PARA_SEP);
-    const joinedSentenceTranslation = await translateText(joinedSentences, code);
+    const joinedTokens = allTokens.join(SEP);
+
+    // 1) Full-sentence translation lines AND 2) word glosses issued together —
+    // Google preserves the blank-line / newline structure, so a single request
+    // each covers the whole chunk. Running them concurrently halves the latency.
+    const [joinedSentenceTranslation, joinedTokenTranslation] = await Promise.all([
+      translateText(joinedSentences, code),
+      allTokens.length > 0 ? translateText(joinedTokens, code) : Promise.resolve(''),
+    ]);
+
     const sentenceLines = splitByParagraph(joinedSentenceTranslation);
     // Pad/trim so every paragraph gets a line even if the separator was dropped.
     while (sentenceLines.length < paragraphs.length) sentenceLines.push('');
     const translations = sentenceLines.slice(0, paragraphs.length);
 
-    // 2) Word glosses: gather every token of every paragraph, translate them all
-    //    in one blob, then redistribute by the known per-paragraph token counts.
-    const perParagraphTokens = paragraphs.map((p) => tokenizeWords(p.text));
-    const allTokens = perParagraphTokens.flat();
     let allTargets: string[];
-
     if (allTokens.length === 0) {
       allTargets = [];
     } else {
-      const joinedTokens = allTokens.join(SEP);
-      const joinedTokenTranslation = await translateText(joinedTokens, code);
       const split = joinedTokenTranslation.split(SEP).map((t) => t.trim());
       allTargets = split.length === allTokens.length ? split : await translateTokensIndividually(allTokens, code);
     }

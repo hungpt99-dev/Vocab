@@ -11,7 +11,32 @@ import { sharedRateLimiter } from './rate-limiter';
 const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
 
 /** Keep each provider request small enough to stay inside a model context. */
-const CHUNK_SIZE = 8;
+const CHUNK_SIZE = 16;
+
+/** How many chunks may be in flight at once (network overlap, bounded). */
+const CHUNK_CONCURRENCY = 3;
+
+/** Run `task` over items with a bounded number of concurrent executions. */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      const item = items[index];
+      if (item === undefined) continue;
+      results[index] = await task(item);
+    }
+  }
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
 
 interface CacheEntry {
   translations: string[];
@@ -64,25 +89,31 @@ export class TranslateService {
     // one like Ollama/LM Studio that needs no key) always takes precedence.
     const adapter = getProvider(active.type);
     if (adapter.requiresApiKey && !active.apiKey) {
-      const translations = await googleTranslate.translate(
-        paragraphs.map((p) => p.text),
-        language,
-      );
-      return paragraphs.map((paragraph, index) => ({
-        id: paragraph.id,
-        text: paragraph.text,
-        translation: translations[index] ?? '',
-      }));
+      // Keyless fallback: reuse the same per-chunk cache as the AI path so a
+      // re-render of the same text does not re-hit the network.
+      const out: TranslationResult[] = [];
+      for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
+        const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
+        const cached = this.readCache(active, chunk, language);
+        const translations =
+          cached ?? (await googleTranslate.translate(chunk.map((p) => p.text), language));
+        if (!cached) this.writeCache(active, chunk, language, translations);
+        chunk.forEach((paragraph, index) => {
+          out.push({ id: paragraph.id, text: paragraph.text, translation: translations[index] ?? '' });
+        });
+      }
+      return out;
     }
     const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
-    const results: TranslationResult[] = [];
+    const chunks: TranslationParagraph[][] = [];
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
-      const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
-      const chunkResults = await this.translateChunk(active, fallback, chunk, language, signal);
-      results.push(...chunkResults);
+      chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
-    return results;
+    const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
+      this.translateChunk(active, fallback, chunk, language, signal),
+    );
+    return chunked.flat();
   }
 
   /** Word-by-word aligned translation: returns ordered source→target glosses. */
@@ -111,20 +142,27 @@ export class TranslateService {
     // glosses per token.
     const alignAdapter = getProvider(active.type);
     if (alignAdapter.requiresApiKey && !active.apiKey) {
-      return googleTranslate.align(
-        paragraphs.map((p) => ({ id: p.id, text: p.text })),
-        language,
-      );
+      // Keyless fallback: cache per chunk so repeated rendering is instant.
+      const out: WordAlignResult[] = [];
+      for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
+        const chunk = paragraphs.slice(start, start + CHUNK_SIZE).map((p) => ({ id: p.id, text: p.text }));
+        const cached = this.readAlignCache(active, chunk, language);
+        const results = cached ?? (await googleTranslate.align(chunk, language));
+        if (!cached) this.writeAlignCache(active, chunk, language, results);
+        out.push(...results);
+      }
+      return out;
     }
     const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
 
-    const results: WordAlignResult[] = [];
+    const chunks: TranslationParagraph[][] = [];
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
-      const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
-      const chunkResults = await this.alignChunk(active, fallback, chunk, language, signal);
-      results.push(...chunkResults);
+      chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
-    return results;
+    const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
+      this.alignChunk(active, fallback, chunk, language, signal),
+    );
+    return chunked.flat();
   }
 
   private async translateChunk(
