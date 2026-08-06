@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TranslateService } from './translate-service';
 import { SettingsRepository } from '@/storage/settings-repository';
 
+/** A provider with no key set, so the keyless fallback path is exercised. */
+const NO_KEY = '';
+
 /** Build a translations payload sized to match the request body's paragraph count. */
 function translationPayload(body: string): string {
   const match = body.match(/Translate the (\d+) paragraph/);
@@ -90,6 +93,37 @@ describe('TranslateService', () => {
     ]);
   });
 
+  it('caches the keyless fallback so a re-render does not re-hit the network', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [
+        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: NO_KEY, baseUrl: '', model: '', enabled: true },
+      ],
+      activeProviderId: 'p1',
+    });
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = new URL(url);
+      const q = u.searchParams.get('q') ?? '';
+      const tl = u.searchParams.get('tl') ?? 'en';
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [[[`[${tl}]${q}`]]],
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const service = new TranslateService(settings);
+    const paragraphs = [{ id: 'a', text: 'Hello' }];
+    await service.alignWords(paragraphs, 'Vietnamese');
+    fetchMock.mockClear();
+    await service.alignWords(paragraphs, 'Vietnamese');
+
+    // Second call served from cache: no Google requests at all.
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
   it('uses the configured provider when a key is present (no keyless fallback)', async () => {
     const settings = new SettingsRepository();
     await settings.update({
@@ -148,13 +182,17 @@ describe('TranslateService', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const paragraphs = Array.from({ length: 10 }, (_, index) => ({ id: `p${index}`, text: `Para ${index}` }));
+    const paragraphs = Array.from({ length: 20 }, (_, index) => ({ id: `p${index}`, text: `Para ${index}` }));
     const result = await new TranslateService(settings).translate(paragraphs, 'Spanish');
 
+    // CHUNK_SIZE is 16, so 20 paragraphs span two chunks (still order-preserving).
+    // Each chunk is translated independently, so the mock yields T1..T16 then T1..T4.
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result).toHaveLength(10);
+    expect(result).toHaveLength(20);
     expect(result[0]).toEqual({ id: 'p0', text: 'Para 0', translation: 'T1' });
-    expect(result[9]).toEqual({ id: 'p9', text: 'Para 9', translation: 'T2' });
+    expect(result[15]).toEqual({ id: 'p15', text: 'Para 15', translation: 'T16' });
+    expect(result[16]).toEqual({ id: 'p16', text: 'Para 16', translation: 'T1' });
+    expect(result[19]).toEqual({ id: 'p19', text: 'Para 19', translation: 'T4' });
   });
 
   it('serves repeated requests from the cache', async () => {
