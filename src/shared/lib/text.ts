@@ -31,6 +31,28 @@ export function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Matches one "word-like" token so the gloss wrapper and the keyless word
+ * aligner agree on boundaries.
+ *
+ * A token starts and ends with a letter/number, and may contain letters,
+ * numbers, Unicode combining marks (so accented letters like naïve/résumé stay
+ * whole), and the common word-internal punctuation: apostrophe `'`, curly
+ * quotes `‘’`, en/em dashes `– —`, hyphen `-`, period `.` (abbreviations like
+ * `U.S.A.`, `e.g.`) and middle dot `·`. Curly quotes/dashes are included
+ * because real web text uses them (e.g. "it's" with a typographic apostrophe
+ * would otherwise split into "it" + "s").
+ *
+ * Punctuation that is NOT word-internal (`:`, `,`, `(`, `“` at a boundary) is
+ * correctly excluded, so "read: this" yields two tokens.
+ */
+export const WORD_TOKEN = /([\p{L}\p{N}][\p{L}\p{N}\p{M}'\-’‘–—.·]*[\p{L}\p{N}]|\p{L}|\p{N})/gu;
+
+/** Split text into word-like tokens, preserving order and position boundaries. */
+export function tokenizeWords(text: string): string[] {
+  return text.match(WORD_TOKEN) ?? [];
+}
+
 /** Matches terminal punctuation that can end a sentence. */
 const SENTENCE_TERMINATORS = /[.!?。！？]/u;
 

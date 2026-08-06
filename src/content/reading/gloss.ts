@@ -1,4 +1,5 @@
 import type { WordAlignResult, WordPair } from '@/ai/types';
+import { WORD_TOKEN } from '@/shared/lib/text';
 
 /**
  * Word-by-word reading: wrap each source word that has a target-language gloss
@@ -20,8 +21,12 @@ import type { WordAlignResult, WordPair } from '@/ai/types';
  * flag, so accented words (Vietnamese, etc.) would never be recognised as word
  * boundaries and would be skipped. We instead split on a negated character set
  * (anything that is NOT part of a token) and keep the tokens in the result.
+ *
+ * The shared `WORD_TOKEN` (see @/shared/lib/text) is the single source of truth;
+ * it additionally keeps curly quotes/dashes/combining marks so real web text
+ * like "it's" (typographic apostrophe) or "naïve" stays whole.
  */
-const TOKEN = /([\p{L}\p{N}][\p{L}\p{N}'.-]*[\p{L}\p{N}]|\p{L}|\p{N})/gu;
+const TOKEN = WORD_TOKEN;
 
 export function wrapWords(root: HTMLElement, result: WordAlignResult): void {
   if (result.pairs.length === 0) return;
