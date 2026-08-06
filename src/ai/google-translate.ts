@@ -12,6 +12,7 @@
  * no API key. We call it over HTTPS from the background service worker.
  */
 import { toLanguageCode } from './language-codes';
+import { tokenizeWords } from '@/shared/lib/text';
 
 const GTX_BASE = 'https://translate.googleapis.com/translate_a/single';
 
@@ -76,7 +77,7 @@ export const googleTranslate = {
     return Promise.all(
       paragraphs.map(async (paragraph) => {
         const translation = await translateText(paragraph.text, code);
-        const tokens = paragraph.text.match(/([\p{L}\p{N}][\p{L}\p{N}'.-]*[\p{L}\p{N}]|\p{L}|\p{N})/gu) ?? [];
+        const tokens = tokenizeWords(paragraph.text);
         const joined = tokens.join(SEP);
         const joinedTranslation = tokens.length ? await translateText(joined, code) : '';
         const tokenTargets = joinedTranslation.split(SEP).map((t) => t.trim());

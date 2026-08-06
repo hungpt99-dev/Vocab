@@ -8,6 +8,7 @@ import {
   normalizeTags,
   normalizeWord,
   splitIntoSentences,
+  tokenizeWords,
 } from './text';
 
 describe('normalizeWord', () => {
@@ -109,3 +110,33 @@ describe('splitIntoSentences', () => {
     expect(splitIntoSentences('你好。再见！')).toEqual(['你好。', '再见！']);
   });
 });
+
+describe('tokenizeWords', () => {
+  it('keeps typographic apostrophes inside words (it’s stays whole)', () => {
+    expect(tokenizeWords('it’s a test')).toEqual(['it’s', 'a', 'test']);
+  });
+
+  it('keeps hyphenated compounds and dotted abbreviations whole', () => {
+    expect(tokenizeWords('state-of-the-art')).toEqual(['state-of-the-art']);
+    // Trailing period is sentence punctuation, not word-internal, so it is
+    // dropped — the abbreviation core is preserved.
+    expect(tokenizeWords('U.S.A. e.g.')).toEqual(['U.S.A', 'e.g']);
+  });
+
+  it('keeps accented/combining-mark letters whole (naïve, résumé)', () => {
+    expect(tokenizeWords('naïve résumé')).toEqual(['naïve', 'résumé']);
+  });
+
+  it('keeps en/em dashes and Node.js-style tokens', () => {
+    expect(tokenizeWords('hello—world Node.js')).toEqual(['hello—world', 'Node.js']);
+  });
+
+  it('splits on boundary punctuation, not word-internal marks', () => {
+    expect(tokenizeWords('read: this (note)')).toEqual(['read', 'this', 'note']);
+  });
+
+  it('tokenizes non-Latin scripts without spaces', () => {
+    expect(tokenizeWords('日本語の')).toEqual(['日本語の']);
+  });
+});
+

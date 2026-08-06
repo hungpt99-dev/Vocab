@@ -35,6 +35,13 @@ let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
 let rescanTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * Per-tab bilingual opt-out. The user can turn bilingual off on ONE page via the
+ * in-page bar; that must not affect other tabs. The global `bilingualMode`
+ * setting is the *default* (set from the popup); this flag is the local override
+ * for the current tab only, and resets on reload.
+ */
+let localBilingualOff = false;
 
 registerMessageHandlers({
   'get-selection': () => readSelection(),
@@ -277,23 +284,36 @@ async function refresh(): Promise<void> {
 }
 
 function syncBilingual(enabled: boolean, targetLanguage: string): void {
-  if (enabled) {
-    // Show the bar immediately in a loading state, then clear it once the inline
-    // translations have been injected (or quickly, if there is nothing to inject).
-    bilingualBar.show(targetLanguage, () => {
-      void settingsRepository.update({ bilingualMode: false });
-    }, true);
-    document.body.classList.add('avs-bilingual-on');
-    if (!reader.isOpen) {
-      void reader.open().finally(() => bilingualBar.setLoading(false));
-    } else {
-      bilingualBar.setLoading(false);
-    }
-  } else {
+  if (!enabled) {
+    // Global default is off: every tab follows it, and any local opt-out is moot.
+    localBilingualOff = false;
     bilingualBar.hide();
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
+    return;
   }
+  // Global default is on, but this tab may have opted out locally via the bar.
+  if (localBilingualOff) {
+    bilingualBar.hide();
+    document.body.classList.remove('avs-bilingual-on');
+    if (reader.isOpen) reader.close();
+    return;
+  }
+  bilingualBar.show(targetLanguage, onBilingualBarClose, true);
+  document.body.classList.add('avs-bilingual-on');
+  if (!reader.isOpen) {
+    void reader.open().finally(() => bilingualBar.setLoading(false));
+  } else {
+    bilingualBar.setLoading(false);
+  }
+}
+
+/** In-page "turn off" — local to this tab only, never writes global settings. */
+function onBilingualBarClose(): void {
+  localBilingualOff = true;
+  bilingualBar.hide();
+  document.body.classList.remove('avs-bilingual-on');
+  if (reader.isOpen) reader.close();
 }
 
 function scan(root: Node | null): void {
