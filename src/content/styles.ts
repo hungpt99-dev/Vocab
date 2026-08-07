@@ -611,6 +611,29 @@ export function injectStyles(doc: Document = document): void {
       flex: none;
     }
     @keyframes avs-spin { to { transform: rotate(360deg); } }
+
+    /* Loading skeleton shown under a block while its translation streams in. */
+    .avs-skeleton-line {
+      display: block;
+      margin: 2px 0 6px;
+      padding-left: 10px;
+      height: 0.92em;
+      border-left: 2px solid var(--avs-overlay-divider);
+      border-radius: 4px;
+      background: linear-gradient(
+        90deg,
+        var(--avs-overlay-surface-alt) 25%,
+        var(--avs-overlay-hover, rgba(127, 127, 127, 0.35)) 37%,
+        var(--avs-overlay-surface-alt) 63%
+      );
+      background-size: 400% 100%;
+      animation: avs-shimmer 1.3s ease-in-out infinite;
+    }
+    @keyframes avs-shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+    .avs-skeleton-line[hidden] { display: none; }
     .avs-bilingual-banner {
       position: fixed;
       top: 12px;
