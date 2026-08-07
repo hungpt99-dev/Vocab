@@ -58,6 +58,24 @@ describe('InlineReader bilingual injection', () => {
       '<article><p>Hello world</p><p>Goodbye world</p></article>';
     defer();
     stubSettings();
+    // Default IntersectionObserver: report every observed element as intersecting
+    // (jsdom has no layout). This makes open() translate all blocks eagerly,
+    // matching the historical behaviour the other tests rely on. Individual
+    // tests can override this with a non-auto-firing mock.
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(private readonly cb: IntersectionObserverCallback) {}
+        observe(el: Element): void {
+          this.cb([{ target: el, isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+        }
+        unobserve(): void {}
+        disconnect(): void {}
+        takeRecords(): IntersectionObserverEntry[] {
+          return [];
+        }
+      } as unknown as typeof IntersectionObserver,
+    );
     vi.mocked(sendMessage).mockImplementation(async (message) => {
       if (message.type === 'align-words') {
         const paragraphs = message.payload.paragraphs as Array<{ id: string; text: string }>;
@@ -159,6 +177,90 @@ describe('InlineReader bilingual injection', () => {
     reader.close();
   });
 
+  it('translates lazily — only in-view blocks initially, more as they intersect', async () => {
+    // A long article: many paragraphs, far more than one viewport.
+    const paragraphs = Array.from({ length: 40 }, (_, i) => `<p id="p${i}">Paragraph number ${i} about linguistics</p>`).join('');
+    document.body.innerHTML = `<article>${paragraphs}</article>`;
+
+    // jsdom has no layout, so getBoundingClientRect returns zeros and nothing is
+    // "near visible" on open — translation must come solely from the observer.
+    // Force a zero-height viewport so the "near visible" heuristic sees nothing
+    // as visible on open() — translation must come solely from the observer.
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 0 });
+
+    const observers: Array<{ cb: IntersectionObserverCallback; elements: Element[] }> = [];
+    class MockIO {
+      public elements: Element[] = [];
+      constructor(public cb: IntersectionObserverCallback) {
+        observers.push({ cb, elements: this.elements });
+      }
+      observe(el: Element): void {
+        this.elements.push(el);
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', MockIO as unknown as typeof IntersectionObserver);
+
+    // align-words echoes the requested paragraphs (resolved immediately).
+    vi.mocked(sendMessage).mockImplementation(async (message) => {
+      if (message.type === 'align-words') {
+        const paragraphsReq = message.payload.paragraphs as Array<{ id: string; text: string }>;
+        return paragraphsReq.map((paragraph) => ({
+          id: paragraph.id,
+          text: paragraph.text,
+          pairs: [{ source: 'linguistics', target: 'ngôn ngữ học' }],
+          translation: `[vi]${paragraph.text}`,
+        })) as never;
+      }
+      return [] as never;
+    });
+
+    const reader = new InlineReader();
+    await reader.open();
+    await flush();
+    await flush();
+
+    // Nothing translated yet — the page was NOT loaded all at once.
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
+
+    const observer = observers[0]!;
+    const firstEl = document.getElementById('p0')!;
+    const lastEl = document.getElementById('p39')!;
+
+    // Simulate the top block scrolling into view.
+    await observer.cb(
+      [{ target: firstEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(1);
+
+    // Simulate the last block intersecting.
+    await observer.cb(
+      [{ target: lastEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+
+    // Re-intersecting the same block must NOT re-translate it.
+    await observer.cb(
+      [{ target: firstEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+
+    reader.close();
+  });
+
   it('shows a persistent banner when the AI call fails (no silent monolingual page)', async () => {
     vi.mocked(sendMessage).mockImplementation(async (message) => {
       if (message.type === 'align-words') throw Object.assign(new Error('An API key is required.'), { code: 'missing_api_key' });
@@ -179,5 +281,26 @@ describe('InlineReader bilingual injection', () => {
     expect(banner!.textContent).toContain('API key');
     reader.close();
     expect(document.querySelector('.avs-bilingual-banner')).toBeNull();
+  });
+
+  it('shows a skeleton while a block translates, then replaces it with the line', async () => {
+    const reader = new InlineReader();
+    // Keep the align response pending so we can observe the loading state.
+    void reader.open();
+    await flush();
+
+    // While the request is in flight, a shimmering skeleton placeholder is shown.
+    expect(document.querySelectorAll('.avs-skeleton-line').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
+
+    // The translation arrives.
+    resolveSend(glossResponse());
+    await flush();
+    await flush();
+
+    // Skeleton is gone; the real translation line took its place.
+    expect(document.querySelectorAll('.avs-skeleton-line').length).toBe(0);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    reader.close();
   });
 });

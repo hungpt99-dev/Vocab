@@ -32,6 +32,12 @@ export class InlineReader {
   private alignment: ReadingAlignment = 'sentence';
   private mode: ReadingMode = 'word';
   private active = false;
+  /** IntersectionObserver that triggers translation as blocks enter the viewport. */
+  private observer: IntersectionObserver | null = null;
+  /** Block ids already translated, so we never re-translate on re-observe. */
+  private readonly translatedBlockIds = new Set<string>();
+  /** Skeleton placeholders currently shown, keyed by block id, for removal. */
+  private readonly skeletons = new Map<string, HTMLElement>();
   /** Monotonic token; bumped on every (re)inject or close so a stale in-flight
    *  batch can tell it has been superseded and must not append nodes. */
   private generation = 0;
@@ -62,9 +68,6 @@ export class InlineReader {
     this.generation += 1;
     this.lastError = null;
 
-    if (settings.bilingualMode) {
-      await this.injectAll(blocks);
-    }
     this.buildControl(settings.bilingualMode);
     this.prefsListener = watchReadingPreferences((next) => {
       this.alignment = next.alignment;
@@ -76,6 +79,13 @@ export class InlineReader {
     });
     document.body.addEventListener('mouseover', this.onWordHover);
     document.body.addEventListener('mouseout', this.onWordLeave);
+
+    if (settings.bilingualMode) {
+      // Lazily translate: eagerly translate what is (or is about to be) visible so
+      // the first screenful appears instantly, then top up the rest on scroll.
+      // We never "load all" the page up front.
+      await this.observeBlocks(blocks);
+    }
     return true;
   }
 
@@ -97,6 +107,10 @@ export class InlineReader {
   close(): void {
     this.active = false;
     this.generation += 1;
+    this.observer?.disconnect();
+    this.observer = null;
+    this.translatedBlockIds.clear();
+    this.skeletons.clear();
     document.body.removeEventListener('mouseover', this.onWordHover);
     document.body.removeEventListener('mouseout', this.onWordLeave);
     this.popover.destroy();
@@ -123,7 +137,10 @@ export class InlineReader {
       for (const node of nodes) node.remove();
     }
     this.injected.clear();
-    await this.injectAll(blocks);
+    this.translatedBlockIds.clear();
+    this.observer?.disconnect();
+    this.observer = null;
+    if (blocks.length > 0) this.observeBlocks(blocks);
   }
 
   /** Undo any word wrapping we applied to the host page. */
@@ -132,71 +149,149 @@ export class InlineReader {
     this.hostOriginal.clear();
   }
 
-  private async injectAll(blocks: ArticleBlock[]): Promise<void> {
+  /**
+   * Lazily translate the page. An IntersectionObserver watches every block; only
+   * blocks that are in (or near) the viewport are sent for translation, and
+   * more are translated as the reader scrolls. This keeps first paint instant
+   * and avoids translating an entire long article up front.
+   */
+  private async observeBlocks(blocks: ArticleBlock[]): Promise<void> {
     const generation = this.generation;
-    const items: Array<{ id: string; text: string; anchor: HTMLElement }> = [];
+    const visible = blocks.filter((b) => {
+      const el = b.element;
+      if (!(el instanceof HTMLElement)) return false;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      // Anything within one viewport below the fold is considered "near" and is
+      // translated eagerly so it's ready just as the reader reaches it.
+      return rect.top < vh * 2 && rect.bottom > -vh;
+    });
+
+    // Translate what's already (near) visible right away, so the first screenful
+    // appears without waiting for a scroll.
+    if (visible.length > 0) await this.translateBlocks(visible);
+
+    // A close()/rerender() may have superseded this run while we awaited the
+    // eager batch; if so, don't set up the observer (it would fire stale work).
+    if (this.generation !== generation) return;
+
+    // Top up the rest as it scrolls into view.
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        const entering = entries
+          .filter((e) => e.isIntersecting)
+          .map((e) => blocks.find((b) => b.element === e.target))
+          .filter((b): b is ArticleBlock => Boolean(b));
+        if (entering.length > 0) void this.translateBlocks(entering);
+      },
+      // Start translating a block a full viewport before it scrolls into view.
+      { rootMargin: '200% 0px 200% 0px' },
+    );
     for (const block of blocks) {
+      if (block.element instanceof HTMLElement) this.observer.observe(block.element);
+    }
+  }
+
+  /** Translate a specific set of blocks (visible ones), skipping already-done. */
+  private async translateBlocks(blocks: ArticleBlock[]): Promise<void> {
+    const generation = this.generation;
+    const pending = blocks.filter((b) => !this.translatedBlockIds.has(b.id));
+    if (pending.length === 0) return;
+
+    const items: Array<{ id: string; text: string; anchor: HTMLElement }> = [];
+    for (const block of pending) {
       const targets = this.resolveTargets(block);
       for (const target of targets) items.push(target);
     }
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      // Nothing translatable here (e.g. navigation) — still mark done so we
+      // don't keep re-checking it.
+      for (const b of pending) this.translatedBlockIds.add(b.id);
+      return;
+    }
+
+    // Show a shimmering skeleton under each pending block right away, so the
+    // page feels responsive while the translation streams in (instead of a
+    // blank gap). Replaced by the real line once it arrives.
+    const skeletonByAnchor = new Map<HTMLElement, HTMLElement>();
+    for (const block of pending) {
+      const anchor = block.element instanceof HTMLElement ? block.element : null;
+      if (!anchor || this.skeletons.has(block.id)) continue;
+      const skeleton = this.buildSkeletonLine();
+      anchor.after(skeleton);
+      this.skeletons.set(block.id, skeleton);
+      skeletonByAnchor.set(anchor, skeleton);
+    }
+
+    const replaceSkeleton = (anchor: HTMLElement, node: HTMLElement | null): void => {
+      const skeleton = skeletonByAnchor.get(anchor);
+      if (!skeleton) return;
+      if (node) skeleton.replaceWith(node);
+      else skeleton.remove();
+      for (const [id, sk] of this.skeletons) if (sk === skeleton) this.skeletons.delete(id);
+    };
 
     let injectedSomething = false;
     if (this.mode === 'word') {
       const aligned = await this.alignItems(items);
-      // A close() or rerender() may have superseded this batch while we waited
-      // on the AI call; if so, discard rather than append stale duplicates.
-      if (this.generation !== generation) return;
+      if (this.generation !== generation) {
+        for (const sk of skeletonByAnchor.values()) sk.remove();
+        return;
+      }
       let lastText: string | null = null;
       for (const item of items) {
         const result = aligned.get(item.id);
         if (!result) continue;
         this.applyWordGloss(item, result);
-        // Word mode keeps the page readable (gloss revealed on hover) but ALSO
-        // shows a full-sentence translation line per paragraph so the reader sees
-        // the translation immediately without hovering. Prefer the model's
-        // full-sentence `translation`; fall back to the joined word glosses if it
-        // came back empty (so a blank reply doesn't drop the line entirely).
-        // Skip a line identical to the previous one so repeated blocks don't
-        // stack duplicates.
         const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
         if (line && line !== lastText) {
           const node = buildSentenceBlock(line);
-          item.anchor.after(node);
+          replaceSkeleton(item.anchor, node);
           this.track(item.id, node);
           lastText = result.translation;
           injectedSomething = true;
+        } else {
+          replaceSkeleton(item.anchor, null);
         }
       }
     } else {
-      // Sentence mode: one full-block (or full-sentence) translation line each.
       const translated = await this.translateItems(items);
-      if (this.generation !== generation) return;
+      if (this.generation !== generation) {
+        for (const sk of skeletonByAnchor.values()) sk.remove();
+        return;
+      }
       let lastText: string | null = null;
       for (const item of items) {
         const translation = translated.get(item.id);
         if (!translation) continue;
-        // Skip a line identical to the one we just injected so the page does not
-        // show the same translation stacked twice (e.g. when several sentences
-        // resolve to the same block element / repeated phrasing).
-        if (translation === lastText) continue;
+        if (translation === lastText) {
+          replaceSkeleton(item.anchor, null);
+          continue;
+        }
         lastText = translation;
         const node = buildSentenceBlock(translation);
-        item.anchor.after(node);
+        replaceSkeleton(item.anchor, node);
         this.track(item.id, node);
         injectedSomething = true;
       }
     }
 
-    // Fail loudly: if the AI call produced nothing (missing key, network block,
-    // etc.) the page would otherwise stay fully monolingual and the feature looks
-    // broken. Show a persistent banner with the exact reason so it's unmissable.
+    for (const b of pending) this.translatedBlockIds.add(b.id);
+
     if (!injectedSomething && this.lastError) {
       this.showBanner(this.lastError);
       this.lastError = null;
     } else if (injectedSomething) {
       this.hideBanner();
     }
+  }
+
+  /** Build a shimmering placeholder line shown while a block is translating. */
+  private buildSkeletonLine(): HTMLElement {
+    const skeleton = document.createElement('div');
+    skeleton.className = 'avs-skeleton-line';
+    skeleton.setAttribute('aria-hidden', 'true');
+    return skeleton;
   }
 
   /** Render a persistent, dismissable banner explaining why nothing translated. */
