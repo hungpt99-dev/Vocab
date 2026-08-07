@@ -177,12 +177,6 @@ async function handleToolbarAction(
       }
       return;
     }
-    case 'reading-mode': {
-      toolbar.hide();
-      const opened = await reader.toggle();
-      if (!opened) showToast('No article found on this page.', 'error');
-      return;
-    }
     default:
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();

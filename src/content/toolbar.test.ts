@@ -153,72 +153,35 @@ describe('SelectionToolbar', () => {
     toolbarUi.destroy();
   });
 
-  it('opens the More menu and emits the reading-mode action from it', () => {
+  it('emits a "more" action that opens the smart-assist menu (no reading-mode submenu)', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const toolbarUi = new SelectionToolbar();
     toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
 
-    toolbarUi.toggleMenu();
-    expect(toolbarUi.isMenuOpen).toBe(true);
-
-    const menuItem = document.querySelector<HTMLButtonElement>('[data-action="reading-mode"]');
-    expect(menuItem).not.toBeNull();
-    expect(menuItem?.getAttribute('role')).toBe('menuitem');
-
-    const handler = vi.fn();
-    document.addEventListener('avs-toolbar-action', handler);
-    menuItem!.click();
-
-    expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { action: 'reading-mode', text: 'hello' } }),
-    );
-    expect(toolbarUi.isMenuOpen).toBe(false);
-    toolbarUi.destroy();
-  });
-
-  it('closes the More menu when the toolbar hides', () => {
-    document.body.innerHTML = '<p>hello world</p>';
-    const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
-    toolbarUi.toggleMenu();
-    expect(toolbarUi.isMenuOpen).toBe(true);
-
-    toolbarUi.hide();
-    expect(toolbarUi.isMenuOpen).toBe(false);
-    toolbarUi.destroy();
-  });
-
-  it('marks the More trigger as expanded while the menu is open', () => {
-    document.body.innerHTML = '<p>hello world</p>';
-    const toolbarUi = new SelectionToolbar();
-    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
-
-    const moreButton = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
-    toolbarUi.toggleMenu();
-    expect(moreButton.getAttribute('aria-expanded')).toBe('true');
-
-    toolbarUi.toggleMenu();
-    expect(moreButton.hasAttribute('aria-expanded')).toBe(false);
-    toolbarUi.destroy();
-  });
-
-  it('renders a divider before the More trigger and positions its menu', () => {
-    document.body.innerHTML = '<p>hello world</p>';
-    const toolbarUi = new SelectionToolbar();
-    toolbarUi.show(makeState('hello'));
-
-    const divider = document.querySelector('.avs-toolbar-divider');
-    expect(divider).not.toBeNull();
-    expect(divider?.getAttribute('aria-hidden')).toBe('true');
+    // Reading mode was removed: no secondary toolbar menu exists.
+    expect(document.getElementById('avs-toolbar-menu')).toBeNull();
+    expect(document.querySelector('[data-action="reading-mode"]')).toBeNull();
 
     const moreButton = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
     expect(moreButton.getAttribute('aria-haspopup')).toBe('menu');
 
-    toolbarUi.toggleMenu();
-    const menu = document.getElementById('avs-toolbar-menu')!;
-    expect(menu.hidden).toBe(false);
-    expect(menu.style.top).toBe('8px');
-    expect(menu.style.left).toBe('8px');
+    const handler = vi.fn();
+    document.addEventListener('avs-toolbar-action', handler);
+    moreButton.click();
+
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ action: 'more', text: 'hello' }) }),
+    );
+    toolbarUi.destroy();
+  });
+
+  it('marks the More trigger as a popup host', () => {
+    document.body.innerHTML = '<p>hello world</p>';
+    const toolbarUi = new SelectionToolbar();
+    toolbarUi.show({ text: 'hello', unit: 'word', rect: { top: 100, bottom: 114, left: 20, width: 50 } });
+
+    const moreButton = document.querySelector<HTMLButtonElement>('[data-action="more"]')!;
+    expect(moreButton.getAttribute('aria-haspopup')).toBe('menu');
     toolbarUi.destroy();
   });
 });

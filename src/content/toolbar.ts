@@ -3,11 +3,9 @@ import type { ExplainKind } from '@/shared/types/ai';
 import type { SelectionPayload } from '@/shared/messaging/contract';
 import { readSelection } from './selection';
 import { computePosition } from './hover-card';
-import { computeMenuPosition } from './more-menu';
 import {
   ICON_BOOK,
   ICON_BOOKMARK,
-  ICON_BOOK_OPEN,
   ICON_COPY,
   ICON_FILE,
   ICON_MESSAGE,
@@ -51,13 +49,8 @@ const TOOLBAR_ACTIONS = [
 
 export type ToolbarActionId = (typeof TOOLBAR_ACTIONS)[number]['id'];
 
-/** Actions hidden behind the 'More' trigger (e.g. reading-mode entry). */
-const TOOLBAR_MENU_ACTIONS = [{ id: 'reading-mode', label: 'Reading mode', icon: ICON_BOOK_OPEN }] as const;
-
-export type ToolbarMenuActionId = (typeof TOOLBAR_MENU_ACTIONS)[number]['id'];
-
-/** Every action the toolbar can emit, including menu-only ones. */
-export type ToolbarAnyActionId = ToolbarActionId | ToolbarMenuActionId;
+/** Every action the toolbar can emit. */
+export type ToolbarAnyActionId = ToolbarActionId;
 
 /** The smart-AI actions exposed on a translated/selected sentence. */
 export type SmartAssistActionId =
@@ -149,8 +142,6 @@ export function computeToolbarPosition(
 export class SelectionToolbar {
   private element: HTMLElement | null = null;
   private buttons: HTMLButtonElement[] = [];
-  private menu: HTMLElement | null = null;
-  private moreButton: HTMLButtonElement | null = null;
   private state: ToolbarState | null = null;
   private scrollHandler = (): void => this.reposition();
 
@@ -186,10 +177,6 @@ export class SelectionToolbar {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (action.id === 'more') {
-          this.toggleMenu();
-          return;
-        }
         if (this.state) {
           document.dispatchEvent(
             new CustomEvent('avs-toolbar-action', {
@@ -201,45 +188,9 @@ export class SelectionToolbar {
       this.buttons.push(button);
       toolbar.append(button);
       if (action.id === 'more') {
-        this.moreButton = button;
         button.setAttribute('aria-haspopup', 'menu');
       }
     }
-
-    const menu = document.createElement('div');
-    menu.id = `${TOOLBAR_ID}-menu`;
-    menu.className = 'avs-toolbar-menu';
-    menu.setAttribute('role', 'menu');
-    menu.setAttribute('aria-label', 'More actions');
-    menu.hidden = true;
-    for (const action of TOOLBAR_MENU_ACTIONS) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'avs-toolbar-menu-item';
-      item.dataset.action = action.id;
-      item.setAttribute('role', 'menuitem');
-      item.setAttribute('aria-label', action.label);
-      item.title = action.label;
-      item.innerHTML = action.icon;
-      const label = document.createElement('span');
-      label.textContent = action.label;
-      item.append(label);
-      item.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (this.state) {
-          document.dispatchEvent(
-            new CustomEvent('avs-toolbar-action', {
-              detail: { action: action.id, text: this.state.text },
-            }),
-          );
-        }
-        this.hideMenu();
-      });
-      menu.append(item);
-    }
-    toolbar.append(menu);
-    this.menu = menu;
 
     toolbar.addEventListener('keydown', (event) => this.handleKeydown(event));
     document.body.append(toolbar);
@@ -286,30 +237,7 @@ export class SelectionToolbar {
   hide(): void {
     if (this.element) this.element.hidden = true;
     this.state = null;
-    this.hideMenu();
     window.removeEventListener('scroll', this.scrollHandler, true);
-  }
-
-  /** Open/close the 'More' menu containing secondary actions (e.g. reading mode). */
-  toggleMenu(): void {
-    if (this.isMenuOpen) {
-      this.hideMenu();
-    } else {
-      this.menu?.removeAttribute('hidden');
-      this.positionMenu();
-      this.moreButton?.setAttribute('aria-expanded', 'true');
-      this.menu?.querySelector<HTMLElement>('.avs-toolbar-menu-item')?.focus();
-    }
-  }
-
-  /** Hide the 'More' menu without hiding the toolbar. */
-  hideMenu(): void {
-    this.menu?.setAttribute('hidden', '');
-    this.moreButton?.removeAttribute('aria-expanded');
-  }
-
-  get isMenuOpen(): boolean {
-    return !!this.menu?.isConnected && !this.menu.hidden;
   }
 
   get isVisible(): boolean {
@@ -318,8 +246,6 @@ export class SelectionToolbar {
 
   destroy(): void {
     this.hide();
-    this.menu?.remove();
-    this.menu = null;
     this.element?.remove();
     this.element = null;
   }
@@ -334,19 +260,6 @@ export class SelectionToolbar {
     );
     this.element.style.top = `${top}px`;
     this.element.style.left = `${left}px`;
-  }
-
-  /** Anchor the 'More' menu below the trigger, right-aligned to it. */
-  private positionMenu(): void {
-    if (!this.menu || !this.moreButton) return;
-    const { width, height } = this.menu.getBoundingClientRect();
-    const { top, left } = computeMenuPosition(
-      this.moreButton.getBoundingClientRect(),
-      { width, height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    this.menu.style.top = `${top}px`;
-    this.menu.style.left = `${left}px`;
   }
 }
 
