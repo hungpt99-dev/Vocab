@@ -32,9 +32,11 @@ interface RowData {
  * overhead entirely.
  *
  * Rows are variable-height (a card grows when expanded, edited, or showing an
- * explanation). Each rendered row reports its measured height via a ResizeObserver;
- * when it changes we tell the list to recompute offsets from that index so scroll
- * positions stay correct.
+ * explanation). Each rendered row measures an inner content wrapper (NOT the
+ * row itself — react-window pins the row box to its own height, so observing
+ * the row box would never fire when the content grows). The wrapper follows
+ * its content, so its ResizeObserver fires on expand/collapse; we then tell the
+ * list to recompute offsets from that index so scroll positions stay correct.
  */
 export function LibraryList(props: LibraryListProps): JSX.Element {
   const { entries, loading, filtered } = props;
@@ -94,15 +96,27 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
     const entry = data.entries[index];
     if (!entry) return <></>;
     return (
-      <li role="listitem" style={style} ref={(node) => { measure(node, index); cleanupRow(node); }}>
-        <EntryCard
-          entry={entry}
-          explaining={data.list.explainingId === entry.id}
-          onUpdate={data.list.onUpdate}
-          onDelete={data.list.onDelete}
-          onToggleFavorite={data.list.onToggleFavorite}
-          onExplain={data.list.onExplain}
-        />
+      <li role="listitem" style={style}>
+        <div
+          ref={(node) => {
+            // Disconnect the previous observer BEFORE creating the next one:
+            // created last render, it is keyed by the same node. Order matters —
+            // calling cleanupRow after measure would disconnect the observer we
+            // just created, so it would never fire and row heights would stay at
+            // the initial estimate (causing expanded content to overlap).
+            cleanupRow(node);
+            measure(node, index);
+          }}
+        >
+          <EntryCard
+            entry={entry}
+            explaining={data.list.explainingId === entry.id}
+            onUpdate={data.list.onUpdate}
+            onDelete={data.list.onDelete}
+            onToggleFavorite={data.list.onToggleFavorite}
+            onExplain={data.list.onExplain}
+          />
+        </div>
       </li>
     );
   };
