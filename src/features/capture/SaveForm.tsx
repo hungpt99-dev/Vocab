@@ -3,6 +3,7 @@ import type { SelectionPayload } from '@/shared/messaging/contract';
 import { Button } from '@/shared/ui/Button';
 import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
+import { useSettings } from '@/shared/hooks/useSettings';
 
 export interface SaveFormProps {
   selection: SelectionPayload | null;
@@ -17,6 +18,7 @@ export function SaveForm({ selection, saving, word, onWordChange, onSave }: Save
   const [note, setNote] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const { settings } = useSettings();
 
   useEffect(() => {
     if (selection?.word) onWordChange(selection.word);
@@ -53,6 +55,24 @@ export function SaveForm({ selection, saving, word, onWordChange, onSave }: Save
         <p className="line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
           “{selection.sentence}”
         </p>
+      )}
+      {selection?.word && (
+        <div className="flex items-center gap-2">
+          <mark
+            className="rounded px-1 py-0.5 text-sm font-medium text-slate-900 dark:text-slate-900"
+            style={{ backgroundColor: settings.highlightColor }}
+          >
+            {selection.word}
+          </mark>
+          <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span
+              aria-hidden="true"
+              className="inline-block h-3 w-3 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20"
+              style={{ backgroundColor: settings.highlightColor }}
+            />
+            Highlighted on the page
+          </span>
+        </div>
       )}
       <TextField
         label="Note"

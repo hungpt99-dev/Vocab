@@ -6,7 +6,7 @@ import { runActiveWithFallback } from './run-with-fallback';
 import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
-import { sharedRateLimiter } from './rate-limiter';
+import { translationRateLimiter } from './rate-limiter';
 
 const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
 
@@ -240,7 +240,7 @@ export class TranslateService {
     signal?: AbortSignal,
   ): Promise<WordAlignResult[]> {
     const adapter = getProvider(provider.type);
-    await sharedRateLimiter.acquire(signal);
+    await translationRateLimiter.acquire(signal);
     const result = await withRetry(
       () => adapter.align(request, {
         apiKey: provider.apiKey,
@@ -262,7 +262,7 @@ export class TranslateService {
     signal?: AbortSignal,
   ): Promise<string[]> {
     const adapter = getProvider(provider.type);
-    await sharedRateLimiter.acquire(signal);
+    await translationRateLimiter.acquire(signal);
     const result = await withRetry(
       () =>
         adapter.translate(request, {

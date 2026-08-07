@@ -138,32 +138,45 @@ function LibraryScreen() {
   // When the page toolbar asks to explain a word, it hands the word off here so
   // the popup is the single explain surface. Explain an existing entry, or save a
   // new one first, then run the explain flow.
+  //
+  // The pending explain is written to `chrome.storage.local`; we consume it from
+  // a storage-change listener (not just a mount effect) so it also fires when the
+  // popup is already open — `chrome.action.openPopup()` throws "already open" in
+  // that case and is ignored, so a mount-only effect would silently drop the
+  // request and the toolbar button would "do nothing". A mount-time catch-up
+  // covers the cold-open case (popup opened by the toolbar).
   useEffect(() => {
-    let active = true;
-    void (async () => {
+    let cancelled = false;
+
+    const runPending = async (): Promise<void> => {
       const pending = await takePendingExplain();
-      if (!pending || !active) return;
+      if (!pending || pending.word.trim() === '') return;
       const word = pending.word.trim();
-      if (!word) return;
       try {
         let entry = await vocabularyRepository.findByWord(word);
         if (!entry) {
           entry = await vocabularyRepository.save({
             word,
             sentence: pending.context ?? '',
-            sourceUrl: selection?.sourceUrl ?? '',
-            sourceTitle: selection?.sourceTitle ?? '',
           });
         }
-        await handleExplain(entry);
+        if (!cancelled) await handleExplain(entry);
       } catch (cause) {
-        notify(aiErrorMessage(cause), 'error');
+        if (!cancelled) notify(aiErrorMessage(cause), 'error');
       }
-    })();
-    return () => {
-      active = false;
     };
-  }, [handleExplain, notify, selection]);
+
+    void runPending();
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    return () => {
+      cancelled = true;
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    };
+
+    function onStorageChanged(changes: Record<string, chrome.storage.StorageChange>, area: string): void {
+      if (area === 'local' && 'avs:pending-explain' in changes) void runPending();
+    }
+  }, [handleExplain, notify]);
 
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
 
