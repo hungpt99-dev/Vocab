@@ -1,13 +1,15 @@
 import { registerMessageHandlers } from '@/shared/messaging/router';
 import { SETTINGS_KEY, settingsRepository } from '@/storage/settings-repository';
 import { sendMessage } from '@/shared/messaging/client';
-import { aiErrorMessage } from '@/ai/types';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
+import { ExplainPopover, type ExplainPopoverInput } from './explain-popover';
+import type { ExplainRequest } from '@/shared/types/explain';
+import type { Explanation } from '@/shared/types/vocabulary';
 import {
   SMART_ASSIST_ACTIONS,
   SelectionToolbar,
@@ -18,7 +20,6 @@ import {
   type ToolbarAnyActionId,
   type ToolbarState,
 } from './toolbar';
-import { setPendingExplain } from './pending-explain';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
@@ -29,8 +30,17 @@ const RESCAN_DELAY_MS = 400;
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
+const explainPopover = new ExplainPopover(runExplainRequest);
 const reader = new InlineReader();
 const bilingualBar = new BilingualBar();
+
+/** Analysis kind for the next inline explain request (set per toolbar action). */
+let currentExplainKind: ExplainKind = 'word';
+
+/** Build an explain request and send it to the background worker. */
+async function runExplainRequest(request: ExplainRequest): Promise<Explanation> {
+  return sendMessage({ type: 'explain', payload: { ...request, kind: currentExplainKind } });
+}
 
 /** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
 let currentSettings: import('@/shared/types/settings').Settings | null = null;
@@ -168,41 +178,74 @@ async function handleToolbarAction(
     }
     case 'save': {
       toolbar.hide();
+      if (state) await saveSelectionState(state);
+      else showToast('No selection to save.', 'error');
+      return;
+    }
+    case 'copy': {
       try {
-        const entry = await sendMessage({ type: 'save-current-selection' });
-        if (entry) {
-          showToast(`Saved "${entry.word}"`, 'success');
-        } else {
-          showToast('No selection to save.', 'error');
-        }
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Could not save that word.', 'error');
+        await navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard', 'success');
+      } catch {
+        showToast('Could not copy', 'error');
       }
+      toolbar.hide();
+      return;
+    }
+    case 'more': {
+      if (state) assistMenu.toggle(state, isAiAvailable());
       return;
     }
     case 'explain': {
-      // Real explain flow: ask the AI and show the result panel.
       toolbar.hide();
-      if (state) {
-        await runExplain('word', state);
-      } else {
-        showToast('Select a word first, then choose Explain.', 'error');
-      }
+      if (state) showInlineExplain(state, 'word');
       return;
     }
     case 'simplify': {
       toolbar.hide();
-      if (state) {
-        await runExplain('simplify', state);
-      } else {
-        showToast('Select a word first, then choose Simplify.', 'error');
-      }
+      if (state) showInlineExplain(state, 'simplify');
       return;
     }
     default:
       showToast(`${action}: ${text.slice(0, 24)}${text.length > 24 ? '…' : ''}`, 'success');
       toolbar.hide();
   }
+}
+
+/** Save using the selection captured when the toolbar opened (not the live,
+ * possibly-collapsed selection), so the button never silently no-ops. */
+async function saveSelectionState(state: ToolbarState): Promise<void> {
+  const payload = state.selection;
+  if (!payload || !payload.word.trim()) {
+    showToast('No selection to save.', 'error');
+    return;
+  }
+  try {
+    const entry = await sendMessage({ type: 'save-selection', payload });
+    if (entry) showToast(`Saved "${entry.word}"`, 'success');
+    else showToast('No selection to save.', 'error');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Could not save that word.', 'error');
+  }
+}
+
+/** Open the inline explain popover for the current selection + analysis kind. */
+function showInlineExplain(state: ToolbarState, kind: ExplainKind): void {
+  if (!isAiAvailable()) {
+    showToast('AI actions need an API key in settings', 'error');
+    return;
+  }
+  const input: ExplainPopoverInput = {
+    text: state.text,
+    unit: state.unit,
+    rect: state.rect,
+    context: state.sentence ?? '',
+    sourceUrl: state.sourceUrl ?? '',
+    sourceTitle: state.sourceTitle ?? '',
+  };
+  explainPopover.show(input);
+  // Pre-seed the kind so the background explains with the right analysis.
+  currentExplainKind = kind;
 }
 
 /**
@@ -218,25 +261,9 @@ async function handleAssistAction(action: SmartAssistActionId, state: ToolbarSta
   }
   const assistAction = SMART_ASSIST_ACTIONS.find((candidate) => candidate.id === action);
   if (!assistAction?.kind) return;
-  await runExplain(assistAction.kind, state);
+  showInlineExplain(state, assistAction.kind);
 }
 
-async function runExplain(kind: ExplainKind, state: ToolbarState): Promise<void> {
-  try {
-    // Consolidate into the popup as the single explain surface: hand the word
-    // off to the popup and open it, instead of a second floating panel.
-    await setPendingExplain({ word: state.text, context: state.sentence || undefined, kind });
-    if (typeof chrome.action?.openPopup === 'function') {
-      try {
-        await chrome.action.openPopup();
-      } catch {
-        /* popup may already be open; ignore */
-      }
-    }
-  } catch (cause) {
-    showToast(aiErrorMessage(cause), 'error');
-  }
-}
 
 async function saveDifficultWords(state: ToolbarState): Promise<void> {
   try {
