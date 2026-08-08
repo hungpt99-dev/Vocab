@@ -9,8 +9,6 @@ import { toExplainUnit } from './explain-popover';
 import {
   ICON_BOOKMARK,
   ICON_COPY,
-  ICON_MINIMIZE,
-  ICON_MORE,
   ICON_SPARKLES,
 } from './icons';
 
@@ -29,11 +27,9 @@ export interface CardState {
 }
 
 const CARD_ACTIONS = [
-  { id: 'explain', label: 'Explain with AI', icon: ICON_SPARKLES },
-  { id: 'simplify', label: 'Simplify', icon: ICON_MINIMIZE },
+  { id: 'generate', label: 'Generate with AI', icon: ICON_SPARKLES },
   { id: 'save', label: 'Save to Vocabulary', icon: ICON_BOOKMARK },
   { id: 'copy', label: 'Copy', icon: ICON_COPY },
-  { id: 'more', label: 'More', icon: ICON_MORE },
 ] as const;
 
 export type CardActionId = (typeof CARD_ACTIONS)[number]['id'];
