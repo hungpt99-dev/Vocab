@@ -46,6 +46,10 @@ beforeEach(async () => {
   deps = {
     vocabulary: new VocabularyRepository(db),
     settings,
+    review: {
+      ensureScheduled: vi.fn(async () => undefined),
+      remove: vi.fn(async () => undefined),
+    } as unknown as import('@/storage/review-repository').ReviewRepository,
     explain: Object.assign(new ExplainService(settings), {
       explain: vi.fn(async () => explanation),
       explainWith: vi.fn(async () => explanation),

@@ -16,12 +16,14 @@ import {
   VocabularyRepository,
   vocabularyRepository as defaultVocabularyRepository,
 } from '@/storage/vocabulary-repository';
+import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
 
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
   explain: ExplainService;
   translate: TranslateService;
+  review: ReviewRepository;
 }
 
 export const defaultDeps: BackgroundDeps = {
@@ -29,6 +31,7 @@ export const defaultDeps: BackgroundDeps = {
   settings: defaultSettingsRepository,
   explain: defaultExplainService,
   translate: defaultTranslationService,
+  review: defaultReviewRepository,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -43,29 +46,31 @@ export async function saveSelection(
   deps: BackgroundDeps,
   selection: SelectionPayload,
 ): Promise<VocabularyEntry> {
-  const entry = await deps.vocabulary.save({
+  const saved = await deps.vocabulary.save({
     word: selection.word,
     sentence: selection.sentence,
     sourceUrl: selection.sourceUrl,
     sourceTitle: selection.sourceTitle,
     sourceLanguage: selection.sourceLanguage,
   });
+  // Schedule the new word for spaced-repetition review (best-effort, never blocks save).
+  await deps.review.ensureScheduled(saved).catch(() => undefined);
 
   const settings = await deps.settings.get();
-  if (settings.autoExplainOnSave && !entry.explanation) {
+  if (settings.autoExplainOnSave && !saved.explanation) {
     try {
       const explanation = await deps.explain.explainWith(settings, {
-        word: entry.word,
-        context: entry.sentence,
+        word: saved.word,
+        context: saved.sentence,
         pageTitle: selection.sourceTitle,
         precedingText: selection.precedingText,
       });
-      return await deps.vocabulary.update(entry.id, { explanation });
+      return await deps.vocabulary.update(saved.id, { explanation });
     } catch {
       // Auto-explain is best-effort; the entry is already safely stored.
     }
   }
-  return entry;
+  return saved;
 }
 
 export async function buildHighlightData(deps: BackgroundDeps): Promise<HighlightData> {
