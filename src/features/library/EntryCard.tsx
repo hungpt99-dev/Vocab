@@ -6,6 +6,7 @@ import { Spinner } from '@/shared/ui/Spinner';
 import { TagInput } from '@/shared/ui/TagInput';
 import { TextField } from '@/shared/ui/TextField';
 import { Badge } from '@/shared/ui/Badge';
+import { PlusIcon } from '@/shared/ui/Icons';
 import { Dialog } from '@/shared/ui/Dialog';
 import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from './ExplanationView';
@@ -17,6 +18,7 @@ export interface EntryCardProps {
   onDelete: (id: string) => Promise<void>;
   onToggleFavorite: (id: string) => Promise<void>;
   onExplain: (entry: VocabularyEntry) => Promise<void>;
+  onQuickAdd?: (word: string) => void;
 }
 
 export function EntryCard({
@@ -26,6 +28,7 @@ export function EntryCard({
   onDelete,
   onToggleFavorite,
   onExplain,
+  onQuickAdd,
 }: EntryCardProps) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -115,6 +118,14 @@ export function EntryCard({
             </ul>
           )}
 
+          {entry.explanation && (entry.explanation.relatedPhrases?.length || entry.explanation.relatedWords?.length) && (
+            <RelatedChips
+              phrases={entry.explanation.relatedPhrases ?? []}
+              words={entry.explanation.relatedWords ?? []}
+              onAdd={onQuickAdd}
+            />
+          )}
+
           {entry.explanation ? (
             <div className="mt-2">
               <button
@@ -164,6 +175,44 @@ export function EntryCard({
           </Dialog>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Tappable chips for AI-suggested related vocabulary, surfacing the words the
+ * explanation already captured (relatedPhrases / relatedWords) as quick-save
+ * targets. Turning already-stored AI data into vocabulary discovery — no extra
+ * AI calls.
+ */
+function RelatedChips({
+  phrases,
+  words,
+  onAdd,
+}: {
+  phrases: readonly string[];
+  words: readonly string[];
+  onAdd?: (word: string) => void;
+}) {
+  const items = [...phrases, ...words].filter((item) => item.trim().length > 0).slice(0, 8);
+  if (items.length === 0 || !onAdd) return null;
+  return (
+    <div className="mt-2">
+      <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">Related vocabulary</p>
+      <ul className="flex flex-wrap gap-1">
+        {items.map((item) => (
+          <li key={item}>
+            <button
+              type="button"
+              onClick={() => onAdd(item.trim())}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-brand-300"
+            >
+              <PlusIcon size={12} aria-hidden="true" />
+              {item}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

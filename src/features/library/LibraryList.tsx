@@ -15,6 +15,7 @@ export interface LibraryListProps {
   onDelete: (id: string) => Promise<void>;
   onToggleFavorite: (id: string) => Promise<void>;
   onExplain: (entry: VocabularyEntry) => Promise<void>;
+  onQuickAdd?: (word: string) => void;
 }
 
 const VIEWPORT_HEIGHT = 320; // matches the `max-h-80` scroll area
@@ -115,6 +116,7 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
             onDelete={data.list.onDelete}
             onToggleFavorite={data.list.onToggleFavorite}
             onExplain={data.list.onExplain}
+            onQuickAdd={data.list.onQuickAdd}
           />
         </div>
       </li>

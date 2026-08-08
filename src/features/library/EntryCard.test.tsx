@@ -21,12 +21,13 @@ const entry: VocabularyEntry = {
   updatedAt: Date.UTC(2026, 0, 1),
 };
 
-function setup(overrides: Partial<VocabularyEntry> = {}, explaining = false) {
+function setup(overrides: Partial<VocabularyEntry> = {}, explaining = false, extra: { onQuickAdd?: (word: string) => void } = {}) {
   const handlers = {
     onUpdate: vi.fn(async () => undefined),
     onDelete: vi.fn(async () => undefined),
     onToggleFavorite: vi.fn(async () => undefined),
     onExplain: vi.fn(async () => undefined),
+    onQuickAdd: extra.onQuickAdd ?? vi.fn(),
   };
   render(<EntryCard entry={{ ...entry, ...overrides }} explaining={explaining} {...handlers} />);
   return handlers;
@@ -94,36 +95,35 @@ describe('EntryCard', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Asking your AI');
   });
 
-  it('collapses enrich data behind a dropdown by default, then expands on click', async () => {
+  it('renders related-phrase chips that quick-add on click', async () => {
     const user = userEvent.setup();
-    setup({
-      explanation: {
-        meaning: 'A fortunate accident.',
-        simpleExplanation: 'Good luck finding things.',
-        translation: '',
-        examples: ['What serendipity!'],
-        synonyms: ['luck'],
-        antonyms: [],
-        relatedWords: [],
-        pronunciation: '/x/',
-        collocations: ['pure serendipity'],
-        grammar: '',
-        provider: 'openai',
-        model: 'gpt-4o-mini',
-        generatedAt: 1,
+    const onQuickAdd = vi.fn();
+    setup(
+      {
+        explanation: {
+          meaning: 'A fortunate accident.',
+          simpleExplanation: 'Good luck finding things.',
+          translation: '',
+          examples: [],
+          synonyms: [],
+          antonyms: [],
+          relatedWords: ['fortune'],
+          pronunciation: '',
+          collocations: [],
+          grammar: '',
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          generatedAt: 1,
+          relatedPhrases: ['happy accident'],
+        },
       },
-    });
+      false,
+      { onQuickAdd },
+    );
 
-    // Collapsed: meaning is hidden until the dropdown is opened.
-    expect(screen.queryByText('A fortunate accident.')).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: /show enrich data/i });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('A fortunate accident.')).toBeInTheDocument();
-    expect(screen.getByText('What serendipity!')).toBeInTheDocument();
-    expect(screen.getByText('luck')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Refresh explanation' })).toBeInTheDocument();
+    expect(screen.getByText('Related vocabulary')).toBeInTheDocument();
+    const chip = screen.getByRole('button', { name: /happy accident/ });
+    await user.click(chip);
+    expect(onQuickAdd).toHaveBeenCalledWith('happy accident');
   });
 });
