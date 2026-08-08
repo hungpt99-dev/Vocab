@@ -118,7 +118,7 @@ describe('SelectionToolbar', () => {
     const element = document.getElementById('avs-toolbar')!;
     expect(element.hidden).toBe(false);
     expect(element.getAttribute('role')).toBe('toolbar');
-    expect(element.querySelectorAll('.avs-toolbar-btn')).toHaveLength(4);
+    expect(element.querySelectorAll('.avs-toolbar-btn')).toHaveLength(5);
 
     const handler = vi.fn();
     document.addEventListener('avs-toolbar-action', handler);
@@ -201,31 +201,31 @@ describe('SelectionToolbar keyboard navigation', () => {
     );
   };
 
-  it('exposes a single tab stop (roving tabindex) and a horizontal toolbar', () => {
+  it('exposes a single tab stop (roving tabindex) and a vertical toolbar', () => {
     const { toolbarUi, buttons } = showToolbar();
     const toolbar = document.getElementById('avs-toolbar')!;
-    expect(toolbar.getAttribute('aria-orientation')).toBe('horizontal');
+    expect(toolbar.getAttribute('aria-orientation')).toBe('vertical');
     expect(buttons.filter((button) => button.tabIndex === 0)).toHaveLength(1);
     expect(buttons[0]!.tabIndex).toBe(0);
     toolbarUi.destroy();
   });
 
-  it('moves focus right on ArrowRight, wrapping to the first action', () => {
+  it('moves focus down on ArrowDown, wrapping to the first action', () => {
     const { toolbarUi, buttons } = showToolbar();
     const last = buttons[buttons.length - 1]!;
     last.focus();
-    press(last, 'ArrowRight');
+    press(last, 'ArrowDown');
     expect(document.activeElement).toBe(buttons[0]);
     expect(buttons[0]!.tabIndex).toBe(0);
     expect(last.tabIndex).toBe(-1);
     toolbarUi.destroy();
   });
 
-  it('moves focus left on ArrowLeft, wrapping to the last action', () => {
+  it('moves focus up on ArrowUp, wrapping to the last action', () => {
     const { toolbarUi, buttons } = showToolbar();
     const first = buttons[0]!;
     first.focus();
-    press(first, 'ArrowLeft');
+    press(first, 'ArrowUp');
     expect(document.activeElement).toBe(buttons[buttons.length - 1]);
     expect(buttons[buttons.length - 1]!.tabIndex).toBe(0);
     toolbarUi.destroy();
@@ -275,7 +275,7 @@ describe('SmartAssistMenu', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const menu = new SmartAssistMenu();
     const state = makeState('A difficult sentence.', 'sentence');
-    menu.toggle(state);
+    menu.toggle(state, true);
 
     const element = document.getElementById('avs-assist-menu')!;
     expect(element.hidden).toBe(false);
@@ -296,9 +296,9 @@ describe('SmartAssistMenu', () => {
   it('toggles off when reopened with the same text', () => {
     document.body.innerHTML = '<p>hello</p>';
     const menu = new SmartAssistMenu();
-    menu.toggle(makeState('hello'));
+    menu.toggle(makeState('hello'), true);
     expect(menu.isVisible).toBe(true);
-    menu.toggle(makeState('hello'));
+    menu.toggle(makeState('hello'), true);
     expect(menu.isVisible).toBe(false);
     menu.destroy();
   });
@@ -306,12 +306,31 @@ describe('SmartAssistMenu', () => {
   it('hides on Escape and returns focus to the more button', () => {
     document.body.innerHTML = '<button data-action="more">more</button>';
     const menu = new SmartAssistMenu();
-    menu.toggle(makeState('hello'));
+    menu.toggle(makeState('hello'), true);
 
     const element = document.getElementById('avs-assist-menu')!;
     element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     expect(menu.isVisible).toBe(false);
+    menu.destroy();
+  });
+
+  it('greys out AI actions when no AI key is available', () => {
+    document.body.innerHTML = '<p>hello</p>';
+    const menu = new SmartAssistMenu();
+    menu.toggle(makeState('hello'), false);
+
+    const element = document.getElementById('avs-assist-menu')!;
+    const aiItems = ['explain-sentence', 'simplify', 'native'].map(
+      (id) => element.querySelector<HTMLButtonElement>(`[data-action="${id}"]`)!,
+    );
+    for (const item of aiItems) {
+      expect(item.disabled).toBe(true);
+      expect(item.classList.contains('avs-assist-item--disabled')).toBe(true);
+    }
+    // Non-AI repository action stays enabled.
+    const saveDifficult = element.querySelector<HTMLButtonElement>('[data-action="save-difficult-words"]')!;
+    expect(saveDifficult.disabled).toBe(false);
     menu.destroy();
   });
 });

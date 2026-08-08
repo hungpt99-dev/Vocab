@@ -149,6 +149,32 @@ export function injectStyles(doc: Document = document): void {
       font: ${typography.overlayCompact} ${typography.systemStack};
     }
     .avs-toolbar[hidden] { display: none; }
+    .avs-toolbar-header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: ${spacing.xs} ${spacing.xs} ${spacing.xs} 0;
+      margin-right: ${spacing.xs};
+      border-right: 1px solid var(--avs-overlay-divider);
+      min-width: 0;
+    }
+    .avs-toolbar-word {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--avs-overlay-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+    .avs-toolbar-translation {
+      font-size: 12px;
+      color: var(--avs-overlay-accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
     .avs-toolbar-btn {
       display: inline-flex;
       align-items: center;
@@ -242,6 +268,14 @@ export function injectStyles(doc: Document = document): void {
     .avs-assist-item:focus-visible {
       background: ${color.overlaySurfaceAlt};
       outline: none;
+    }
+    .avs-assist-item--disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .avs-assist-item--disabled:hover,
+    .avs-assist-item--disabled:focus-visible {
+      background: transparent;
     }
     .avs-assist-icon {
       display: inline-flex;
