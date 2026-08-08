@@ -149,6 +149,59 @@ export function injectStyles(doc: Document = document): void {
       font: ${typography.overlayCompact} ${typography.systemStack};
     }
     .avs-toolbar[hidden] { display: none; }
+    .avs-toolbar--expanded {
+      flex-direction: column;
+      align-items: stretch;
+      max-width: 320px;
+    }
+    .avs-toolbar--expanded .avs-toolbar-header { border-right: 0; margin-right: 0; padding-right: 0; }
+    .avs-toolbar-body {
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.xs};
+      margin-top: ${spacing.xs};
+      padding-top: ${spacing.sm};
+      border-top: 1px solid var(--avs-overlay-divider);
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .avs-toolbar-status {
+      font-size: 12px;
+      color: var(--avs-overlay-muted);
+      margin: 0;
+    }
+    .avs-toolbar-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .avs-toolbar-field-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--avs-overlay-muted);
+    }
+    .avs-toolbar-field-value {
+      font-size: 13px;
+      color: var(--avs-overlay-text);
+    }
+    .avs-toolbar-list {
+      margin: 0;
+      padding-left: ${spacing.md};
+      font-size: 13px;
+      color: var(--avs-overlay-text);
+    }
+    .avs-toolbar-explain-settings {
+      align-self: flex-start;
+      margin-top: ${spacing.xs};
+      padding: ${spacing.xs} ${spacing.sm};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface-alt);
+      color: var(--avs-overlay-text);
+      cursor: pointer;
+      font-size: 12px;
+    }
     .avs-toolbar-header {
       display: flex;
       flex-direction: column;

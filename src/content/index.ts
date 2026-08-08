@@ -7,9 +7,6 @@ import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
-import { ExplainPopover, type ExplainPopoverInput } from './explain-popover';
-import type { ExplainRequest } from '@/shared/types/explain';
-import type { Explanation } from '@/shared/types/vocabulary';
 import {
   SMART_ASSIST_ACTIONS,
   SelectionToolbar,
@@ -30,17 +27,8 @@ const RESCAN_DELAY_MS = 400;
 const hoverCard = new HoverCard();
 const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
-const explainPopover = new ExplainPopover(runExplainRequest);
 const reader = new InlineReader();
 const bilingualBar = new BilingualBar();
-
-/** Analysis kind for the next inline explain request (set per toolbar action). */
-let currentExplainKind: ExplainKind = 'word';
-
-/** Build an explain request and send it to the background worker. */
-async function runExplainRequest(request: ExplainRequest): Promise<Explanation> {
-  return sendMessage({ type: 'explain', payload: { ...request, kind: currentExplainKind } });
-}
 
 /** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
 let currentSettings: import('@/shared/types/settings').Settings | null = null;
@@ -229,23 +217,13 @@ async function saveSelectionState(state: ToolbarState): Promise<void> {
   }
 }
 
-/** Open the inline explain popover for the current selection + analysis kind. */
+/** Open the inline explain inside the floating toolbar for the current selection + analysis kind. */
 function showInlineExplain(state: ToolbarState, kind: ExplainKind): void {
   if (!isAiAvailable()) {
     showToast('AI actions need an API key in settings', 'error');
     return;
   }
-  const input: ExplainPopoverInput = {
-    text: state.text,
-    unit: state.unit,
-    rect: state.rect,
-    context: state.sentence ?? '',
-    sourceUrl: state.sourceUrl ?? '',
-    sourceTitle: state.sourceTitle ?? '',
-  };
-  explainPopover.show(input);
-  // Pre-seed the kind so the background explains with the right analysis.
-  currentExplainKind = kind;
+  void toolbar.showExplainInline(state, kind);
 }
 
 /**
