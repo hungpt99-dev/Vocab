@@ -6,6 +6,7 @@ import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { takePendingExplain } from '@/content/pending-explain';
+import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
@@ -15,6 +16,7 @@ import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { StatsRow } from '@/shared/ui/StatsRow';
+import { OnboardingCoachmark } from '@/shared/ui/OnboardingCoachmark';
 import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
 import { TranslatePanel } from '@/features/capture/TranslatePanel';
@@ -38,6 +40,11 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   // form. Either way it can be enriched inline before saving.
   const [word, setWord] = useState('');
   const { notify } = useToast();
+  const [onboarded, setOnboarded] = useState(true);
+
+  useEffect(() => {
+    void isOnboarded().then((value) => setOnboarded(value));
+  }, []);
 
   const debouncedSearch = useDebouncedValue(filters.search, 250);
   const query = useMemo(
@@ -244,15 +251,18 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
       {loading ? (
         <SkeletonList rows={4} />
       ) : entries.length === 0 ? (
-        <EmptyState
-          icon={<BookIcon size={20} />}
-          title={isFiltered ? 'No matches' : 'No words yet'}
-          description={
-            isFiltered
-              ? 'Try a different search term or clear your filters.'
-              : 'Select text on any page and use the context menu, Ctrl+Shift+S, or the form above.'
-          }
-        />
+        <>
+          {!isFiltered && !onboarded && <OnboardingCoachmark />}
+          <EmptyState
+            icon={<BookIcon size={20} />}
+            title={isFiltered ? 'No matches' : 'No words yet'}
+            description={
+              isFiltered
+                ? 'Try a different search term or clear your filters.'
+                : 'Highlight any word on a page, then open this popup to save it or get an AI explanation. Your vocabulary builds as you read.'
+            }
+          />
+        </>
       ) : (
         <LibraryList
           entries={entries}
