@@ -31,6 +31,19 @@ const toolbar = new SelectionToolbar();
 const assistMenu = new SmartAssistMenu();
 const reader = new InlineReader();
 const bilingualBar = new BilingualBar();
+
+/** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
+let currentSettings: import('@/shared/types/settings').Settings | null = null;
+
+/** Whether an AI provider is usable right now (mirrors useAiAvailable in the popup). */
+function isAiAvailable(): boolean {
+  const settings = currentSettings;
+  if (!settings) return false;
+  const active = settings.providers.find((p) => p.id === settings.activeProviderId);
+  if (!active) return false;
+  const needsKey = !['ollama', 'lmstudio'].includes(active.type);
+  return needsKey ? (active.apiKey ?? '').trim().length > 0 : true;
+}
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
 let observer: MutationObserver | null = null;
@@ -150,7 +163,7 @@ async function handleToolbarAction(
       return;
     }
     case 'more': {
-      if (state) assistMenu.toggle(state);
+      if (state) assistMenu.toggle(state, isAiAvailable());
       return;
     }
     case 'save': {
@@ -174,6 +187,15 @@ async function handleToolbarAction(
         await runExplain('word', state);
       } else {
         showToast('Select a word first, then choose Explain.', 'error');
+      }
+      return;
+    }
+    case 'simplify': {
+      toolbar.hide();
+      if (state) {
+        await runExplain('simplify', state);
+      } else {
+        showToast('Select a word first, then choose Simplify.', 'error');
       }
       return;
     }
@@ -257,6 +279,13 @@ async function refresh(): Promise<void> {
   } catch {
     // The service worker is asleep or the extension was reloaded.
     return;
+  }
+
+  // Keep a settings snapshot for AI-key gating in the toolbar/assist menu.
+  try {
+    currentSettings = await settingsRepository.get();
+  } catch {
+    // Non-fatal: gating will assume no AI key until the next refresh.
   }
 
   // Bilingual (inline) reading is independent of word highlighting: sync it first
