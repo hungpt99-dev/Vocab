@@ -14,6 +14,7 @@ import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
+import { StatsRow } from '@/shared/ui/StatsRow';
 import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
 import { TranslatePanel } from '@/features/capture/TranslatePanel';
@@ -24,7 +25,7 @@ import type { Explanation } from '@/shared/types/vocabulary';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
 
-function LibraryScreen() {
+function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => void }) {
   const [selection, setSelection] = useState<SelectionPayload | null>(null);
   const [filters, setFilters] = useState<LibraryFilters>(EMPTY_FILTERS);
   const [saving, setSaving] = useState(false);
@@ -89,13 +90,14 @@ function LibraryScreen() {
         if (explanation) setEnrich(null);
         notify(`Saved “${word}”.`, 'success');
         await reload();
+        onVocabularyChanged?.();
       } catch (cause) {
         notify(cause instanceof Error ? cause.message : 'Could not save that word.', 'error');
       } finally {
         setSaving(false);
       }
     },
-    [reload, selection, notify, enrich],
+    [reload, selection, notify, enrich, onVocabularyChanged],
   );
 
   const enrichWord = selection?.word ?? word;
@@ -254,6 +256,17 @@ function LibraryScreen() {
 export function App() {
   const { settings, update } = useSettings();
   const [activating, setActivating] = useState(false);
+  const [stats, setStats] = useState<{ total: number; addedToday: number; streak: number } | null>(null);
+
+  const refreshStats = useCallback(() => {
+    void vocabularyRepository.stats().then(setStats).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    refreshStats();
+    window.addEventListener('focus', refreshStats);
+    return () => window.removeEventListener('focus', refreshStats);
+  }, [refreshStats]);
 
   const toggleBilingual = useCallback(
     async (next: boolean) => {
@@ -287,6 +300,10 @@ export function App() {
           </Button>
         </header>
 
+        {stats && (
+          <StatsRow total={stats.total} addedToday={stats.addedToday} streak={stats.streak} />
+        )}
+
         {/* Bilingual reading card — top of the dashboard */}
         <section
           aria-labelledby="bilingual-card-heading"
@@ -311,7 +328,7 @@ export function App() {
           </p>
         </section>
 
-        <LibraryScreen />
+        <LibraryScreen onVocabularyChanged={refreshStats} />
       </div>
     </ToastProvider>
   );

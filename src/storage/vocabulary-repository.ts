@@ -149,6 +149,45 @@ export class VocabularyRepository {
     return [...new Set(entries.flatMap((entry) => entry.tags))].sort();
   }
 
+  /**
+   * Lightweight progress snapshot for the popup: total saved words, words added
+   * today (local time), and a daily-save streak. The streak counts consecutive
+   * calendar days (ending today or yesterday) that each had at least one save.
+   */
+  async stats(): Promise<{ total: number; addedToday: number; streak: number }> {
+    const entries = await this.db.vocabulary.toArray();
+    const total = entries.length;
+    if (total === 0) return { total: 0, addedToday: 0, streak: 0 };
+
+    const dayKey = (ts: number): string => {
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    };
+    const todayKey = dayKey(Date.now());
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = dayKey(yesterday.getTime());
+
+    const daysWithSaves = new Set(entries.map((entry) => dayKey(entry.createdAt)));
+    const addedToday = entries.filter((entry) => dayKey(entry.createdAt) === todayKey).length;
+
+    // Walk backwards from today (or yesterday) counting consecutive active days.
+    let streak = 0;
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    // If nothing was saved today, the streak still counts if yesterday was active.
+    if (!daysWithSaves.has(todayKey)) cursor.setDate(cursor.getDate() - 1);
+    while (daysWithSaves.has(dayKey(cursor.getTime()))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    // A streak that has no save today and none yesterday has effectively lapsed.
+    if (streak > 0 && !daysWithSaves.has(todayKey) && !daysWithSaves.has(yesterdayKey)) {
+      streak = 0;
+    }
+    return { total, addedToday, streak };
+  }
+
   /** Every stored word key — used by the content script to build its matcher. */
   async listWordKeys(): Promise<string[]> {
     const entries = await this.db.vocabulary.toArray();
