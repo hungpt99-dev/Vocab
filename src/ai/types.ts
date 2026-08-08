@@ -42,6 +42,8 @@ export interface TranslationResult {
   id: string;
   text: string;
   translation: string;
+  /** Optional timing breakdown, attached for bilingual debug logging. */
+  perf?: BilingualPerf;
 }
 
 /** A single source→target word alignment produced by the word-align mode. */
@@ -58,6 +60,22 @@ export interface WordAlignResult {
   pairs: WordPair[];
   /** Full-sentence translation, used as a fallback when pairs are missing. */
   translation: string;
+  /** Optional timing breakdown, attached for bilingual debug logging. */
+  perf?: BilingualPerf;
+}
+
+/** Per-request timing breakdown for the bilingual pipeline (debug only). */
+export interface BilingualPerf {
+  /** Wall-clock service-worker time for the whole request, ms. */
+  totalMs: number;
+  /** Time spent waiting on the rate limiter queue, ms. */
+  rateLimitWaitMs: number;
+  /** Time spent in the provider call(s), ms. */
+  providerMs: number;
+  /** Number of chunks the paragraphs were split into. */
+  chunks: number;
+  /** Number of chunks served from the in-memory cache. */
+  cacheHits: number;
 }
 
 export type TranslateResultList = TranslationResult[];

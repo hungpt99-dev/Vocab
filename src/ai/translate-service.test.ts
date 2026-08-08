@@ -48,7 +48,7 @@ describe('TranslateService', () => {
     expect((init.headers as Record<string, string>)['x-api-key']).toBe('key-123');
     const body = JSON.parse(init.body as string);
     expect(body.messages[0].content).toContain('Hello');
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { id: 'a', text: 'Hello', translation: 'T1' },
       { id: 'b', text: 'World', translation: 'T2' },
     ]);
@@ -158,7 +158,7 @@ describe('TranslateService', () => {
     expect((fetchMock.mock.calls[0]![1]!.headers as Record<string, string>)['Authorization']).toBe('Bearer sk-test');
     // The keyless endpoint must NOT have been used.
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes('translate.googleapis.com'))).toBe(false);
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { id: 'a', text: 'Hello', translation: 'T1' },
       { id: 'b', text: 'World', translation: 'T2' },
     ]);
@@ -190,10 +190,10 @@ describe('TranslateService', () => {
     // Each chunk is translated independently, so the mock yields T1..T16 then T1..T4.
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result).toHaveLength(20);
-    expect(result[0]).toEqual({ id: 'p0', text: 'Para 0', translation: 'T1' });
-    expect(result[15]).toEqual({ id: 'p15', text: 'Para 15', translation: 'T16' });
-    expect(result[16]).toEqual({ id: 'p16', text: 'Para 16', translation: 'T1' });
-    expect(result[19]).toEqual({ id: 'p19', text: 'Para 19', translation: 'T4' });
+    expect(result[0]).toMatchObject({ id: 'p0', text: 'Para 0', translation: 'T1' });
+    expect(result[15]).toMatchObject({ id: 'p15', text: 'Para 15', translation: 'T16' });
+    expect(result[16]).toMatchObject({ id: 'p16', text: 'Para 16', translation: 'T1' });
+    expect(result[19]).toMatchObject({ id: 'p19', text: 'Para 19', translation: 'T4' });
   });
 
   it('serves repeated requests from the cache', async () => {
@@ -219,5 +219,39 @@ describe('TranslateService', () => {
     await service.translate([{ id: 'a', text: 'Hello' }], 'Spanish');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches a BilingualPerf breakdown to the first result for debug logging', async () => {
+    const settings = new SettingsRepository();
+    await settings.update({
+      providers: [
+        { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'sk-test', baseUrl: '', model: '', enabled: true },
+      ],
+      activeProviderId: 'p1',
+    });
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: translationPayload(init?.body as string) } }] }),
+      text: async () => '',
+    } as unknown as Response));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new TranslateService(settings).translate(
+      [
+        { id: 'a', text: 'Hello' },
+        { id: 'b', text: 'World' },
+      ],
+      'Spanish',
+    );
+
+    expect(result[0]?.perf).toBeDefined();
+    expect(result[0]?.perf).toMatchObject({
+      chunks: 1,
+      cacheHits: 0,
+      rateLimitWaitMs: expect.any(Number),
+      providerMs: expect.any(Number),
+      totalMs: expect.any(Number),
+    });
   });
 });
