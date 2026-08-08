@@ -102,6 +102,103 @@ export function injectStyles(doc: Document = document): void {
       pointer-events: auto;
     }
     .avs-card-explain:hover { background: ${color.overlaySurface}; }
+    .avs-selection-card {
+      pointer-events: auto;
+      width: var(${CARD_WIDTH_VAR}, 320px);
+      max-width: calc(100vw - ${spacing.md} * 2);
+      max-height: min(420px, 80vh);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .avs-selection-card[hidden] { display: none; }
+    .avs-selection-card-header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: ${spacing.md} ${spacing.lg};
+      border-bottom: 1px solid var(--avs-overlay-divider);
+    }
+    .avs-selection-card-word {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-selection-card-translation {
+      font-size: 14px;
+      color: var(--avs-overlay-accent);
+    }
+    .avs-selection-card-actions {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.xs};
+      padding: ${spacing.sm} ${spacing.lg};
+      border-bottom: 1px solid var(--avs-overlay-divider);
+    }
+    .avs-selection-card-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 0;
+      border-radius: ${radius.sm};
+      background: transparent;
+      color: var(--avs-overlay-text);
+      cursor: pointer;
+    }
+    .avs-selection-card-btn:hover { background: var(--avs-overlay-surface-alt); }
+    .avs-selection-card-btn:active { background: var(--avs-overlay-surface-active); }
+    .avs-selection-card-btn:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 1px; }
+    .avs-selection-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.xs};
+      padding: ${spacing.md} ${spacing.lg};
+      overflow-y: auto;
+    }
+    .avs-selection-card-status {
+      font-size: 13px;
+      color: var(--avs-overlay-muted);
+      margin: 0;
+    }
+    .avs-selection-card-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .avs-selection-card-field-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--avs-overlay-muted);
+    }
+    .avs-selection-card-field-value {
+      font-size: 14px;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-selection-card-list {
+      margin: 0;
+      padding-left: ${spacing.md};
+      font-size: 14px;
+      color: var(--avs-overlay-text);
+    }
+    .avs-selection-card-settings {
+      align-self: flex-start;
+      margin-top: ${spacing.xs};
+      padding: ${spacing.xs} ${spacing.sm};
+      border: 0;
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface-alt);
+      color: var(--avs-overlay-text);
+      cursor: pointer;
+      font-size: 12px;
+    }
     .avs-card-explain:focus-visible {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;

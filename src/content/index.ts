@@ -9,14 +9,13 @@ import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import {
   SMART_ASSIST_ACTIONS,
-  SelectionToolbar,
   SmartAssistMenu,
   readToolbarSelection,
   type SmartAssistActionId,
-  type ToolbarActionId,
   type ToolbarAnyActionId,
   type ToolbarState,
 } from './toolbar';
+import { SelectionCard } from './selection-card';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
@@ -25,7 +24,7 @@ import { BilingualBar } from './bilingual-bar';
 const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
-const toolbar = new SelectionToolbar();
+const toolbar = new SelectionCard();
 const assistMenu = new SmartAssistMenu();
 const reader = new InlineReader();
 const bilingualBar = new BilingualBar();
@@ -125,7 +124,7 @@ function attachSelectionToolbar(): void {
   });
 
   document.addEventListener('avs-toolbar-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: ToolbarActionId; text: string; state?: ToolbarState }>).detail;
+    const detail = (event as CustomEvent<{ action: ToolbarAnyActionId; text: string; state?: ToolbarState }>).detail;
     void handleToolbarAction(detail.action, detail.text, detail.state);
   }) as EventListener);
 
@@ -140,7 +139,7 @@ function toolbarElementContains(node: Node): boolean {
 }
 
 function toolbarElement(): HTMLElement | null {
-  return document.getElementById('avs-toolbar');
+  return document.getElementById('avs-selection-card');
 }
 
 /** Route a toolbar action to the existing message bus / handlers. */
@@ -223,7 +222,7 @@ function showInlineExplain(state: ToolbarState, kind: ExplainKind): void {
     showToast('AI actions need an API key in settings', 'error');
     return;
   }
-  void toolbar.showExplainInline(state, kind);
+  void toolbar.showExplain(state, kind);
 }
 
 /**
