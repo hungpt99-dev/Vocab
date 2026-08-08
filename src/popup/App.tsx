@@ -6,6 +6,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
+import { reviewRepository } from '@/storage/review-repository';
 import { takePendingExplain } from '@/content/pending-explain';
 import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
@@ -23,6 +24,7 @@ import { SaveForm } from '@/features/capture/SaveForm';
 import { TranslatePanel } from '@/features/capture/TranslatePanel';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
+import { ReviewScreen } from '@/features/review/ReviewScreen';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import type { Explanation } from '@/shared/types/vocabulary';
 
@@ -53,9 +55,12 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const { notify } = useToast();
   const [onboarded, setOnboarded] = useState(true);
   const { settings } = useSettings();
+  const [tab, setTab] = useState<'library' | 'review'>('library');
+  const [dueCount, setDueCount] = useState(0);
 
   useEffect(() => {
     void isOnboarded().then((value) => setOnboarded(value));
+    void reviewRepository.dueCount().then(setDueCount);
   }, []);
 
   const debouncedSearch = useDebouncedValue(filters.search, 250);
@@ -71,6 +76,14 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   );
 
   const { entries, tags, loading, error, reload, update, remove, toggleFavorite } = useVocabulary(query);
+
+  const handleRemove = useCallback(
+    async (id: string) => {
+      await remove(id);
+      await reviewRepository.remove(id).catch(() => undefined);
+    },
+    [remove],
+  );
 
   useEffect(() => {
     const readSelection = (): void => {
@@ -356,47 +369,83 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         </p>
       )}
 
-      <LibraryToolbar filters={filters} tags={tags} count={entries.length} onChange={setFilters} />
+      <div className="flex items-center gap-1 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setTab('library')}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+            tab === 'library'
+              ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          Library
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('review')}
+          className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
+            tab === 'review'
+              ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          Review
+          {dueCount > 0 && (
+            <span className="rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold text-white">
+              {dueCount}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {loading ? (
-        <SkeletonList rows={4} />
-      ) : entries.length === 0 ? (
+      {tab === 'review' ? (
+        <ReviewScreen />
+      ) : (
         <>
-          {!isFiltered && !onboarded && (
-            <OnboardingCoachmark
-              onStartSaving={() => {
-                requestAnimationFrame(() => {
-                  document
-                    .querySelector<HTMLInputElement>(
-                      'input[placeholder="Select text on the page, or type it here"]',
-                    )
-                    ?.focus();
-                });
-              }}
+          <LibraryToolbar filters={filters} tags={tags} count={entries.length} onChange={setFilters} />
+
+          {loading ? (
+            <SkeletonList rows={4} />
+          ) : entries.length === 0 ? (
+            <>
+              {!isFiltered && !onboarded && (
+                <OnboardingCoachmark
+                  onStartSaving={() => {
+                    requestAnimationFrame(() => {
+                      document
+                        .querySelector<HTMLInputElement>(
+                          'input[placeholder="Select text on the page, or type it here"]',
+                        )
+                        ?.focus();
+                    });
+                  }}
+                />
+              )}
+              <EmptyState
+                icon={<BookIcon size={20} />}
+                title={isFiltered ? 'No matches' : 'No words yet'}
+                description={
+                  isFiltered
+                    ? 'Try a different search term or clear your filters.'
+                    : 'Highlight any word on a page, then open this popup to save it or get an AI explanation. Your vocabulary builds as you read.'
+                }
+              />
+            </>
+          ) : (
+            <LibraryList
+              entries={entries}
+              loading={loading}
+              explainingId={explainingId}
+              filtered={isFiltered}
+              onUpdate={update}
+              onDelete={handleRemove}
+              onToggleFavorite={toggleFavorite}
+              onExplain={handleExplain}
+              onQuickAdd={handleQuickAdd}
             />
           )}
-          <EmptyState
-            icon={<BookIcon size={20} />}
-            title={isFiltered ? 'No matches' : 'No words yet'}
-            description={
-              isFiltered
-                ? 'Try a different search term or clear your filters.'
-                : 'Highlight any word on a page, then open this popup to save it or get an AI explanation. Your vocabulary builds as you read.'
-            }
-          />
         </>
-      ) : (
-        <LibraryList
-          entries={entries}
-          loading={loading}
-          explainingId={explainingId}
-          filtered={isFiltered}
-          onUpdate={update}
-          onDelete={remove}
-          onToggleFavorite={toggleFavorite}
-          onExplain={handleExplain}
-          onQuickAdd={handleQuickAdd}
-        />
       )}
     </>
   );
