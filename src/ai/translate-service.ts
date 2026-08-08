@@ -1,15 +1,11 @@
-import type { Settings, SavedProvider } from '@/shared/types/settings';
+import type { TranslationParagraph, TranslationResult, WordAlignResult, BilingualPerf } from './types';
+import type { Settings } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
-import { getProvider } from './registry';
 import { googleTranslate } from './google-translate';
-import { runActiveWithFallback } from './run-with-fallback';
-import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult, BilingualPerf } from './types';
-import { AiError } from './types';
-import { withRetry, type RetryOptions } from './retry';
-import { translationRateLimiter } from './rate-limiter';
 import { bilingualLog } from '@/shared/lib/bilingual-log';
 
-const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
+/** Stable cache key for bilingual translations, which always use keyless Google. */
+const GOOGLE_CACHE_PROVIDER = 'google-keyless';
 
 /** Keep each provider request small enough to stay inside a model context. */
 const CHUNK_SIZE = 16;
@@ -74,52 +70,27 @@ export class TranslateService {
 
   /** Translate using an explicit settings object (used by tests). */
   async translateWith(
-    settings: Settings,
+    _settings: Settings,
     paragraphs: readonly TranslationParagraph[],
     language: string,
     signal?: AbortSignal,
   ): Promise<TranslationResult[]> {
-    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
-    if (!active) {
-      throw new AiError('unknown_provider', 'No active AI provider is configured.');
-    }
-    // Keyless fallback: if the active provider needs an API key but has none, the
-    // configured AI path cannot run. Rather than leave the page silently
-    // monolingual, fall back to the no-key translation endpoint so bilingual
-    // reading works out of the box. A configured provider (with a key, or a local
-    // one like Ollama/LM Studio that needs no key) always takes precedence.
-    const adapter = getProvider(active.type);
-    if (adapter.requiresApiKey && !active.apiKey) {
-      // Keyless fallback: reuse the same per-chunk cache as the AI path so a
-      // re-render of the same text does not re-hit the network.
-      const out: TranslationResult[] = [];
-      for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
-        const chunk = paragraphs.slice(start, start + CHUNK_SIZE);
-        const cached = this.readCache(active, chunk, language);
-        const translations =
-          cached ?? (await googleTranslate.translate(chunk.map((p) => p.text), language));
-        if (!cached) this.writeCache(active, chunk, language, translations);
-        chunk.forEach((paragraph, index) => {
-          out.push({ id: paragraph.id, text: paragraph.text, translation: translations[index] ?? '' });
-        });
-      }
-      return out;
-    }
-    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
-
+    // Bilingual reading never uses the AI provider — it is keyless Google
+    // Translate so it works out of the box and stays independent of the user's
+    // AI key (which is reserved for Explain / enrich). See VOC-101.
+    const perf = this.makePerfCollector(Math.ceil(paragraphs.length / CHUNK_SIZE) || 1);
     const chunks: TranslationParagraph[][] = [];
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
       chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
-    const perf = this.makePerfCollector(chunks.length);
     const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
-      this.translateChunk(active, fallback, chunk, language, signal, perf),
+      this.translateChunk(chunk, language, signal, perf),
     );
     const out = chunked.flat();
     perf.finish();
     perf.attach(out[0]);
     bilingualLog.sw(
-      `translate ${paragraphs.length} paragraphs → ${chunks.length} chunks`,
+      `translate ${paragraphs.length} paragraphs → ${chunks.length} chunks (google keyless)`,
       perf.summary(),
     );
     return out;
@@ -136,64 +107,41 @@ export class TranslateService {
   }
 
   async alignWith(
-    settings: Settings,
+    _settings: Settings,
     paragraphs: readonly TranslationParagraph[],
     language: string,
     signal?: AbortSignal,
   ): Promise<WordAlignResult[]> {
-    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
-    if (!active) {
-      throw new AiError('unknown_provider', 'No active AI provider is configured.');
-    }
-    // Keyless fallback (same rationale as translateWith): a provider that needs a
-    // key but has none cannot produce word alignments, so use the no-key endpoint,
-    // which returns both a faithful full-sentence translation and single-word
-    // glosses per token.
-    const alignAdapter = getProvider(active.type);
-    if (alignAdapter.requiresApiKey && !active.apiKey) {
-      // Keyless fallback: cache per chunk so repeated rendering is instant.
-      const out: WordAlignResult[] = [];
-      for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
-        const chunk = paragraphs.slice(start, start + CHUNK_SIZE).map((p) => ({ id: p.id, text: p.text }));
-        const cached = this.readAlignCache(active, chunk, language);
-        const results = cached ?? (await googleTranslate.align(chunk, language));
-        if (!cached) this.writeAlignCache(active, chunk, language, results);
-        out.push(...results);
-      }
-      return out;
-    }
-    const fallback = settings.providers.find((p) => p.id === settings.fallbackProviderId);
-
+    // Bilingual reading never uses the AI provider — keyless Google Translate.
+    // See VOC-101.
+    const perf = this.makePerfCollector(Math.ceil(paragraphs.length / CHUNK_SIZE) || 1);
     const chunks: TranslationParagraph[][] = [];
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
       chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
-    const perf = this.makePerfCollector(chunks.length);
     const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
-      this.alignChunk(active, fallback, chunk, language, signal, perf),
+      this.alignChunk(chunk, language, signal, perf),
     );
     const out = chunked.flat();
     perf.finish();
     perf.attach(out[0]);
     bilingualLog.sw(
-      `align ${paragraphs.length} paragraphs → ${chunks.length} chunks`,
+      `align ${paragraphs.length} paragraphs → ${chunks.length} chunks (google keyless)`,
       perf.summary(),
     );
     return out;
   }
 
   private async translateChunk(
-    active: SavedProvider,
-    fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal: AbortSignal | undefined,
+    _signal: AbortSignal | undefined,
     perf: PerfCollector,
   ): Promise<TranslationResult[]> {
-    const cached = this.readCache(active, chunk, language);
+    const cached = this.readCache(GOOGLE_CACHE_PROVIDER, chunk, language);
     if (cached) perf.markCacheHit();
-    const translations = cached ?? (await this.runChunk(active, fallback, chunk, language, signal, perf));
-    if (!cached) this.writeCache(active, chunk, language, translations);
+    const translations = cached ?? (await googleTranslate.translate(chunk.map((p) => p.text), language));
+    if (!cached) this.writeCache(GOOGLE_CACHE_PROVIDER, chunk, language, translations);
 
     return chunk.map((paragraph, index) => ({
       id: paragraph.id,
@@ -202,131 +150,39 @@ export class TranslateService {
     }));
   }
 
-  private async runChunk(
-    active: SavedProvider,
-    fallback: SavedProvider | undefined,
-    chunk: readonly TranslationParagraph[],
-    language: string,
-    signal: AbortSignal | undefined,
-    perf: PerfCollector,
-  ): Promise<string[]> {
-    const request: TranslateRequest = {
-      paragraphs: chunk.map(({ text }) => ({ text })),
-      language,
-    };
-    return runActiveWithFallback(
-      (provider) => this.runOnce(provider, request, signal, perf),
-      active,
-      fallback,
-      { kind: 'translate', language, paragraphs: chunk.map(({ text }) => text) },
-    );
-  }
-
   private async alignChunk(
-    active: SavedProvider,
-    fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal: AbortSignal | undefined,
+    _signal: AbortSignal | undefined,
     perf: PerfCollector,
   ): Promise<WordAlignResult[]> {
-    const cached = this.readAlignCache(active, chunk, language);
+    const cached = this.readAlignCache(GOOGLE_CACHE_PROVIDER, chunk, language);
     if (cached) perf.markCacheHit();
-    const results = cached ?? (await this.runAlignChunk(active, fallback, chunk, language, signal, perf));
-    if (!cached) this.writeAlignCache(active, chunk, language, results);
+    const results =
+      cached ??
+      (await googleTranslate.align(
+        chunk.map((p) => ({ id: p.id, text: p.text })),
+        language,
+      ));
+    if (!cached) this.writeAlignCache(GOOGLE_CACHE_PROVIDER, chunk, language, results);
     return results;
   }
 
-  private async runAlignChunk(
-    active: SavedProvider,
-    fallback: SavedProvider | undefined,
-    chunk: readonly TranslationParagraph[],
-    language: string,
-    signal: AbortSignal | undefined,
-    perf: PerfCollector,
-  ): Promise<WordAlignResult[]> {
-    const request: TranslateRequest = {
-      paragraphs: chunk.map(({ id, text }) => ({ id, text })),
-      language,
-    };
-    return runActiveWithFallback(
-      (provider) => this.runAlignOnce(provider, request, signal, perf),
-      active,
-      fallback,
-      { kind: 'align', language, pairs: chunk.map(({ id, text }) => ({ id, text })) },
-    );
-  }
-
-  private async runAlignOnce(
-    provider: SavedProvider,
-    request: TranslateRequest,
-    signal: AbortSignal | undefined,
-    perf: PerfCollector,
-  ): Promise<WordAlignResult[]> {
-    const adapter = getProvider(provider.type);
-    const waitStart = performance.now();
-    await translationRateLimiter.acquire(signal);
-    perf.addRateLimitWait(performance.now() - waitStart);
-    const callStart = performance.now();
-    const result = await withRetry(
-      () => adapter.align(request, {
-        apiKey: provider.apiKey,
-        model: provider.model,
-        baseUrl: provider.baseUrl,
-        temperature: provider.temperature,
-        maxTokens: provider.maxTokens,
-        signal,
-        timeoutMs: provider.timeoutMs,
-      }),
-      { ...RETRY_OPTIONS, signal },
-    );
-    perf.addProviderMs(performance.now() - callStart);
-    return result;
-  }
-
-  private async runOnce(
-    provider: SavedProvider,
-    request: TranslateRequest,
-    signal: AbortSignal | undefined,
-    perf: PerfCollector,
-  ): Promise<string[]> {
-    const adapter = getProvider(provider.type);
-    const waitStart = performance.now();
-    await translationRateLimiter.acquire(signal);
-    perf.addRateLimitWait(performance.now() - waitStart);
-    const callStart = performance.now();
-    const result = await withRetry(
-      () =>
-        adapter.translate(request, {
-          apiKey: provider.apiKey,
-          model: provider.model,
-          baseUrl: provider.baseUrl,
-          temperature: provider.temperature,
-          maxTokens: provider.maxTokens,
-          signal,
-          timeoutMs: provider.timeoutMs,
-        }),
-      { ...RETRY_OPTIONS, signal },
-    );
-    perf.addProviderMs(performance.now() - callStart);
-    return result.paragraphs.map(({ translation }) => translation);
-  }
-
   private cacheKey(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
   ): string {
     const body = paragraphs.map(({ text }) => text).join('␞');
-    return `${provider.type}|${provider.model}|${language}|${body}`;
+    return `${providerKey}|${language}|${body}`;
   }
 
   private readCache(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
   ): string[] | null {
-    const key = this.cacheKey(provider, paragraphs, language);
+    const key = this.cacheKey(providerKey, paragraphs, language);
     const entry = this.cache.get(key);
     if (entry && entry.expiresAt > Date.now()) return entry.translations;
     this.cache.delete(key);
@@ -334,32 +190,32 @@ export class TranslateService {
   }
 
   private writeCache(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
     translations: readonly string[],
   ): void {
-    this.cache.set(this.cacheKey(provider, paragraphs, language), {
+    this.cache.set(this.cacheKey(providerKey, paragraphs, language), {
       translations: [...translations],
       expiresAt: Date.now() + this.cacheTtlMs,
     });
   }
 
   private alignCacheKey(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
   ): string {
     const body = paragraphs.map(({ text }) => text).join('␞');
-    return `align|${provider.type}|${provider.model}|${language}|${body}`;
+    return `align|${providerKey}|${language}|${body}`;
   }
 
   private readAlignCache(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
   ): WordAlignResult[] | null {
-    const key = this.alignCacheKey(provider, paragraphs, language);
+    const key = this.alignCacheKey(providerKey, paragraphs, language);
     const entry = this.alignCache.get(key);
     if (entry && entry.expiresAt > Date.now()) return entry.results;
     this.alignCache.delete(key);
@@ -367,12 +223,12 @@ export class TranslateService {
   }
 
   private writeAlignCache(
-    provider: SavedProvider,
+    providerKey: string,
     paragraphs: readonly TranslationParagraph[],
     language: string,
     results: readonly WordAlignResult[],
   ): void {
-    this.alignCache.set(this.alignCacheKey(provider, paragraphs, language), {
+    this.alignCache.set(this.alignCacheKey(providerKey, paragraphs, language), {
       results: results.map((r) => ({ ...r, pairs: [...r.pairs] })),
       expiresAt: Date.now() + this.cacheTtlMs,
     });
