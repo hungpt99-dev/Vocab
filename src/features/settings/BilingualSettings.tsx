@@ -18,7 +18,7 @@ export function BilingualSettings({ settings, onChange }: BilingualSettingsProps
   const languageListId = useId();
 
   return (
-    <section className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+    <section className="flex flex-col gap-1">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Bilingual mode</h2>
       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
         Get explanations and translations in your language, and tune the explain prompt.
