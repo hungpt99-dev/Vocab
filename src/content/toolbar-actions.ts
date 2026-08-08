@@ -1,7 +1,7 @@
 import { sendMessage } from '@/shared/messaging/client';
 import type { PopoverAnchor, SelectionPopover } from './selection-popover';
 import type { MoreMenu } from './more-menu';
-import type { ToolbarActionId } from './toolbar';
+import type { ToolbarAnyActionId } from './toolbar';
 import { showToast } from './toast';
 import { ICON_SETTINGS } from './icons';
 
@@ -21,7 +21,7 @@ export interface ToolbarActionDeps {
  * worker, so no provider knowledge leaks into the page.
  */
 export async function handleToolbarAction(
-  action: ToolbarActionId,
+  action: ToolbarAnyActionId,
   text: string,
   deps: ToolbarActionDeps,
 ): Promise<void> {
