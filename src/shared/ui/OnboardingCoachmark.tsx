@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SparklesIcon, CheckIcon, XIcon } from './Icons';
+import { SparklesIcon, CheckIcon, XIcon, ArrowRightIcon } from './Icons';
 import { Button } from './Button';
 import { markOnboarded } from '@/shared/lib/onboarding';
 
@@ -15,7 +15,7 @@ const STEPS = [
 ];
 
 /** One-time first-run coachmark shown when the library is empty. */
-export function OnboardingCoachmark() {
+export function OnboardingCoachmark({ onStartSaving }: { onStartSaving?: () => void }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
 
@@ -27,6 +27,8 @@ export function OnboardingCoachmark() {
     void markOnboarded();
     setDone(true);
   };
+
+  const isLast = step >= STEPS.length - 1;
 
   return (
     <div
@@ -53,17 +55,31 @@ export function OnboardingCoachmark() {
       <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{current.body}</p>
 
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400">
-          Step {step + 1} of {STEPS.length}
-        </span>
-        {step < STEPS.length - 1 ? (
+        <div className="flex items-center gap-1" aria-hidden="true">
+          {STEPS.map((_, index) => (
+            <span
+              key={index}
+              className={`h-1.5 w-1.5 rounded-full ${
+                index === step ? 'bg-brand-500' : 'bg-brand-200 dark:bg-brand-800'
+              }`}
+            />
+          ))}
+        </div>
+        {!isLast ? (
           <Button size="sm" variant="secondary" onClick={() => setStep((s) => s + 1)}>
             Next
+            <ArrowRightIcon size={14} className="ml-1.5" aria-hidden="true" />
           </Button>
         ) : (
-          <Button size="sm" onClick={finish}>
+          <Button
+            size="sm"
+            onClick={() => {
+              finish();
+              onStartSaving?.();
+            }}
+          >
             <CheckIcon size={14} className="mr-1.5" aria-hidden="true" />
-            Got it
+            Save your first word
           </Button>
         )}
       </div>

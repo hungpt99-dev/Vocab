@@ -306,7 +306,19 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         <SkeletonList rows={4} />
       ) : entries.length === 0 ? (
         <>
-          {!isFiltered && !onboarded && <OnboardingCoachmark />}
+          {!isFiltered && !onboarded && (
+            <OnboardingCoachmark
+              onStartSaving={() => {
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector<HTMLInputElement>(
+                      'input[placeholder="Select text on the page, or type it here"]',
+                    )
+                    ?.focus();
+                });
+              }}
+            />
+          )}
           <EmptyState
             icon={<BookIcon size={20} />}
             title={isFiltered ? 'No matches' : 'No words yet'}
