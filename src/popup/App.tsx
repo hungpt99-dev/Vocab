@@ -21,7 +21,8 @@ import { StatsRow } from '@/shared/ui/StatsRow';
 import { OnboardingCoachmark } from '@/shared/ui/OnboardingCoachmark';
 import { tints } from '@/shared/styles/tokens';
 import { SaveForm } from '@/features/capture/SaveForm';
-import { TranslatePanel } from '@/features/capture/TranslatePanel';
+import { WordCard } from '@/features/capture/WordCard';
+import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
 import { ReviewScreen } from '@/features/review/ReviewScreen';
@@ -57,13 +58,31 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const { notify } = useToast();
   const [onboarded, setOnboarded] = useState(true);
   const { settings } = useSettings();
+  const { available: aiAvailable } = useAiAvailable();
   const [tab, setTab] = useState<'library' | 'review' | 'quiz' | 'progress'>('library');
   const [dueCount, setDueCount] = useState(0);
+  const [alreadySaved, setAlreadySaved] = useState(false);
 
   useEffect(() => {
     void isOnboarded().then((value) => setOnboarded(value));
     void reviewRepository.dueCount().then(setDueCount);
   }, []);
+
+  // Track whether the current word is already in the library (drives the Save button).
+  useEffect(() => {
+    const word = selection?.word.trim();
+    if (!word) {
+      setAlreadySaved(false);
+      return;
+    }
+    let cancelled = false;
+    void vocabularyRepository.findByWord(word).then((entry) => {
+      if (!cancelled) setAlreadySaved(Boolean(entry));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selection]);
 
   const debouncedSearch = useDebouncedValue(filters.search, 250);
   const query = useMemo(
@@ -313,7 +332,12 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         onWordChange={setWord}
         onSave={handleSave}
       />
-      <TranslatePanel selection={selection} />
+      <WordCard
+        selection={selection}
+        alreadySaved={alreadySaved}
+        saving={saving}
+        onSave={() => void handleSave({ word: enrichWord, note: '', tags: [] })}
+      />
 
       {enrichWord && (
         <div className="border-b border-slate-200 p-3 dark:border-slate-700">
@@ -321,7 +345,13 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
               {enrichWord}
             </p>
-            <Button size="sm" variant="secondary" disabled={enriching} onClick={() => void handleEnrich()}>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={enriching || !aiAvailable}
+              title={aiAvailable ? undefined : 'AI actions need an API key in settings'}
+              onClick={() => void handleEnrich()}
+            >
               <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
               {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
             </Button>
@@ -332,9 +362,9 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
                 key={action.kind}
                 size="sm"
                 variant="ghost"
-                disabled={explainKind !== null}
+                disabled={explainKind !== null || !aiAvailable}
                 onClick={() => void handleExplainKind(action.kind)}
-                title={action.label}
+                title={aiAvailable ? action.label : 'AI actions need an API key in settings'}
               >
                 {explainKind === action.kind ? '…' : action.label}
               </Button>
@@ -344,9 +374,9 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
             <Button
               size="sm"
               variant="ghost"
-              disabled={generatingRelated}
+              disabled={generatingRelated || !aiAvailable}
               onClick={() => void handleGenerateRelated()}
-              title="Use AI to suggest related vocabulary"
+              title={aiAvailable ? 'Use AI to suggest related vocabulary' : 'AI actions need an API key in settings'}
             >
               <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
               {generatingRelated ? 'Generating…' : 'Generate related vocabulary'}
