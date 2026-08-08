@@ -8,10 +8,7 @@ import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import {
-  SMART_ASSIST_ACTIONS,
-  SmartAssistMenu,
   readToolbarSelection,
-  type SmartAssistActionId,
   type ToolbarAnyActionId,
   type ToolbarState,
 } from './toolbar';
@@ -25,7 +22,6 @@ const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionCard();
-const assistMenu = new SmartAssistMenu();
 const reader = new InlineReader();
 const bilingualBar = new BilingualBar();
 
@@ -127,11 +123,6 @@ function attachSelectionToolbar(): void {
     const detail = (event as CustomEvent<{ action: ToolbarAnyActionId; text: string; state?: ToolbarState }>).detail;
     void handleToolbarAction(detail.action, detail.text, detail.state);
   }) as EventListener);
-
-  document.addEventListener('avs-assist-action', ((event: Event) => {
-    const detail = (event as CustomEvent<{ action: SmartAssistActionId; state: ToolbarState }>).detail;
-    void handleAssistAction(detail.action, detail.state);
-  }) as EventListener);
 }
 
 function toolbarElementContains(node: Node): boolean {
@@ -159,30 +150,17 @@ async function handleToolbarAction(
       toolbar.hide();
       return;
     }
-    case 'more': {
-      if (state) assistMenu.toggle(state, isAiAvailable());
-      return;
-    }
     case 'save': {
       toolbar.hide();
       if (state) await saveSelectionState(state);
       else showToast('No selection to save.', 'error');
       return;
     }
-    case 'copy': {
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard', 'success');
-      } catch {
-        showToast('Could not copy', 'error');
-      }
-      toolbar.hide();
-      return;
-    }
-    case 'more': {
-      if (state) assistMenu.toggle(state, isAiAvailable());
-      return;
-    }
+    // One AI button generates the full enrichment (meaning, translation, examples,
+    // synonyms, related words) inline in the card. The reader's highlighted-word
+    // click still dispatches 'explain' for the same full card, and 'simplify'
+    // requests the simplified variant. See VOC-119.
+    case 'generate':
     case 'explain': {
       toolbar.hide();
       if (state) showInlineExplain(state, 'word');
@@ -225,45 +203,6 @@ function showInlineExplain(state: ToolbarState, kind: ExplainKind): void {
   void toolbar.showExplain(state, kind);
 }
 
-/**
- * Route a smart-assistance action. The five AI analyses go through the message
- * bus to the ExplainService (provider-agnostic); "Save difficult words" asks
- * the background to extract and persist the difficult words in the repository.
- */
-async function handleAssistAction(action: SmartAssistActionId, state: ToolbarState): Promise<void> {
-  toolbar.hide();
-  if (action === 'save-difficult-words') {
-    await saveDifficultWords(state);
-    return;
-  }
-  const assistAction = SMART_ASSIST_ACTIONS.find((candidate) => candidate.id === action);
-  if (!assistAction?.kind) return;
-  showInlineExplain(state, assistAction.kind);
-}
-
-
-async function saveDifficultWords(state: ToolbarState): Promise<void> {
-  try {
-    const entries = await sendMessage({
-      type: 'save-difficult-words',
-      payload: {
-        word: state.text,
-        context: state.sentence || undefined,
-        sourceUrl: state.sourceUrl ?? '',
-        sourceTitle: state.sourceTitle ?? '',
-        sourceLanguage: state.selection?.sourceLanguage ?? '',
-      },
-    });
-    showToast(
-      entries.length === 0
-        ? 'No difficult words found'
-        : `Saved ${entries.length} word${entries.length === 1 ? '' : 's'}`,
-      'success',
-    );
-  } catch (cause) {
-    showToast(cause instanceof Error ? cause.message : 'Could not save the words.', 'error');
-  }
-}
 
 /**
  * Observe settings directly rather than relying on a relay from the service

@@ -174,10 +174,19 @@ export async function translateUnit(
   deps: BackgroundDeps,
   payload: { text: string; language?: string },
 ): Promise<string> {
-  const results = await deps.translate.translate(
-    [{ id: 'unit', text: payload.text }],
-    payload.language ?? 'English',
-  );
+  // No explicit language means "translate into the user's configured target
+  // language" — otherwise we'd silently translate English→English and return the
+  // source unchanged (which the UI renders as a blank "—"). See VOC-119.
+  let language = payload.language;
+  if (!language) {
+    try {
+      const settings = await deps.settings.get();
+      language = settings.targetLanguage || 'English';
+    } catch {
+      language = 'English';
+    }
+  }
+  const results = await deps.translate.translate([{ id: 'unit', text: payload.text }], language);
   return results[0]?.translation ?? '';
 }
 

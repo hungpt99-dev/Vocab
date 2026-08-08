@@ -7,6 +7,7 @@ import {
   saveDifficultWords,
   saveSelection,
   splitVocabularyTerm,
+  translateUnit,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -435,3 +436,30 @@ describe('createHandlers', () => {
     expect(await deps.vocabulary.findByWord('serendipity')).toBeDefined();
   });
 });
+
+describe('translateUnit default language', () => {
+  it('translates into the user target language when none is provided', async () => {
+    const translate = { translate: vi.fn(async () => [{ id: 'unit', text: 'unit', translation: 'x' }]) };
+    const depsWithLang: BackgroundDeps = {
+      ...deps,
+      settings: { get: vi.fn(async () => ({ ...(await deps.settings.get()), targetLanguage: 'Vietnamese' })) } as unknown as import('@/storage/settings-repository').SettingsRepository,
+      translate: translate as unknown as TranslateService,
+    };
+    const result = await translateUnit(depsWithLang, { text: 'hello' });
+    expect(result).toBe('x');
+    expect(translate.translate).toHaveBeenCalledWith([{ id: 'unit', text: 'hello' }], 'Vietnamese');
+  });
+
+  it('falls back to English when settings are unavailable', async () => {
+    const translate = { translate: vi.fn(async () => [{ id: 'unit', text: 'unit', translation: 'x' }]) };
+    const depsBroken: BackgroundDeps = {
+      ...deps,
+      settings: { get: vi.fn(async () => { throw new Error('boom'); }) } as unknown as import('@/storage/settings-repository').SettingsRepository,
+      translate: translate as unknown as TranslateService,
+    };
+    const result = await translateUnit(depsBroken, { text: 'hello' });
+    expect(result).toBe('x');
+    expect(translate.translate).toHaveBeenCalledWith([{ id: 'unit', text: 'hello' }], 'English');
+  });
+});
+
