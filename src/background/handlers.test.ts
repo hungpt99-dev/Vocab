@@ -218,6 +218,17 @@ describe('explainWord', () => {
       promptTemplate: '',
     });
   });
+
+  it('prefers an explicit language over the settings default', async () => {
+    await explainWord(deps, 'mot', 'context', 'native', undefined, undefined, 'Vietnamese');
+    expect(deps.explain.explain).toHaveBeenCalledWith({
+      word: 'mot',
+      context: 'context',
+      kind: 'native',
+      language: 'Vietnamese',
+      promptTemplate: '',
+    });
+  });
 });
 
 describe('splitVocabularyTerm', () => {

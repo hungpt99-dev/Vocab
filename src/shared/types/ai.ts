@@ -10,4 +10,6 @@ export type ExplainKind =
   | 'grammar'
   | 'vocabulary'
   | 'simplify'
-  | 'summarize';
+  | 'summarize'
+  | 'examples'
+  | 'native';

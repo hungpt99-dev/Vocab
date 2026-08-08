@@ -1,6 +1,8 @@
 /** Selection granularity an explanation is requested for. */
 export type ExplainUnit = 'word' | 'phrase' | 'sentence';
 
+import type { ExplainKind } from './ai';
+
 /**
  * Full-context AI explanation request, produced by the content script and sent
  * via the message bus. Merges the two prompt models used across the VOC
@@ -13,7 +15,7 @@ export interface ExplainRequest {
   /** Which unit the selection was classified as; drives the structured sections. */
   unit?: ExplainUnit;
   /** Which analysis kind was requested (smart-assist actions). */
-  kind?: 'word' | 'sentence' | 'grammar' | 'vocabulary' | 'simplify' | 'summarize';
+  kind?: ExplainKind;
   /** Surrounding paragraph/sentence the selection appeared in. */
   context?: string;
   /** Source page URL the selection came from. */

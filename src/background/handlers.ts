@@ -100,6 +100,7 @@ export async function explainWord(
   kind?: ExplainKind,
   pageTitle?: string,
   precedingText?: string,
+  language?: string,
 ): Promise<Explanation> {
   const settings = await deps.settings.get();
   const explanation = await deps.explain.explain({
@@ -108,7 +109,7 @@ export async function explainWord(
     kind,
     pageTitle,
     precedingText,
-    language: settings.targetLanguage || 'English',
+    language: language ?? (settings.targetLanguage || 'English'),
     promptTemplate: settings.explainPromptTemplate,
   });
   const existing = await deps.vocabulary.findByWord(word);
@@ -205,6 +206,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         message.payload.kind,
         message.payload.pageTitle,
         message.payload.precedingText,
+        message.payload.language,
       ),
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     translate: (message) => translateUnit(deps, message.payload),
