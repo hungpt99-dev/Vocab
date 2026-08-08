@@ -1,9 +1,12 @@
-import { isPhrase } from '@/shared/lib/text';
+import { isPhrase, detectLanguage } from '@/shared/lib/text';
 import type { ExplainKind } from '@/shared/types/ai';
+import type { Explanation } from '@/shared/types/vocabulary';
+import { aiErrorMessage } from '@/ai/types';
 import type { SelectionPayload } from '@/shared/messaging/contract';
 import { readSelection } from './selection';
 import { computePosition } from './hover-card';
 import { sendMessage } from '@/shared/messaging/client';
+import { toExplainUnit } from './explain-popover';
 import {
   ICON_BOOK,
   ICON_BOOKMARK,
@@ -153,6 +156,7 @@ export function computeToolbarPosition(
  */
 export class SelectionToolbar {
   private element: HTMLElement | null = null;
+  private body: HTMLElement | null = null;
   private buttons: HTMLButtonElement[] = [];
   private state: ToolbarState | null = null;
   private scrollHandler = (): void => this.reposition();
@@ -222,7 +226,131 @@ export class SelectionToolbar {
     return toolbar;
   }
 
-  /** ARIA toolbar keyboard interaction: arrows move focus, Home/End jump. */
+  /**
+   * Fetch the AI explanation for the current selection and render it inline in
+   * the toolbar (no separate popover). Shows a loading state, then the structured
+   * enrich data (meaning / translation / examples), or an error with a path to
+   * Settings when no provider key is configured.
+   */
+  async showExplainInline(state: ToolbarState, kind: ExplainKind): Promise<void> {
+    const toolbar = this.ensureElement();
+    const body = this.ensureBody(toolbar);
+    this.setExpanded(true);
+    body.replaceChildren(this.statusRow('Asking the AI…'));
+    this.reposition();
+
+    try {
+      const explanation = await sendMessage({
+        type: 'explain',
+        payload: {
+          word: state.text,
+          unit: toExplainUnit(state.unit),
+          context: state.sentence ?? '',
+          pageTitle: state.sourceTitle ?? '',
+          precedingText: '',
+          language: detectLanguage(state.text),
+          kind,
+        },
+      });
+      body.replaceChildren(...this.renderExplanation(explanation, kind));
+    } catch (cause) {
+      const message = aiErrorMessage(cause);
+      const frag = document.createDocumentFragment();
+      frag.append(this.statusRow(message));
+      if (/no ai provider|provider is configured|api key/i.test(message)) {
+        const settings = document.createElement('button');
+        settings.type = 'button';
+        settings.className = 'avs-toolbar-explain-settings';
+        settings.textContent = 'Open Settings';
+        settings.addEventListener('click', () => {
+          void sendMessage({ type: 'open-options' });
+          this.hide();
+        });
+        frag.append(settings);
+      }
+      body.replaceChildren(frag);
+    }
+    this.reposition();
+  }
+
+  /** Lazily create the expandable explain body and return it. */
+  private ensureBody(toolbar: HTMLElement): HTMLElement {
+    if (this.body?.isConnected) return this.body;
+    const body = document.createElement('div');
+    body.className = 'avs-toolbar-body';
+    body.hidden = true;
+    toolbar.append(body);
+    this.body = body;
+    return body;
+  }
+
+  /** Show/hide the inline explain body and switch the toolbar to its expanded layout. */
+  private setExpanded(expanded: boolean): void {
+    if (!this.body) return;
+    this.body.hidden = !expanded;
+    this.element?.classList.toggle('avs-toolbar--expanded', expanded);
+  }
+
+  private statusRow(message: string): HTMLElement {
+    const row = document.createElement('p');
+    row.className = 'avs-toolbar-status';
+    row.textContent = message;
+    row.setAttribute('role', 'status');
+    return row;
+  }
+
+  /** Render the structured AI explanation inline, driven by the analysis kind. */
+  private renderExplanation(explanation: Explanation, kind: ExplainKind): HTMLElement[] {
+    const rows: HTMLElement[] = [];
+    const field = (label: string, value: string | undefined): void => {
+      if (!value) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'avs-toolbar-field';
+      const l = document.createElement('span');
+      l.className = 'avs-toolbar-field-label';
+      l.textContent = label;
+      const v = document.createElement('span');
+      v.className = 'avs-toolbar-field-value';
+      v.textContent = value;
+      wrap.append(l, v);
+      rows.push(wrap);
+    };
+    const list = (label: string, items: readonly string[] | undefined): void => {
+      if (!items || items.length === 0) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'avs-toolbar-field';
+      const l = document.createElement('span');
+      l.className = 'avs-toolbar-field-label';
+      l.textContent = label;
+      const ul = document.createElement('ul');
+      ul.className = 'avs-toolbar-list';
+      for (const item of items) {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.append(li);
+      }
+      wrap.append(l, ul);
+      rows.push(wrap);
+    };
+
+    if (kind === 'simplify') {
+      field('Simplified', explanation.meaning || explanation.summary);
+      field('Translation', explanation.translation);
+      return rows;
+    }
+    if (kind === 'summarize') {
+      field('Summary', explanation.summary || explanation.meaning);
+      return rows;
+    }
+    field('Meaning', explanation.meaning);
+    field('Translation', explanation.translation);
+    field('Pronunciation', explanation.pronunciation);
+    field('Part of speech', explanation.partOfSpeech);
+    list('Examples', explanation.examples);
+    list('Synonyms', explanation.synonyms);
+    list('Related words', explanation.relatedWords);
+    return rows;
+  }
   private handleKeydown(event: KeyboardEvent): void {
     const current = event.target;
     if (!(current instanceof HTMLButtonElement) || !this.buttons.includes(current)) return;
@@ -257,8 +385,8 @@ export class SelectionToolbar {
     const translationEl = toolbar.querySelector<HTMLElement>('[data-role="translation"]');
     if (wordEl) wordEl.textContent = state.text;
     if (translationEl) {
-      translationEl.hidden = true;
-      translationEl.textContent = '';
+      translationEl.hidden = false;
+      translationEl.textContent = 'Translating…';
       void this.loadTranslation(state.text, translationEl);
     }
     toolbar.hidden = false;
@@ -272,10 +400,14 @@ export class SelectionToolbar {
       const result = await sendMessage({ type: 'translate', payload: { text } });
       if (result && result !== text) {
         el.textContent = result;
-        el.hidden = false;
+      } else {
+        el.textContent = '—';
       }
+      el.hidden = false;
     } catch {
-      // Translation is best-effort; failure simply leaves the word header only.
+      // Translation is best-effort; show a placeholder so the slot stays visible.
+      el.textContent = '—';
+      el.hidden = false;
     }
   }
 
