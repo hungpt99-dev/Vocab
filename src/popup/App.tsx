@@ -25,6 +25,7 @@ import { TranslatePanel } from '@/features/capture/TranslatePanel';
 import { LibraryList } from '@/features/library/LibraryList';
 import { LibraryToolbar, type LibraryFilters } from '@/features/library/LibraryToolbar';
 import { ReviewScreen } from '@/features/review/ReviewScreen';
+import { QuizScreen } from '@/features/quiz/QuizScreen';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import type { Explanation } from '@/shared/types/vocabulary';
 
@@ -55,7 +56,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const { notify } = useToast();
   const [onboarded, setOnboarded] = useState(true);
   const { settings } = useSettings();
-  const [tab, setTab] = useState<'library' | 'review'>('library');
+  const [tab, setTab] = useState<'library' | 'review' | 'quiz'>('library');
   const [dueCount, setDueCount] = useState(0);
 
   useEffect(() => {
@@ -397,9 +398,22 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
             </span>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('quiz')}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+            tab === 'quiz'
+              ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          Quiz
+        </button>
       </div>
 
-      {tab === 'review' ? (
+      {tab === 'quiz' ? (
+        <QuizScreen />
+      ) : tab === 'review' ? (
         <ReviewScreen />
       ) : (
         <>
