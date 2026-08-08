@@ -6,6 +6,11 @@
  * can advance time deterministically. It never rejects a request outright — it
  * waits until capacity is available — because the extension is user-driven and
  * a paused call is preferable to a dropped one.
+ *
+ * Note: bilingual reading does NOT use this limiter. Bilingual always routes
+ * through keyless Google Translate (independent of the user's AI key), so it
+ * has its own path. This limiter is shared only by explanation-style
+ * capabilities (auto-explain, enrichment).
  */
 export interface RateLimiter {
   /** Resolves once a permit is available. Honours an optional abort signal. */
@@ -28,24 +33,11 @@ interface Bucket {
 }
 
 /**
- * Rate limiter used ONLY for bilingual reading-mode translation/alignment.
- * Translation already batches ~16 paragraphs into a single provider call, so it
- * naturally issues far fewer requests than word-level explain; it also needs to
- * keep first-paint fast on long pages (many chunks in flight). We therefore give
- * it a generous standalone allowance rather than sharing the conservative
- * explanation limiter, which would serialize the chunks 2s apart and stall the
- * first screenful. Tunable: raise/lower TRANSLATION_RATE_LIMIT per provider.
- */
-export const TRANSLATION_RATE_LIMIT = { maxRequests: 30, windowMs: 10_000 };
-export const translationRateLimiter: RateLimiter = createRateLimiter(TRANSLATION_RATE_LIMIT);
-
-/**
  * The single rate limiter shared by explanation-style capabilities (auto-explain,
- * enrichment) so concurrent requests there do not burst a provider. Translation
- * uses its own higher-allowance limiter (see translationRateLimiter) because it
- * issues batched, latency-sensitive calls that must not serialize behind
- * explanation traffic. Defaults to at most 5 requests per 10 seconds — friendly
- * to local models and free tiers alike.
+ * enrichment) so concurrent requests there do not burst a provider. Defaults to
+ * at most 5 requests per 10 seconds — friendly to local models and free tiers
+ * alike. Bilingual reading does NOT use this (it is keyless Google, see
+ * translate-service).
  */
 export const sharedRateLimiter: RateLimiter = createRateLimiter({ maxRequests: 5, windowMs: 10_000 });
 
