@@ -3,10 +3,11 @@ import { settingsRepository, type SettingsRepository } from '@/storage/settings-
 import { getProvider } from './registry';
 import { googleTranslate } from './google-translate';
 import { runActiveWithFallback } from './run-with-fallback';
-import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult } from './types';
+import type { TranslateRequest, TranslationParagraph, TranslationResult, WordAlignResult, BilingualPerf } from './types';
 import { AiError } from './types';
 import { withRetry, type RetryOptions } from './retry';
 import { translationRateLimiter } from './rate-limiter';
+import { bilingualLog } from '@/shared/lib/bilingual-log';
 
 const RETRY_OPTIONS: RetryOptions = { maxAttempts: 3 };
 
@@ -110,10 +111,18 @@ export class TranslateService {
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
       chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
+    const perf = this.makePerfCollector(chunks.length);
     const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
-      this.translateChunk(active, fallback, chunk, language, signal),
+      this.translateChunk(active, fallback, chunk, language, signal, perf),
     );
-    return chunked.flat();
+    const out = chunked.flat();
+    perf.finish();
+    perf.attach(out[0]);
+    bilingualLog.sw(
+      `translate ${paragraphs.length} paragraphs → ${chunks.length} chunks`,
+      perf.summary(),
+    );
+    return out;
   }
 
   /** Word-by-word aligned translation: returns ordered source→target glosses. */
@@ -159,10 +168,18 @@ export class TranslateService {
     for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
       chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
     }
+    const perf = this.makePerfCollector(chunks.length);
     const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
-      this.alignChunk(active, fallback, chunk, language, signal),
+      this.alignChunk(active, fallback, chunk, language, signal, perf),
     );
-    return chunked.flat();
+    const out = chunked.flat();
+    perf.finish();
+    perf.attach(out[0]);
+    bilingualLog.sw(
+      `align ${paragraphs.length} paragraphs → ${chunks.length} chunks`,
+      perf.summary(),
+    );
+    return out;
   }
 
   private async translateChunk(
@@ -170,10 +187,12 @@ export class TranslateService {
     fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<TranslationResult[]> {
     const cached = this.readCache(active, chunk, language);
-    const translations = cached ?? (await this.runChunk(active, fallback, chunk, language, signal));
+    if (cached) perf.markCacheHit();
+    const translations = cached ?? (await this.runChunk(active, fallback, chunk, language, signal, perf));
     if (!cached) this.writeCache(active, chunk, language, translations);
 
     return chunk.map((paragraph, index) => ({
@@ -188,14 +207,15 @@ export class TranslateService {
     fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<string[]> {
     const request: TranslateRequest = {
       paragraphs: chunk.map(({ text }) => ({ text })),
       language,
     };
     return runActiveWithFallback(
-      (provider) => this.runOnce(provider, request, signal),
+      (provider) => this.runOnce(provider, request, signal, perf),
       active,
       fallback,
       { kind: 'translate', language, paragraphs: chunk.map(({ text }) => text) },
@@ -207,10 +227,12 @@ export class TranslateService {
     fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<WordAlignResult[]> {
     const cached = this.readAlignCache(active, chunk, language);
-    const results = cached ?? (await this.runAlignChunk(active, fallback, chunk, language, signal));
+    if (cached) perf.markCacheHit();
+    const results = cached ?? (await this.runAlignChunk(active, fallback, chunk, language, signal, perf));
     if (!cached) this.writeAlignCache(active, chunk, language, results);
     return results;
   }
@@ -220,14 +242,15 @@ export class TranslateService {
     fallback: SavedProvider | undefined,
     chunk: readonly TranslationParagraph[],
     language: string,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<WordAlignResult[]> {
     const request: TranslateRequest = {
       paragraphs: chunk.map(({ id, text }) => ({ id, text })),
       language,
     };
     return runActiveWithFallback(
-      (provider) => this.runAlignOnce(provider, request, signal),
+      (provider) => this.runAlignOnce(provider, request, signal, perf),
       active,
       fallback,
       { kind: 'align', language, pairs: chunk.map(({ id, text }) => ({ id, text })) },
@@ -237,10 +260,14 @@ export class TranslateService {
   private async runAlignOnce(
     provider: SavedProvider,
     request: TranslateRequest,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<WordAlignResult[]> {
     const adapter = getProvider(provider.type);
+    const waitStart = performance.now();
     await translationRateLimiter.acquire(signal);
+    perf.addRateLimitWait(performance.now() - waitStart);
+    const callStart = performance.now();
     const result = await withRetry(
       () => adapter.align(request, {
         apiKey: provider.apiKey,
@@ -253,16 +280,21 @@ export class TranslateService {
       }),
       { ...RETRY_OPTIONS, signal },
     );
+    perf.addProviderMs(performance.now() - callStart);
     return result;
   }
 
   private async runOnce(
     provider: SavedProvider,
     request: TranslateRequest,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    perf: PerfCollector,
   ): Promise<string[]> {
     const adapter = getProvider(provider.type);
+    const waitStart = performance.now();
     await translationRateLimiter.acquire(signal);
+    perf.addRateLimitWait(performance.now() - waitStart);
+    const callStart = performance.now();
     const result = await withRetry(
       () =>
         adapter.translate(request, {
@@ -276,6 +308,7 @@ export class TranslateService {
         }),
       { ...RETRY_OPTIONS, signal },
     );
+    perf.addProviderMs(performance.now() - callStart);
     return result.paragraphs.map(({ translation }) => translation);
   }
 
@@ -343,6 +376,60 @@ export class TranslateService {
       results: results.map((r) => ({ ...r, pairs: [...r.pairs] })),
       expiresAt: Date.now() + this.cacheTtlMs,
     });
+  }
+
+  /** Create a perf collector for one translate/align request (debug only). */
+  makePerfCollector(chunks: number): PerfCollector {
+    return new PerfCollector(chunks);
+  }
+}
+
+/**
+ * Aggregates bilingual-pipeline timing across the chunks of one translate/align
+ * request. Off by default; only does real work when the service-worker debug
+ * flag is on (see bilingualLog). Attaches a `BilingualPerf` to the first result
+ * so the content script can attribute slowness to the network vs. the DOM.
+ */
+class PerfCollector {
+  private rateLimitWaitMs = 0;
+  private providerMs = 0;
+  private cacheHits = 0;
+  private readonly totalChunks: number;
+  private readonly startMs: number;
+
+  constructor(totalChunks: number) {
+    this.totalChunks = totalChunks;
+    this.startMs = performance.now();
+  }
+
+  addRateLimitWait(ms: number): void {
+    this.rateLimitWaitMs += ms;
+  }
+
+  addProviderMs(ms: number): void {
+    this.providerMs += ms;
+  }
+
+  markCacheHit(): void {
+    this.cacheHits += 1;
+  }
+
+  finish(): void {
+    // no-op; kept for symmetry / future tail logging
+  }
+
+  summary(): BilingualPerf {
+    return {
+      totalMs: Math.round(performance.now() - this.startMs),
+      rateLimitWaitMs: Math.round(this.rateLimitWaitMs),
+      providerMs: Math.round(this.providerMs),
+      chunks: this.totalChunks,
+      cacheHits: this.cacheHits,
+    };
+  }
+
+  attach(result: { perf?: BilingualPerf } | undefined): void {
+    if (result) result.perf = this.summary();
   }
 }
 

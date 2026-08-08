@@ -39,6 +39,8 @@ export interface TranslatedParagraphPayload {
   id: string;
   text: string;
   translation: string;
+  /** Optional timing breakdown, attached for bilingual debug logging. */
+  perf?: import('@/ai/types').BilingualPerf;
 }
 
 export type Message =

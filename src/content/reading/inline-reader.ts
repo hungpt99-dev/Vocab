@@ -11,8 +11,9 @@ import {
 import { extractArticle, type ArticleBlock } from './extract';
 import { buildSentenceBlock, wrapWords } from './gloss';
 import { WordGlossPopover } from './word-gloss-popover';
-import type { WordAlignResult } from '@/ai/types';
+import type { WordAlignResult, BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
+import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
 
 /**
@@ -198,6 +199,9 @@ export class InlineReader {
     const pending = blocks.filter((b) => !this.translatedBlockIds.has(b.id));
     if (pending.length === 0) return;
 
+    const timer = contentTimer(`translateBlocks(${pending.length} blocks)`);
+    const t0 = performance.now();
+
     const items: Array<{ id: string; text: string; anchor: HTMLElement }> = [];
     for (const block of pending) {
       const targets = this.resolveTargets(block);
@@ -207,6 +211,7 @@ export class InlineReader {
       // Nothing translatable here (e.g. navigation) — still mark done so we
       // don't keep re-checking it.
       for (const b of pending) this.translatedBlockIds.add(b.id);
+      timer?.stop(`no items`);
       return;
     }
 
@@ -240,7 +245,7 @@ export class InlineReader {
       }
       let lastText: string | null = null;
       for (const item of items) {
-        const result = aligned.get(item.id);
+        const result = aligned.map.get(item.id);
         if (!result) continue;
         this.applyWordGloss(item, result);
         const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
@@ -254,6 +259,11 @@ export class InlineReader {
           replaceSkeleton(item.anchor, null);
         }
       }
+      const swPerf = aligned.perf;
+      bilingualLog.content(
+        `word batch: ${items.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
+        swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
+      );
     } else {
       const translated = await this.translateItems(items);
       if (this.generation !== generation) {
@@ -262,7 +272,7 @@ export class InlineReader {
       }
       let lastText: string | null = null;
       for (const item of items) {
-        const translation = translated.get(item.id);
+        const translation = translated.map.get(item.id);
         if (!translation) continue;
         if (translation === lastText) {
           replaceSkeleton(item.anchor, null);
@@ -274,8 +284,14 @@ export class InlineReader {
         this.track(item.id, node);
         injectedSomething = true;
       }
+      const swPerf = translated.perf;
+      bilingualLog.content(
+        `sentence batch: ${items.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
+        swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
+      );
     }
 
+    timer?.stop(`items=${items.length}`);
     for (const b of pending) this.translatedBlockIds.add(b.id);
 
     if (!injectedSomething && this.lastError) {
@@ -343,8 +359,9 @@ export class InlineReader {
 
   private async alignItems(
     items: Array<{ id: string; text: string }>,
-  ): Promise<Map<string, WordAlignResult>> {
+  ): Promise<{ map: Map<string, WordAlignResult>; perf?: BilingualPerf }> {
     const out = new Map<string, WordAlignResult>();
+    let perf: BilingualPerf | undefined;
     try {
       const settings = await settingsRepository.get();
       const language = settings.targetLanguage || 'English';
@@ -352,19 +369,23 @@ export class InlineReader {
         type: 'align-words',
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
       });
-      for (const result of results) out.set(result.id, result);
+      for (const result of results) {
+        if (result.perf && !perf) perf = result.perf;
+        out.set(result.id, result);
+      }
     } catch (cause) {
       // Record the failure so the caller can surface an actionable message
       // instead of leaving the page silently monolingual.
       this.lastError = aiErrorMessage(cause);
     }
-    return out;
+    return { map: out, perf };
   }
 
   private async translateItems(
     items: Array<{ id: string; text: string }>,
-  ): Promise<Map<string, string>> {
+  ): Promise<{ map: Map<string, string>; perf?: BilingualPerf }> {
     const out = new Map<string, string>();
+    let perf: BilingualPerf | undefined;
     try {
       const settings = await settingsRepository.get();
       const language = settings.targetLanguage || 'English';
@@ -372,11 +393,14 @@ export class InlineReader {
         type: 'translate-article',
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
       });
-      for (const item of result) out.set(item.id, item.translation);
+      for (const item of result) {
+        if (item.perf && !perf) perf = item.perf;
+        out.set(item.id, item.translation);
+      }
     } catch (cause) {
       this.lastError = aiErrorMessage(cause);
     }
-    return out;
+    return { map: out, perf };
   }
 
   /** Map a block to (sentence or paragraph) source anchors on the live page. */
