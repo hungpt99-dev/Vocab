@@ -102,6 +102,22 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
 
   const enrichWord = selection?.word ?? word;
 
+  const handleQuickAdd = useCallback(
+    async (related: string) => {
+      const word = related.trim();
+      if (!word) return;
+      try {
+        await vocabularyRepository.save({ word });
+        await reload();
+        onVocabularyChanged?.();
+        notify(`Saved “${word}”.`, 'success');
+      } catch (cause) {
+        notify(cause instanceof Error ? cause.message : 'Could not save that word.', 'error');
+      }
+    },
+    [reload, onVocabularyChanged, notify],
+  );
+
   const handleEnrich = useCallback(async () => {
     const target = enrichWord;
     if (!target) return;
@@ -247,6 +263,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
           onDelete={remove}
           onToggleFavorite={toggleFavorite}
           onExplain={handleExplain}
+          onQuickAdd={handleQuickAdd}
         />
       )}
     </>
