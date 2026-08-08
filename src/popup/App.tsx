@@ -11,7 +11,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, LanguagesIcon, SettingsIcon, SparklesIcon } from '@/shared/ui/Icons';
+import { BookIcon, LanguagesIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -165,6 +165,50 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
     [enrichWord, selection, settings.targetLanguage, notify],
   );
 
+  const [generatingRelated, setGeneratingRelated] = useState(false);
+
+  const handleGenerateRelated = useCallback(async () => {
+    const target = enrichWord;
+    if (!target) return;
+    setGeneratingRelated(true);
+    try {
+      const explanation = await sendMessage({
+        type: 'explain',
+        payload: {
+          word: target,
+          context: selection?.sentence,
+          pageTitle: selection?.sourceTitle,
+          language: settings.targetLanguage || 'English',
+          kind: 'related',
+        },
+      });
+      // Persist the generated related vocabulary onto the entry's explanation.
+      const related = [
+        ...(explanation.relatedWords ?? []),
+        ...(explanation.relatedPhrases ?? []),
+      ].filter(Boolean);
+      const entry = await vocabularyRepository.findByWord(target);
+      if (entry) {
+        const merged = new Set([...(entry.explanation?.relatedWords ?? []), ...related]);
+        await update(entry.id, {
+          explanation: {
+            ...(entry.explanation ?? explanation),
+            relatedWords: [...merged],
+            relatedPhrases: explanation.relatedPhrases ?? entry.explanation?.relatedPhrases ?? [],
+          },
+        });
+      }
+      setEnrich({ word: target, explanation: { ...explanation, relatedWords: [...related] } });
+      await reload();
+      onVocabularyChanged?.();
+      notify(`Added ${related.length} related term${related.length === 1 ? '' : 's'}.`, 'success');
+    } catch (cause) {
+      notify(aiErrorMessage(cause), 'error');
+    } finally {
+      setGeneratingRelated(false);
+    }
+  }, [enrichWord, selection, settings.targetLanguage, update, notify, reload, onVocabularyChanged]);
+
   const handleEnrich = useCallback(async () => {
     const target = enrichWord;
     if (!target) return;
@@ -280,6 +324,18 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
                 {explainKind === action.kind ? '…' : action.label}
               </Button>
             ))}
+          </div>
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={generatingRelated}
+              onClick={() => void handleGenerateRelated()}
+              title="Use AI to suggest related vocabulary"
+            >
+              <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
+              {generatingRelated ? 'Generating…' : 'Generate related vocabulary'}
+            </Button>
           </div>
           {selection?.word === enrichWord && selection.sentence && (
             <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">

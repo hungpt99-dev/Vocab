@@ -262,9 +262,10 @@ describe('SMART_ASSIST_ACTIONS', () => {
       'Summarize',
       'Give examples',
       'Explain in my language',
+      'Generate related vocabulary',
       'Save difficult words',
     ]);
-    expect(SMART_ASSIST_ACTIONS.filter((action) => action.kind)).toHaveLength(7);
+    expect(SMART_ASSIST_ACTIONS.filter((action) => action.kind)).toHaveLength(8);
     expect(SMART_ASSIST_ACTIONS.find((action) => action.id === 'save-difficult-words')?.kind).toBeUndefined();
   });
 });
@@ -279,7 +280,7 @@ describe('SmartAssistMenu', () => {
     const element = document.getElementById('avs-assist-menu')!;
     expect(element.hidden).toBe(false);
     expect(element.getAttribute('role')).toBe('menu');
-    expect(element.querySelectorAll('.avs-assist-item')).toHaveLength(8);
+    expect(element.querySelectorAll('.avs-assist-item')).toHaveLength(9);
 
     const handler = vi.fn();
     document.addEventListener('avs-assist-action', handler);

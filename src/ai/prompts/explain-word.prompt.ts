@@ -111,6 +111,15 @@ const EXPLAIN_KIND_SYSTEM_PROMPTS: Record<ExplainKind, string> = {
       ' synonyms, antonyms, relatedWords, collocations, pronunciation, grammar, register and' +
       ' etymology are empty.',
   ),
+  related: buildSystemPrompt(
+    'You are a concise bilingual lexicographer expanding a learner’s vocabulary around one word.',
+    'Rules: relatedWords lists up to 8 words or short phrases semantically related to the input' +
+      ' (synonyms, antonyms, hypernyms, hyponyms, collocations, typical companions) — each a single' +
+      ' term; relatedPhrases lists up to 4 fixed expressions or collocations using the input; meaning' +
+      ' is one sentence on why these are related; simpleExplanation is an A2-level restatement;' +
+      ' translation is the input word translated into the requested language; examples, synonyms,' +
+      ' antonyms, pronunciation, collocations, grammar, register and etymology are empty.',
+  ),
 };
 
 /** The original word-explanation system prompt, unchanged for compatibility. */
