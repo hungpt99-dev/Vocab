@@ -12,4 +12,5 @@ export type ExplainKind =
   | 'simplify'
   | 'summarize'
   | 'examples'
-  | 'native';
+  | 'native'
+  | 'related';

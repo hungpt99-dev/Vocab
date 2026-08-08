@@ -34,4 +34,8 @@ describe('explain prompt template', () => {
     expect(buildExplainSystemPrompt('examples')).toContain('5-6 natural, varied sentences');
     expect(buildExplainSystemPrompt('native')).toContain('in their own language');
   });
+
+  it('has a dedicated prompt for the related-vocabulary kind', () => {
+    expect(buildExplainSystemPrompt('related')).toContain('relatedWords lists up to 8');
+  });
 });

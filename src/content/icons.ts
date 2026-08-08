@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Settings,
   Sparkles,
+  Wand2,
   X,
 } from 'lucide-static';
 
@@ -44,6 +45,7 @@ export const ICON_MESSAGE = icon(MessageSquare);
 export const ICON_BOOK = icon(Book);
 export const ICON_MINIMIZE = icon(Minimize2);
 export const ICON_FILE = icon(FileText);
+export const ICON_WAND = icon(Wand2);
 /** Bilingual-book sentence alignment toggle (stacked facing lines). */
 export const ICON_ALIGN_SENTENCE = icon(AlignVerticalJustifyStart);
 /** Word-by-word interlinear gloss mode (two facing columns). */

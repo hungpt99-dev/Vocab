@@ -13,6 +13,7 @@ import {
   ICON_MINIMIZE,
   ICON_MORE,
   ICON_SPARKLES,
+  ICON_WAND,
 } from './icons';
 
 const TOOLBAR_ID = 'avs-toolbar';
@@ -62,6 +63,7 @@ export type SmartAssistActionId =
   | 'summarize'
   | 'examples'
   | 'native'
+  | 'related'
   | 'save-difficult-words';
 
 export interface SmartAssistAction {
@@ -80,6 +82,7 @@ export const SMART_ASSIST_ACTIONS: readonly SmartAssistAction[] = [
   { id: 'summarize', label: 'Summarize', icon: ICON_FILE, kind: 'summarize' },
   { id: 'examples', label: 'Give examples', icon: ICON_SPARKLES, kind: 'examples' },
   { id: 'native', label: 'Explain in my language', icon: ICON_LANGUAGES, kind: 'native' },
+  { id: 'related', label: 'Generate related vocabulary', icon: ICON_WAND, kind: 'related' },
   { id: 'save-difficult-words', label: 'Save difficult words', icon: ICON_BOOKMARK },
 ];
 
