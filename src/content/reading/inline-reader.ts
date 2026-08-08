@@ -111,7 +111,7 @@ export class InlineReader {
     this.observer?.disconnect();
     this.observer = null;
     this.translatedBlockIds.clear();
-    this.skeletons.clear();
+    this.clearSkeletons();
     document.body.removeEventListener('mouseover', this.onWordHover);
     document.body.removeEventListener('mouseout', this.onWordLeave);
     this.popover.destroy();
@@ -139,6 +139,7 @@ export class InlineReader {
     }
     this.injected.clear();
     this.translatedBlockIds.clear();
+    this.clearSkeletons();
     this.observer?.disconnect();
     this.observer = null;
     if (blocks.length > 0) this.observeBlocks(blocks);
@@ -308,6 +309,12 @@ export class InlineReader {
     skeleton.className = 'avs-skeleton-line';
     skeleton.setAttribute('aria-hidden', 'true');
     return skeleton;
+  }
+
+  /** Remove every skeleton placeholder from the page and forget it (teardown). */
+  private clearSkeletons(): void {
+    for (const skeleton of this.skeletons.values()) skeleton.remove();
+    this.skeletons.clear();
   }
 
   /** Render a persistent, dismissable banner explaining why nothing translated. */

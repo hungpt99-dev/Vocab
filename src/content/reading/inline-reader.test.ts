@@ -303,4 +303,26 @@ describe('InlineReader bilingual injection', () => {
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
     reader.close();
   });
+
+  it('removes skeleton placeholders when closed mid-flight (no orphaned shimmer)', async () => {
+    const reader = new InlineReader();
+    // Start open() but keep the align response pending so skeletons are showing.
+    void reader.open();
+    await flush();
+
+    expect(document.querySelectorAll('.avs-skeleton-line').length).toBeGreaterThan(0);
+
+    // Turn bilingual off WHILE the batch is still translating.
+    reader.close();
+
+    // The pending response arrives after close — must not re-add anything.
+    resolveSend(glossResponse());
+    await flush();
+    await flush();
+
+    // No skeleton shimmer and no injected lines remain on the page.
+    expect(document.querySelectorAll('.avs-skeleton-line').length).toBe(0);
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
+    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
+  });
 });
