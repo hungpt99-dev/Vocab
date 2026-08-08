@@ -41,6 +41,9 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
   bilingualMode: true,
+  popupShowTranslation: true,
+  popupShowSimplify: true,
+  popupDefaultTab: 'library',
   explainPromptTemplate: '',
   readingExperience: {
     showOriginal: true,

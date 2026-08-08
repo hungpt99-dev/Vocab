@@ -69,6 +69,12 @@ export interface Settings {
   autoExplainOnSave: boolean;
   /** Bilingual mode: show translations/meanings inline in the user's language. */
   bilingualMode: boolean;
+  /** Popup: auto-fetch the keyless translation of the highlighted word on open. */
+  popupShowTranslation: boolean;
+  /** Popup: show the Simplify action for the highlighted word. */
+  popupShowSimplify: boolean;
+  /** Popup: which tab to open on launch. */
+  popupDefaultTab: 'library' | 'review' | 'quiz' | 'progress';
   /** Editable system-prompt template for explanations. Tokens:
    *  {{language}} {{word}} {{context}} {{kind}} — empty falls back to built-in. */
   explainPromptTemplate: string;

@@ -4,7 +4,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
-import { BookMarkedIcon, SettingsIcon } from '@/shared/ui/Icons';
+import { BookMarkedIcon, SettingsIcon, WandIcon } from '@/shared/ui/Icons';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 
 export interface WordCardProps {
@@ -13,6 +13,15 @@ export interface WordCardProps {
   alreadySaved?: boolean;
   onSave: () => void;
   saving?: boolean;
+  /** Auto-fetch the keyless translation on open. */
+  showTranslation: boolean;
+  /** Show the Simplify action. */
+  showSimplify: boolean;
+  /** Called when the user asks to simplify the word (AI). */
+  onSimplify?: () => void;
+  simplifying?: boolean;
+  /** Human-readable reason the AI gate is shown, if any. */
+  aiUnavailableHint?: string;
 }
 
 /**
@@ -21,16 +30,26 @@ export interface WordCardProps {
  * Save inline. AI actions are shown separately and greyed when no AI key is
  * configured.
  */
-export function WordCard({ selection, alreadySaved, onSave, saving }: WordCardProps) {
+export function WordCard({
+  selection,
+  alreadySaved,
+  onSave,
+  saving,
+  showTranslation,
+  showSimplify,
+  onSimplify,
+  simplifying,
+  aiUnavailableHint,
+}: WordCardProps) {
   const text = selection?.word.trim() ?? '';
   const [translating, setTranslating] = useState(false);
   const [translation, setTranslation] = useState('');
   const [error, setError] = useState('');
-  const { available, providerName } = useAiAvailable();
+  const { available } = useAiAvailable();
 
   // Auto-translate the highlighted word as soon as a new selection arrives.
   const translate = useCallback(async () => {
-    if (!text) return;
+    if (!text || !showTranslation) return;
     setTranslating(true);
     setError('');
     setTranslation('');
@@ -41,7 +60,7 @@ export function WordCard({ selection, alreadySaved, onSave, saving }: WordCardPr
     } finally {
       setTranslating(false);
     }
-  }, [text]);
+  }, [text, showTranslation]);
 
   useEffect(() => {
     void translate();
@@ -80,6 +99,21 @@ export function WordCard({ selection, alreadySaved, onSave, saving }: WordCardPr
         </Button>
       </div>
 
+      {showSimplify && (
+        <div className="mt-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={simplifying || !available}
+            title={available ? 'Explain the word in plain language' : (aiUnavailableHint ?? 'AI actions need an API key in settings')}
+            onClick={() => onSimplify?.()}
+          >
+            <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
+            {simplifying ? 'Simplifying…' : 'Simplify'}
+          </Button>
+        </div>
+      )}
+
       {!available && (
         <button
           type="button"
@@ -87,9 +121,7 @@ export function WordCard({ selection, alreadySaved, onSave, saving }: WordCardPr
           className="mt-2 flex w-full items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-2 py-1.5 text-left text-xs text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-600 dark:text-slate-400 dark:hover:text-brand-300"
         >
           <SettingsIcon size={13} aria-hidden="true" />
-          <span>
-            AI actions need an API key — none configured{providerName ? ` (${providerName})` : ''}. Open settings.
-          </span>
+          <span>{aiUnavailableHint ?? 'AI actions need an API key — open settings.'}</span>
         </button>
       )}
     </div>

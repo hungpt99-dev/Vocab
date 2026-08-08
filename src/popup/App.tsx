@@ -38,7 +38,6 @@ const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '
  * the explain service. */
 const CONTEXT_ACTIONS: ReadonlyArray<{ kind: ExplainKind; label: string }> = [
   { kind: 'sentence', label: 'Explain sentence' },
-  { kind: 'simplify', label: 'Simplify' },
   { kind: 'examples', label: 'Give examples' },
   { kind: 'native', label: 'In my language' },
 ];
@@ -59,7 +58,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const [onboarded, setOnboarded] = useState(true);
   const { settings } = useSettings();
   const { available: aiAvailable } = useAiAvailable();
-  const [tab, setTab] = useState<'library' | 'review' | 'quiz' | 'progress'>('library');
+  const [tab, setTab] = useState<'library' | 'review' | 'quiz' | 'progress'>(settings.popupDefaultTab);
   const [dueCount, setDueCount] = useState(0);
   const [alreadySaved, setAlreadySaved] = useState(false);
 
@@ -336,7 +335,14 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         selection={selection}
         alreadySaved={alreadySaved}
         saving={saving}
+        showTranslation={settings.popupShowTranslation}
+        showSimplify={settings.popupShowSimplify}
         onSave={() => void handleSave({ word: enrichWord, note: '', tags: [] })}
+        onSimplify={() => void handleExplainKind('simplify')}
+        simplifying={explainKind === 'simplify'}
+        aiUnavailableHint={
+          aiAvailable ? undefined : 'AI actions need an API key — open settings.'
+        }
       />
 
       {enrichWord && (
@@ -550,39 +556,26 @@ export function App() {
               <p className="text-[11px] text-slate-500 dark:text-slate-400">Read, save, learn</p>
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-            <SettingsIcon size={14} />
-            Settings
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="hidden items-center gap-1.5 text-slate-500 dark:text-slate-400 sm:flex" title="Bilingual mode">
+              <LanguagesIcon size={15} aria-hidden="true" />
+              <Switch
+                checked={settings.bilingualMode}
+                loading={activating}
+                onChange={toggleBilingual}
+                label="Bilingual mode"
+              />
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
+              <SettingsIcon size={14} />
+              Settings
+            </Button>
+          </div>
         </header>
 
         {stats && (
           <StatsRow total={stats.total} addedToday={stats.addedToday} streak={stats.streak} />
         )}
-
-        {/* Bilingual reading card — top of the dashboard */}
-        <section
-          aria-labelledby="bilingual-card-heading"
-          className="m-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <LanguagesIcon size={16} className="text-brand-600 dark:text-brand-400" aria-hidden="true" />
-              <h2 id="bilingual-card-heading" className="text-sm font-semibold">
-                Bilingual reading
-              </h2>
-            </div>
-            <Switch
-              checked={settings.bilingualMode}
-              loading={activating}
-              onChange={toggleBilingual}
-              label="Bilingual mode"
-            />
-          </div>
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            Show translations inline and read in your language.
-          </p>
-        </section>
 
         <LibraryScreen onVocabularyChanged={refreshStats} />
       </div>
