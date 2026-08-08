@@ -83,51 +83,50 @@ function SettingsScreen() {
           <Spinner label="Loading settings…" />
         ) : (
           <div className="flex flex-col gap-6">
-            <div
-              id="providers"
-              className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
-                active === 'providers' ? '' : 'md:opacity-60'
-              }`}
-            >
-              <ProviderSettings settings={settings} onChange={update} />
-            </div>
+            {active === 'providers' && (
+              <div
+                id="providers"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <ProviderSettings settings={settings} onChange={update} />
+              </div>
+            )}
 
-            <div
-              id="bilingual"
-              className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
-                active === 'bilingual' ? '' : 'md:opacity-60'
-              }`}
-            >
-              <BilingualSettings settings={settings} onChange={update} />
-            </div>
+            {active === 'bilingual' && (
+              <div
+                id="bilingual"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <BilingualSettings settings={settings} onChange={update} />
+              </div>
+            )}
 
-            <div
-              id="popup"
-              className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
-                active === 'popup' ? '' : 'md:opacity-60'
-              }`}
-            >
-              <PopupSettings settings={settings} onChange={update} />
-            </div>
+            {active === 'popup' && (
+              <div
+                id="popup"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <PopupSettings settings={settings} onChange={update} />
+              </div>
+            )}
 
-            <div
-              id="appearance"
-              className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
-                active === 'appearance' ? '' : 'md:opacity-60'
-              }`}
-            >
-              <AppearanceSettings settings={settings} onChange={update} />
-            </div>
+            {active === 'appearance' && (
+              <div
+                id="appearance"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <AppearanceSettings settings={settings} onChange={update} />
+              </div>
+            )}
 
-
-            <div
-              id="data"
-              className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
-                active === 'data' ? '' : 'md:opacity-60'
-              }`}
-            >
-              <DataSettings notify={notify} />
-            </div>
+            {active === 'data' && (
+              <div
+                id="data"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <DataSettings notify={notify} />
+              </div>
+            )}
           </div>
         )}
       </main>

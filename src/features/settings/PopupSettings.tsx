@@ -16,7 +16,7 @@ const TAB_OPTIONS: ReadonlyArray<{ value: Settings['popupDefaultTab']; label: st
 
 export function PopupSettings({ settings, onChange }: PopupSettingsProps) {
   return (
-    <section aria-label="Popup" className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+    <section aria-label="Popup" className="flex flex-col gap-1">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Popup</h2>
       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
         Control what the popup shows for the word you highlight on a page.
