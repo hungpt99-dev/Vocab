@@ -94,4 +94,43 @@ describe('SelectionCard', () => {
     card.destroy();
     expect(document.querySelectorAll('#avs-selection-card')).toHaveLength(0);
   });
+
+  it('does not show a stale explain result after opening another word', async () => {
+    let resolveA!: (value: unknown) => void;
+    vi.mocked(sendMessage).mockImplementation((async (message: { type: string }) => {
+      if (message.type === 'explain') {
+        // Word A's request resolves only after we open word B.
+        return new Promise((resolve) => { resolveA = resolve; });
+      }
+      return '';
+    }) as unknown as typeof sendMessage);
+
+    const card = new SelectionCard();
+    const a = makeState('serendipity');
+    // Fire the explain for A but do NOT await — it stays pending until resolveA().
+    void card.showExplain(a, 'word');
+    // Body shows the loading state for A.
+    expect(document.querySelector('.avs-selection-card-body')?.textContent).toContain('Asking the AI');
+
+    // Now open a different word — this must clear the body and invalidate A's request.
+    card.show(makeState('ephemeral'));
+    expect(document.querySelector('[data-role="word"]')?.textContent).toBe('ephemeral');
+    expect(document.querySelector('.avs-selection-card-body')?.textContent?.trim()).toBe('');
+
+    // A's response finally resolves with A's data — must be dropped, not painted.
+    resolveA({
+      meaning: 'fortunate happenstance',
+      translation: 'vận may mắn',
+      examples: [],
+      synonyms: [],
+      provider: 'openai',
+      model: 'gpt-4o',
+      generatedAt: Date.now(),
+    });
+    await Promise.resolve();
+    const body = document.querySelector('.avs-selection-card-body')!;
+    expect(body.textContent ?? '').not.toContain('fortunate happenstance');
+    expect(body.textContent ?? '').not.toContain('vận may mắn');
+    card.destroy();
+  });
 });

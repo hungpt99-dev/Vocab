@@ -46,6 +46,8 @@ export class SelectionCard {
   private body: HTMLElement | null = null;
   private buttons: HTMLButtonElement[] = [];
   private state: CardState | null = null;
+  /** Monotonic id for the current selection; stale async results are discarded. */
+  private selectionToken = 0;
   private scrollHandler = (): void => this.reposition();
 
   private ensureElement(): HTMLElement {
@@ -113,6 +115,9 @@ export class SelectionCard {
 
   show(state: CardState): void {
     this.state = state;
+    // Invalidate any in-flight explain/translate for a previous selection so it
+    // can't paint stale content into this card (VOC-120).
+    this.selectionToken += 1;
     const card = this.ensureElement();
     this.buttons.forEach((button, index) => {
       button.tabIndex = index === 0 ? 0 : -1;
@@ -124,8 +129,11 @@ export class SelectionCard {
       translationEl.textContent = 'Translating…';
       void this.loadTranslation(state.text, translationEl);
     }
-    // Collapse any expanded body from a previous selection.
-    if (this.body) this.body.hidden = true;
+    // Collapse AND clear any expanded body from a previous selection.
+    if (this.body) {
+      this.body.replaceChildren();
+      this.body.hidden = true;
+    }
     card.classList.remove('avs-selection-card--expanded');
     card.hidden = false;
     this.reposition();
@@ -134,10 +142,14 @@ export class SelectionCard {
 
   /** Fetch the keyless translation inline (no AI key needed). */
   private async loadTranslation(text: string, el: HTMLElement): Promise<void> {
+    const token = this.selectionToken;
     try {
       const result = await sendMessage({ type: 'translate', payload: { text } });
+      // Another selection opened while we were waiting — ignore this stale result.
+      if (token !== this.selectionToken) return;
       el.textContent = result && result !== text ? result : '—';
     } catch {
+      if (token !== this.selectionToken) return;
       el.textContent = '—';
     }
   }
@@ -146,6 +158,7 @@ export class SelectionCard {
   async showExplain(state: CardState, kind: ExplainKind): Promise<void> {
     const card = this.ensureElement();
     if (!this.body) return;
+    const token = this.selectionToken;
     this.body.hidden = false;
     card.classList.add('avs-selection-card--expanded');
     this.body.replaceChildren(this.statusRow('Asking the AI…'));
@@ -164,8 +177,11 @@ export class SelectionCard {
           kind,
         },
       });
+      // A newer selection opened while the request was in flight — drop the stale result.
+      if (token !== this.selectionToken) return;
       this.body.replaceChildren(...this.renderExplanation(explanation, kind));
     } catch (cause) {
+      if (token !== this.selectionToken) return;
       const message = aiErrorMessage(cause);
       const frag = document.createDocumentFragment();
       frag.append(this.statusRow(message));
@@ -248,6 +264,8 @@ export class SelectionCard {
   hide(): void {
     if (this.element) this.element.hidden = true;
     this.state = null;
+    // Discard any in-flight explain/translate results for this selection.
+    this.selectionToken += 1;
     window.removeEventListener('scroll', this.scrollHandler, true);
   }
 
