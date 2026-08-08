@@ -8,6 +8,7 @@ import {
   ICON_BOOKMARK,
   ICON_COPY,
   ICON_FILE,
+  ICON_LANGUAGES,
   ICON_MESSAGE,
   ICON_MINIMIZE,
   ICON_MORE,
@@ -59,6 +60,8 @@ export type SmartAssistActionId =
   | 'explain-vocabulary'
   | 'simplify'
   | 'summarize'
+  | 'examples'
+  | 'native'
   | 'save-difficult-words';
 
 export interface SmartAssistAction {
@@ -75,6 +78,8 @@ export const SMART_ASSIST_ACTIONS: readonly SmartAssistAction[] = [
   { id: 'explain-vocabulary', label: 'Explain vocabulary', icon: ICON_SPARKLES, kind: 'vocabulary' },
   { id: 'simplify', label: 'Simplify', icon: ICON_MINIMIZE, kind: 'simplify' },
   { id: 'summarize', label: 'Summarize', icon: ICON_FILE, kind: 'summarize' },
+  { id: 'examples', label: 'Give examples', icon: ICON_SPARKLES, kind: 'examples' },
+  { id: 'native', label: 'Explain in my language', icon: ICON_LANGUAGES, kind: 'native' },
   { id: 'save-difficult-words', label: 'Save difficult words', icon: ICON_BOOKMARK },
 ];
 

@@ -253,22 +253,24 @@ describe('SelectionToolbar keyboard navigation', () => {
 });
 
 describe('SMART_ASSIST_ACTIONS', () => {
-  it('exposes the six smart-AI actions with routing metadata', () => {
+  it('exposes the smart-AI actions with routing metadata', () => {
     expect(SMART_ASSIST_ACTIONS.map((action) => action.label)).toEqual([
       'Explain sentence',
       'Explain grammar',
       'Explain vocabulary',
       'Simplify',
       'Summarize',
+      'Give examples',
+      'Explain in my language',
       'Save difficult words',
     ]);
-    expect(SMART_ASSIST_ACTIONS.filter((action) => action.kind)).toHaveLength(5);
+    expect(SMART_ASSIST_ACTIONS.filter((action) => action.kind)).toHaveLength(7);
     expect(SMART_ASSIST_ACTIONS.find((action) => action.id === 'save-difficult-words')?.kind).toBeUndefined();
   });
 });
 
 describe('SmartAssistMenu', () => {
-  it('renders six items and emits an assist action with the toolbar state', () => {
+  it('renders items and emits an assist action with the toolbar state', () => {
     document.body.innerHTML = '<p>hello world</p>';
     const menu = new SmartAssistMenu();
     const state = makeState('A difficult sentence.', 'sentence');
@@ -277,7 +279,7 @@ describe('SmartAssistMenu', () => {
     const element = document.getElementById('avs-assist-menu')!;
     expect(element.hidden).toBe(false);
     expect(element.getAttribute('role')).toBe('menu');
-    expect(element.querySelectorAll('.avs-assist-item')).toHaveLength(6);
+    expect(element.querySelectorAll('.avs-assist-item')).toHaveLength(8);
 
     const handler = vi.fn();
     document.addEventListener('avs-assist-action', handler);

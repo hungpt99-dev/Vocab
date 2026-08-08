@@ -29,4 +29,9 @@ describe('explain prompt template', () => {
     expect(buildExplainSystemPrompt('word')).toContain('"translation":string');
     expect(buildExplainSystemPrompt('word')).toContain('"etymology":string');
   });
+
+  it('has a dedicated prompt for the examples and native kinds', () => {
+    expect(buildExplainSystemPrompt('examples')).toContain('5-6 natural, varied sentences');
+    expect(buildExplainSystemPrompt('native')).toContain('in their own language');
+  });
 });

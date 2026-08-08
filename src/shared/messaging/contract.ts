@@ -58,6 +58,8 @@ export type Message =
         sourceLanguage?: string;
         pageTitle?: string;
         precedingText?: string;
+        /** Target language for the explanation/translation (learner's language). */
+        language?: string;
       };
     }
   | { type: 'save-difficult-words'; payload: DifficultWordsPayload }

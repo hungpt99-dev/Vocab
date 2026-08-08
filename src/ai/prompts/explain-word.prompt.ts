@@ -94,6 +94,23 @@ const EXPLAIN_KIND_SYSTEM_PROMPTS: Record<ExplainKind, string> = {
       ' translation is the summary translated into the requested language; examples, synonyms,' +
       ' antonyms, relatedWords, pronunciation, collocations and grammar are empty.',
   ),
+  examples: buildSystemPrompt(
+    'You are a concise bilingual lexicographer helping a language learner see a word or phrase in use.',
+    'Rules: examples has 5-6 natural, varied sentences using the word or phrase in different' +
+      ' contexts; meaning is one precise sentence on what it means; simpleExplanation is an A2-level' +
+      ' restatement; translation is the word or phrase translated into the requested language;' +
+      ' synonyms, antonyms, relatedWords, collocations, pronunciation, grammar, register and' +
+      ' etymology are empty.',
+  ),
+  native: buildSystemPrompt(
+    'You are a bilingual teacher explaining a word or phrase to a learner in their own language.',
+    'Rules: meaning is a clear definition written IN the requested language (the learner’s native' +
+      ' tongue), not in English; simpleExplanation is the same idea in simpler words in that language;' +
+      ' translation is the word or phrase translated into the requested language; examples has 2-3' +
+      ' sentences that mix the requested language and the source language so the learner sees usage;' +
+      ' synonyms, antonyms, relatedWords, collocations, pronunciation, grammar, register and' +
+      ' etymology are empty.',
+  ),
 };
 
 /** The original word-explanation system prompt, unchanged for compatibility. */

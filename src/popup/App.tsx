@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SelectionPayload } from '@/shared/messaging/contract';
+import type { ExplainKind } from '@/shared/types/ai';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
 import { sendMessage } from '@/shared/messaging/client';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
@@ -27,6 +28,16 @@ import type { Explanation } from '@/shared/types/vocabulary';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
 
+/** Contextual AI actions shown under the enrich panel — part of the learning
+ * flow, not a separate chat. Each maps to an ExplainKind already supported by
+ * the explain service. */
+const CONTEXT_ACTIONS: ReadonlyArray<{ kind: ExplainKind; label: string }> = [
+  { kind: 'sentence', label: 'Explain sentence' },
+  { kind: 'simplify', label: 'Simplify' },
+  { kind: 'examples', label: 'Give examples' },
+  { kind: 'native', label: 'In my language' },
+];
+
 function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => void }) {
   const [selection, setSelection] = useState<SelectionPayload | null>(null);
   const [filters, setFilters] = useState<LibraryFilters>(EMPTY_FILTERS);
@@ -41,6 +52,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const [word, setWord] = useState('');
   const { notify } = useToast();
   const [onboarded, setOnboarded] = useState(true);
+  const { settings } = useSettings();
 
   useEffect(() => {
     void isOnboarded().then((value) => setOnboarded(value));
@@ -123,6 +135,34 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
       }
     },
     [reload, onVocabularyChanged, notify],
+  );
+
+  const [explainKind, setExplainKind] = useState<ExplainKind | null>(null);
+
+  const handleExplainKind = useCallback(
+    async (kind: ExplainKind) => {
+      const target = enrichWord;
+      if (!target) return;
+      setExplainKind(kind);
+      try {
+        const explanation = await sendMessage({
+          type: 'explain',
+          payload: {
+            word: target,
+            context: selection?.sentence,
+            pageTitle: selection?.sourceTitle,
+            language: settings.targetLanguage || 'English',
+            kind,
+          },
+        });
+        setEnrich({ word: target, explanation });
+      } catch (cause) {
+        notify(aiErrorMessage(cause), 'error');
+      } finally {
+        setExplainKind(null);
+      }
+    },
+    [enrichWord, selection, settings.targetLanguage, notify],
   );
 
   const handleEnrich = useCallback(async () => {
@@ -226,6 +266,20 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
               <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
               {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
             </Button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {CONTEXT_ACTIONS.map((action) => (
+              <Button
+                key={action.kind}
+                size="sm"
+                variant="ghost"
+                disabled={explainKind !== null}
+                onClick={() => void handleExplainKind(action.kind)}
+                title={action.label}
+              >
+                {explainKind === action.kind ? '…' : action.label}
+              </Button>
+            ))}
           </div>
           {selection?.word === enrichWord && selection.sentence && (
             <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
