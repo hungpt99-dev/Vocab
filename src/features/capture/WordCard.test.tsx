@@ -15,7 +15,7 @@ const selection = {
 
 describe('WordCard', () => {
   it('renders nothing without a selection', () => {
-    render(<WordCard selection={null} onSave={() => undefined} />);
+    render(<WordCard selection={null} onSave={() => undefined} showTranslation showSimplify />);
     expect(screen.queryByText('serendipity')).not.toBeInTheDocument();
   });
 
@@ -25,7 +25,7 @@ describe('WordCard', () => {
       data: '巧合',
     });
 
-    render(<WordCard selection={selection} onSave={() => undefined} />);
+    render(<WordCard selection={selection} onSave={() => undefined} showTranslation showSimplify />);
 
     // Word is shown immediately.
     expect(screen.getByText('serendipity')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('WordCard', () => {
 
   it('calls onSave and shows Saved when already in the library', async () => {
     const onSave = vi.fn();
-    render(<WordCard selection={selection} alreadySaved onSave={onSave} />);
+    render(<WordCard selection={selection} alreadySaved onSave={onSave} showTranslation showSimplify />);
     const saveButton = screen.getByRole('button', { name: /saved/i });
     expect(saveButton).toBeDisabled();
     expect(onSave).not.toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe('WordCard', () => {
 
   it('triggers save on click', async () => {
     const onSave = vi.fn();
-    render(<WordCard selection={selection} onSave={onSave} />);
+    render(<WordCard selection={selection} onSave={onSave} showTranslation showSimplify />);
     await userEvent.click(screen.getByRole('button', { name: /save/i }));
     expect(onSave).toHaveBeenCalledTimes(1);
   });

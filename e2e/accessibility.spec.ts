@@ -87,6 +87,11 @@ test('options page exposes labelled sections and controls', async ({ page, exten
   await expect(page.getByRole('region', { name: 'Highlighting' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Your data' })).toBeVisible();
 
+  // The Popup section exposes its controls with labels.
+  await expect(page.getByRole('heading', { name: 'Popup' })).toBeVisible();
+  await expect(page.getByLabel(/auto-translate the highlighted word/i)).toBeVisible();
+  await expect(page.getByLabel(/default tab on open/i)).toBeVisible();
+
   // The API key is masked. Open the default provider's editor to reveal it.
   await page.getByRole('button', { name: /^Edit/ }).first().click();
   await expect(page.getByLabel('API key')).toHaveAttribute('type', 'password');

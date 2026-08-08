@@ -195,6 +195,13 @@ test('popup word card shows the highlighted word and its auto-translation', asyn
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
   await page.bringToFront();
+  // Re-trigger the selection read explicitly (popup mount may have raced).
+  await popup.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'get-selection' }, () => resolve());
+      }),
+  );
 
   // The highlighted word is the centerpiece (the WordCard heading).
   await expect(popup.locator('p.text-base.font-semibold', { hasText: 'serendipity' })).toBeVisible();
@@ -207,6 +214,11 @@ test('popup word card shows the highlighted word and its auto-translation', asyn
   await expect(
     popup.locator('p.text-brand-700, p.text-brand-300', { hasText: /serendipity|巧合/i }),
   ).toBeVisible({ timeout: 15_000 });
+
+  // The Simplify action is shown but gated when no AI key is configured.
+  const simplify = popup.getByRole('button', { name: /simplify/i });
+  await expect(simplify).toBeVisible();
+  await expect(simplify).toBeDisabled();
 
   // With no AI key configured, AI actions show the "needs an API key" gate.
   await expect(popup.getByText(/AI actions need an API key/i)).toBeVisible();
