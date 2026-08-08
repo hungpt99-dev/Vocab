@@ -168,6 +168,50 @@ test('saves a word straight from the page with the floating toolbar', async ({
   await expect(highlights).toHaveCount(2);
 });
 
+test('popup word card shows the highlighted word and its auto-translation', async ({
+  page,
+  context,
+  extensionId,
+  samplePageUrl,
+}) => {
+  await page.goto(samplePageUrl);
+
+  // Select "serendipity" in the first paragraph.
+  await page.evaluate(() => {
+    const paragraph = document.getElementById('para')!;
+    const text = paragraph.firstChild as Text;
+    const start = text.data.indexOf('serendipity');
+    const range = document.createRange();
+    range.setStart(text, start);
+    range.setEnd(text, start + 'serendipity'.length);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.bringToFront();
+
+  // Open the popup with the page already the active tab, so its mount-time
+  // get-selection reads the highlighted word (mirrors real popup usage).
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+  await page.bringToFront();
+
+  // The highlighted word is the centerpiece (the WordCard heading).
+  await expect(popup.locator('p.text-base.font-semibold', { hasText: 'serendipity' })).toBeVisible();
+
+  // Save is offered inline (and reflects the selection).
+  await expect(popup.getByTitle('Save this word')).toBeVisible();
+
+  // The translation request fires on mount; the result line is present whether
+  // or not the sandbox can reach keyless Google (offline falls back to source).
+  await expect(
+    popup.locator('p.text-brand-700, p.text-brand-300', { hasText: /serendipity|巧合/i }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // With no AI key configured, AI actions show the "needs an API key" gate.
+  await expect(popup.getByText(/AI actions need an API key/i)).toBeVisible();
+});
+
 test('popup AI explain with no valid provider shows an actionable toast', async ({
   context,
   extensionId,
