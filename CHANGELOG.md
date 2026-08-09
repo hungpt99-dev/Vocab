@@ -7,6 +7,41 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Popup redesign.** New app-bar with a persistent **Bilingual mode** switch (top right) and a single
+  Settings entry; the Library, Review, Quiz and Progress tabs were restyled and the WordCard was
+  reworked into a translation-first layout with inline Explain and Simplify.
+- **Simplified settings.** The Options page is now a one-section-at-a-time sidebar (Providers,
+  Appearance, Popup, Bilingual, Data, Reading experience) instead of one long scrolling form.
+- **Selection card.** The thin floating toolbar was replaced by a proper card/panel: word + keyless
+  translation header and a three-button action row — **Generate** (one AI button that produces the full
+  enrichment inline), **Save** and **Copy**.
+- **Keyless inline translation.** The selection card and the bilingual reader translate through
+  Google's public endpoint with **no AI key**, targeting the user's configured language (previously it
+  defaulted to English→English and showed `—`).
+- **Single AI button.** The card's separate Explain/Simplify AI actions were collapsed into one
+  **Generate** button; the 9-item "More" AI menu was removed from the content layer.
+- **Spaced review & quiz.** The popup Review and Quiz tabs are wired into the library workflow.
+- **Bilingual reading mode.** Side-by-side / original-first / translation-first / hover / toggle
+  layouts, with word-by-word or sentence depth and vocabulary highlighting inside the reader.
+
+### Changed
+- Selection, saving, highlighting and inline translation now work with **no API key**; an AI key is only
+  needed for the Generate/enrich step.
+- `ExplainRequest` and the explain pipeline support kinds `word | phrase | sentence | grammar |
+  vocabulary | simplify | summarize | examples | native | related`.
+- Reading-mode overlays follow the OS light/dark theme and constrain to narrow viewports.
+
+### Fixed
+- **Stale AI result.** Opening a new word while a previous word's AI/translation was in flight no longer
+  paints the old content — a per-selection token discards late results (VOC-120).
+- **Toast contrast.** The toast used a dark font on its dark variant backgrounds; it now uses a fixed
+  dark surface with light text, so success/error toasts are readable on any page theme (VOC-123).
+- **Popup bilingual switch missing.** The switch was gated behind `hidden sm:flex` and vanished in narrow
+  popup windows; it is now always visible (VOC-125).
+- **Translate not working in the card.** The card sent no target language, so the background translated
+  English→English and showed `—`; it now falls back to the user's target language (VOC-119).
+
+### Added (prior unreleased batch)
 - **Reading-mode accessibility.** In-page overlays (selection toolbar, hover card, toast) now follow the
   OS light/dark theme via `prefers-color-scheme`, constrain themselves to narrow viewports (toolbar
   wraps, toast goes edge-to-edge on small screens, the card scrolls when tall), and the selection
@@ -45,7 +80,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are free and instant.
 - **Connection test.** The Options page can test a saved provider on demand and reports a clear message.
 
-### Changed
+### Changed (prior unreleased batch)
 - **Richer page context for AI explanations.** `ExplainRequest` now carries the page title
   (`pageTitle`) and a short excerpt of the text preceding the selection (`precedingText`), captured by
   the content script and passed through the save and explain flows. The prompt includes both, so the

@@ -12,10 +12,10 @@ summary; the issue tracker is authoritative.
 | Capture (context menu, keyboard shortcut, popup) | ✅ |
 | Vocabulary library (search, edit, delete, favourite, tag) | ✅ |
 | On-page highlighting with accessible hover card | ✅ |
-| AI Explain across six providers | ✅ |
+| AI Explain across eleven providers | ✅ |
 | Settings: provider, key, colour, export/import | ✅ |
 | Storage: Dexie with unique-key de-duplication | ✅ |
-| Tests: 187 unit + 14 E2E, all green | ✅ |
+| Tests: 503 unit + 18 E2E, all green | ✅ |
 | Documentation: full `docs/` suite | ✅ |
 | CI: typecheck, lint, unit, build, E2E | ✅ |
 

@@ -1,7 +1,8 @@
 # AI Vocabulary Saver
 
 A lightweight, **local-first** Chrome extension that saves words while you browse, highlights them on
-every page you visit, and explains them using **your own AI API key**.
+every page you visit, and explains them using **your own AI API key** — or, for inline translation, a
+**keyless Google endpoint** that needs no key at all.
 
 No backend. No account. No cloud. No telemetry. Everything stays in your browser.
 
@@ -51,13 +52,14 @@ explains your words — stays under your control.
 | Feature | Details |
 | --- | --- |
 | **Save a selection** | Right-click menu, popup form, or `Ctrl+Shift+S` (`Cmd+Shift+S` on macOS) |
-| **Smart selection toolbar** | Select text on any page to get a floating toolbar: explain with AI, translate, save, copy, or copy the source sentence/citation |
+| **Selection card** | Select text on any page to get a clean card: the word, its keyless translation, and three actions — **Generate** (one AI button that produces the full enrichment: meaning, translation, pronunciation, part of speech, examples, synonyms, related words, all inline), **Save**, and **Copy** |
+| **Keyless translation, no API key** | The selection card and the bilingual reader translate via Google's public endpoint with **no AI key** — selection, saving, highlighting and inline translation all work before you add a provider |
 | **Context preserved** | Stores the word, phrase, surrounding sentence, source URL and title, note and creation time |
 | **Vocabulary library** | Debounced search, inline edit, delete, favourite and tag |
 | **On-page highlighting** | Saved words highlighted everywhere — including both columns of bilingual (original/translation) pages; hover or keyboard-focus shows meaning, pronunciation, note, saved date and an AI-explain shortcut |
-| **AI Explain** | Meaning, simple explanation, examples, synonyms, IPA pronunciation and collocations |
-| **Page translation** | Translate a page paragraph-by-paragraph; headings, lists, links and code preserved, layout untouched |
-| **Bring your own key** | OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama and LM Studio |
+| **AI Explain** | Meaning, translation, simple explanation, examples, synonyms, IPA pronunciation, part of speech and related words |
+| **Bilingual reading mode** | Render any article as original + translation (side-by-side, original-first, translation-first, hover or toggle; word-by-word or sentence depth); toggle from the popup header or Options |
+| **Bring your own key** | OpenAI, OpenRouter, DeepSeek, Mistral, Groq, Together, Google Gemini, Anthropic, LM Studio, Ollama and a `custom` OpenAI-compatible endpoint |
 | **Portable data** | Versioned JSON export and import, with merge or replace |
 | **Accessible** | Keyboard navigable, screen-reader labelled, respects `prefers-reduced-motion` and dark mode |
 
@@ -150,10 +152,12 @@ Open the popup and choose **Settings**, or right-click the extension icon → *O
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Provider | OpenAI | One of six; see below |
+| Provider | OpenAI | One of eleven; see below |
 | API key | empty | Required by hosted providers, not by local ones |
 | Model | provider default | Leave blank unless overriding |
 | Base URL | provider default | For proxies, gateways or non-standard ports |
+| Target language | `English` | The language explanations and inline translations are written in |
+| Bilingual mode | on | Show translations inline in your target language; toggle from the popup header or Options |
 | Highlight saved words | on | Applies to open tabs immediately |
 | Highlight colour | `#fde68a` | Applies to open tabs immediately |
 | Show original word | on | Hover card heading over a saved word |
@@ -162,6 +166,7 @@ Open the popup and choose **Settings**, or right-click the extension icon → *O
 | Card font size | `13px` | Hover card text, `11–18px` |
 | Card spacing | `1.5` | Hover card line-height and row gaps, `1.2–2.0` |
 | Explain automatically on save | off | Costs an API call per saved word |
+| Explain prompt template | built-in | Editable; tokens `{{language}} {{word}} {{context}} {{kind}}` |
 
 Use **Test connection** to verify a provider before saving words.
 
@@ -173,8 +178,13 @@ Use **Test connection** to verify a provider before saving words.
 | --- | --- | --- | --- |
 | OpenAI | required | `gpt-4o-mini` | |
 | OpenRouter | required | `openai/gpt-4o-mini` | Many models behind one key |
+| DeepSeek | required | `deepseek-chat` | OpenAI-compatible |
+| Mistral | required | `mistral-small-latest` | OpenAI-compatible |
+| Groq | required | `llama-3.3-70b-versatile` | OpenAI-compatible, fast |
+| Together | required | `meta-llama/Llama-3.3-70B-Instruct` | OpenAI-compatible |
 | Google Gemini | required | `gemini-1.5-flash` | |
 | Anthropic | required | `claude-3-5-haiku-latest` | |
+| `custom` | varies | — | Any OpenAI-compatible endpoint (gateways, self-hosted vLLM, non-default ports) |
 | Ollama | not required | `llama3.1` | Local, `http://localhost:11434/v1` |
 | LM Studio | not required | `local-model` | Local, `http://localhost:1234/v1` |
 
@@ -190,7 +200,11 @@ Adding a provider is usually a one-object change: see
 
 **Save a word.** Select text, then right-click → *Save "…" to vocabulary*, press `Ctrl+Shift+S`, open
 the popup (the selection is prefilled) and click **Save to vocabulary**, or use the floating
-**Save** button that appears above any selection.
+**Save** button on the selection card that appears above any selection.
+
+**Generate enrichment.** Select a word and the **selection card** appears with its keyless translation and a
+single **Generate** button. One click asks the AI for the full enrichment — meaning, translation, pronunciation,
+part of speech, examples, synonyms and related words — and renders it inline in the card. No popup, no tab-switch.
 
 **Browse your library.** The popup lists entries newest first. Search matches words, notes, sentences
 and tags. Filter by favourites or tag.
@@ -198,9 +212,12 @@ and tags. Filter by favourites or tag.
 **Explain a word.** Click **AI explain** on an entry, or on a hover card over a highlighted word. The
 result is cached until you refresh it.
 
-**Translate a page.** Select any text, then click **Translate** on the selection toolbar. Each
-paragraph, heading, list item and table cell is translated individually — never the whole page as one
-block — so headings, lists, links and code blocks stay intact and the layout is unchanged.
+**Toggle bilingual mode.** Flip the **Bilingual mode** switch in the popup header (top right) or in Options.
+When on, inline translations appear in your target language across the reader and the selection card.
+
+**Translate a page.** Use the bilingual reading mode to render any article as original + translation,
+with word-by-word or sentence-depth glossing. Translation runs through the keyless Google endpoint, so it
+works with no AI key.
 
 **Highlighting.** Saved words are highlighted as you browse, in both the original and translated text
 of bilingual pages. Hover — or tab to a highlight — to see the meaning, pronunciation, your note and
@@ -242,7 +259,7 @@ npm run build        # production build
 npm run package      # build and zip for distribution
 ```
 
-Current status: **187 unit tests** across 23 files, **14 E2E tests** across 3 specs, all green.
+Current status: **503 unit tests** across 30+ files, **18 E2E tests** across 4 specs, all green.
 
 Chrome extensions cannot run headless, so `test:e2e` wraps Playwright in `xvfb-run` on Linux. See
 [docs/TESTING.md](docs/TESTING.md).
