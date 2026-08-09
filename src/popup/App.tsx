@@ -557,7 +557,7 @@ export function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden items-center gap-1.5 text-slate-500 dark:text-slate-400 sm:flex" title="Bilingual mode">
+            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400" title="Bilingual mode">
               <LanguagesIcon size={15} aria-hidden="true" />
               <Switch
                 checked={settings.bilingualMode}
