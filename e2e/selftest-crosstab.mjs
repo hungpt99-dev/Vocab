@@ -40,9 +40,9 @@ const stateBefore = await tabB.evaluate(() => ({
   lines: document.querySelectorAll('.avs-inline-translation').length,
 }));
 
-// Turn OFF on Tab A via the bar close button.
+// Turn OFF on Tab A via the reader control's close button.
 await tabA.evaluate(() => {
-  const btn = document.querySelector('.avs-bilingual-bar-close');
+  const btn = document.querySelector('.avs-inline-control [aria-label="Close bilingual reading"]');
   if (btn) btn.click();
 });
 await tabA.waitForTimeout(1500);

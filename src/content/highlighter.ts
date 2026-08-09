@@ -21,8 +21,8 @@ export function isHighlightableTextNode(node: Node): boolean {
   if (SKIPPED_TAGS.has(parent.tagName)) return false;
   if (parent.isContentEditable) return false;
   if (parent.closest(`.${HIGHLIGHT_CLASS}`)) return false;
-  // Never highlight inside our own injected bilingual content or the headbar.
-  if (parent.closest('.avs-inline-translation, .avs-inline-control, .avs-bilingual-bar')) return false;
+  // Never highlight inside our own injected bilingual content or the reader control.
+  if (parent.closest('.avs-inline-translation, .avs-inline-control')) return false;
   // Never highlight inside our own UI (toast, toolbar, cards, popovers).
   if (parent.closest('.avs-toast, .avs-toolbar, .avs-assist-menu, .avs-panel, .avs-card')) return false;
   return true;

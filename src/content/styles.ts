@@ -906,46 +906,6 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-inline-btn:hover { background: var(--avs-overlay-surface-alt); }
     .avs-inline-btn svg { width: 16px; height: 16px; }
-    .avs-bilingual-bar {
-      position: sticky;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: ${zIndex.overlay};
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      min-height: 32px;
-      padding: 0 8px 0 12px;
-      background: var(--avs-overlay-surface);
-      color: var(--avs-overlay-text);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-      font-size: 12px;
-    }
-    .avs-bilingual-bar[hidden] { display: none; }
-    .avs-bilingual-bar-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-    }
-    .avs-bilingual-bar-label svg { width: 14px; height: 14px; }
-    .avs-bilingual-bar-close {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      border: none;
-      border-radius: ${radius.sm};
-      background: transparent;
-      color: var(--avs-overlay-text);
-      cursor: pointer;
-    }
-    .avs-bilingual-bar-close:hover { background: var(--avs-overlay-surface-alt); }
-    .avs-bilingual-bar-close svg { width: 14px; height: 14px; }
-    .avs-bilingual-bar--loading { opacity: 0.85; }
     .avs-spinner {
       width: 14px;
       height: 14px;

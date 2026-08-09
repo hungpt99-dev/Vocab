@@ -21,14 +21,12 @@ import {
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
-import { BilingualBar } from './bilingual-bar';
 
 const RESCAN_DELAY_MS = 400;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionCard();
 const reader = new InlineReader();
-const bilingualBar = new BilingualBar();
 
 /** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
 let currentSettings: import('@/shared/types/settings').Settings | null = null;
@@ -266,7 +264,7 @@ async function refresh(): Promise<void> {
 
   // Bilingual (inline) reading is independent of word highlighting: sync it first
   // so the headbar + inline translations appear even when no words are saved.
-  syncBilingual(data.bilingualMode, data.targetLanguage);
+  syncBilingual(data.bilingualMode);
 
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
@@ -282,37 +280,24 @@ async function refresh(): Promise<void> {
   startObserving();
 }
 
-function syncBilingual(enabled: boolean, targetLanguage: string): void {
+function syncBilingual(enabled: boolean): void {
   if (!enabled) {
     // Global default is off: every tab follows it, and any local opt-out is moot.
     localBilingualOff = false;
-    bilingualBar.hide();
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
     return;
   }
-  // Global default is on, but this tab may have opted out locally via the bar.
+  // Global default is on, but this tab may have opted out locally.
   if (localBilingualOff) {
-    bilingualBar.hide();
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
     return;
   }
-  bilingualBar.show(targetLanguage, onBilingualBarClose, true);
   document.body.classList.add('avs-bilingual-on');
-  if (!reader.isOpen) {
-    void reader.open().finally(() => bilingualBar.setLoading(false));
-  } else {
-    bilingualBar.setLoading(false);
-  }
-}
-
-/** In-page "turn off" — local to this tab only, never writes global settings. */
-function onBilingualBarClose(): void {
-  localBilingualOff = true;
-  bilingualBar.hide();
-  document.body.classList.remove('avs-bilingual-on');
-  if (reader.isOpen) reader.close();
+  // The reader renders its own inline control (show/hide, layout, close), so no
+  // separate floating bar is needed — that kept colliding with the popup.
+  void reader.open();
 }
 
 function scan(root: Node | null): void {
