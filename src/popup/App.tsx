@@ -12,7 +12,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, LanguagesIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
+import { BookIcon, LanguagesIcon, PlusIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -542,6 +542,22 @@ export function App() {
     [update],
   );
 
+  const addCurrentSiteToBilingual = useCallback(async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url;
+    if (!url) return;
+    let hostname: string;
+    try {
+      hostname = new URL(url).hostname.replace(/^www\./i, '').toLowerCase();
+    } catch {
+      return;
+    }
+    if (!hostname) return;
+    const current = settings.bilingualDomains ?? [];
+    if (current.includes(hostname)) return;
+    await update({ bilingualDomains: [...current, hostname] });
+  }, [settings.bilingualDomains, update]);
+
   return (
     <ToastProvider>
       <div className="flex min-h-[440px] w-full min-w-[300px] max-w-[400px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -566,6 +582,15 @@ export function App() {
                 label="Bilingual mode"
               />
             </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void addCurrentSiteToBilingual()}
+              title="Auto-enable bilingual mode on the current site"
+            >
+              <PlusIcon size={14} className="mr-1" aria-hidden="true" />
+              Auto site
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
               <SettingsIcon size={14} />
               Settings

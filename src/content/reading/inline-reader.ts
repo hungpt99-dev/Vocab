@@ -15,6 +15,7 @@ import type { WordAlignResult, BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
+import { matchesDomain } from '../index';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -69,7 +70,11 @@ export class InlineReader {
     this.generation += 1;
     this.lastError = null;
 
-    this.buildControl(settings.bilingualMode);
+    // Bilingual is active when the global switch is on OR the current domain is in
+    // the auto-enable list. The control and translation honour this effective state.
+    const effective = settings.bilingualMode || matchesDomain(location.hostname, settings.bilingualDomains);
+
+    this.buildControl(effective);
     this.prefsListener = watchReadingPreferences((next) => {
       this.alignment = next.alignment;
       if (next.mode !== this.mode) {
@@ -81,7 +86,7 @@ export class InlineReader {
     document.body.addEventListener('mouseover', this.onWordHover);
     document.body.addEventListener('mouseout', this.onWordLeave);
 
-    if (settings.bilingualMode) {
+    if (effective) {
       // Lazily translate: eagerly translate what is (or is about to be) visible so
       // the first screenful appears instantly, then top up the rest on scroll.
       // We never "load all" the page up front.

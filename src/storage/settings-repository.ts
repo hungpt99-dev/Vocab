@@ -41,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
   bilingualMode: true,
+  bilingualDomains: [],
   popupShowTranslation: true,
   popupShowSimplify: true,
   popupDefaultTab: 'library',
