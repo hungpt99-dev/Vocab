@@ -204,15 +204,15 @@ test('popup bilingual switch activates the headbar on the page', async ({ contex
     'true',
   );
 
-  // Content page must now show the bilingual headbar.
-  await expect(content.locator('.avs-bilingual-bar')).toBeVisible({ timeout: 10_000 });
+  // Content page must now show the reader's bilingual control.
+  await expect(content.locator('.avs-inline-control')).toBeVisible({ timeout: 10_000 });
 
-  // Mode depth (Word / Sentence) is controlled from the in-page bar, not the
+  // Mode depth (Word / Sentence) is controlled from the in-page control, not the
   // popup, so the popup only needs to expose the Bilingual on/off switch. We
-  // confirm flipping it off hides the headbar again.
+  // confirm flipping it off hides the control again.
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
-  await expect(content.locator('.avs-bilingual-bar')).toBeHidden({ timeout: 10_000 });
+  await expect(content.locator('.avs-inline-control')).toBeHidden({ timeout: 10_000 });
 
   await popup.close();
   await content.close();

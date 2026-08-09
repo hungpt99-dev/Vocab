@@ -66,7 +66,7 @@ await page.waitForTimeout(15000);
 const out = await page.evaluate(() => {
   const lines = [...document.querySelectorAll('.avs-inline-translation')].map((e) => e.textContent);
   const glosses = [...document.querySelectorAll('.avs-gloss-word')].slice(0, 8).map((e) => ({ src: e.textContent, tgt: e.dataset.avsGloss }));
-  const bar = !!document.querySelector('.avs-bilingual-bar, [class*="bilingual-bar"]');
+  const bar = !!document.querySelector('.avs-inline-control, [class*="inline-control"]');
   const hasArticle = !!document.querySelector('article, main, [class*="content"], p');
   return { lineCount: lines.length, glossCount: document.querySelectorAll('.avs-gloss-word').length, bar, hasArticle, sampleLines: lines.slice(0, 4), sampleGlosses: glosses };
 });
