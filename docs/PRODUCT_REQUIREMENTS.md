@@ -104,7 +104,7 @@ highlighted. Changing the colour or toggling the feature updates already-open ta
 | --- | --- | --- |
 | FR-4.1 | The user can request an explanation for any entry. | Done |
 | FR-4.2 | An explanation contains meaning, simple explanation, examples, synonyms, pronunciation and collocations. | Done |
-| FR-4.3 | Six providers are supported: OpenAI, OpenRouter, Google Gemini, Anthropic, Ollama, LM Studio. | Done |
+| FR-4.3 | Eleven providers are supported: OpenAI, OpenRouter, DeepSeek, Mistral, Groq, Together, Google Gemini, Anthropic, a `custom` OpenAI-compatible endpoint, Ollama and LM Studio. | Done |
 | FR-4.4 | The user supplies their own key; local providers need none. | Done |
 | FR-4.5 | Explanations are cached on the entry and reused until explicitly refreshed. | Done |
 | FR-4.6 | Provider errors are reported in plain language with a stable error code. | Done |
@@ -157,9 +157,9 @@ doing so.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| FR-6.1 | The user can enter reading mode from the selection toolbar (More → Reading mode). | Done |
+| FR-6.1 | The user can enter reading mode from the popup (Bilingual mode switch) or Options. | Done |
 | FR-6.2 | Reading mode shows the article's title and top-level paragraphs/headings, skipping navigation and code. | Done |
-| FR-6.3 | Each paragraph is translated into the user's target language through the configured AI provider. | Done |
+| FR-6.3 | Each paragraph is translated into the user's target language through the keyless Google endpoint (no AI key required) or, where configured, the AI provider. | Done |
 | FR-6.4 | Five layouts are available: side-by-side, original-first, translation-first, hover-translation, toggle-translation. | Done |
 | FR-6.5 | Switching layout is instant and never reloads the page or rebuilds the article. | Done |
 | FR-6.6 | A block whose translation failed shows an "unavailable" note without blocking the rest. | Done |
