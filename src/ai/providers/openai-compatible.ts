@@ -58,7 +58,12 @@ export class OpenAiCompatibleProvider implements AiProvider {
       buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
     );
-    return toExplanation(content, { provider: this.id, model });
+    return toExplanation(content, {
+      provider: this.id,
+      model,
+      kind: request.kind,
+      text: request.word,
+    });
   }
 
   async translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult> {

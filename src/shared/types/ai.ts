@@ -13,4 +13,6 @@ export type ExplainKind =
   | 'summarize'
   | 'examples'
   | 'native'
-  | 'related';
+  | 'related'
+  /** X-Ray Reading: reveal the simple idea hidden inside complex language. */
+  | 'xray';

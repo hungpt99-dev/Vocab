@@ -188,6 +188,68 @@ export function injectStyles(doc: Document = document): void {
       font-size: 14px;
       color: var(--avs-overlay-text);
     }
+    /* X-Ray Reading: "seeing through complexity" — soft blocks, arrow diagrams,
+       no academic grammar-diagram feel. Uses the shared overlay tokens so dark
+       mode and theming come for free. */
+    .avs-xray-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: ${spacing.sm} 0;
+      border-top: 1px solid var(--avs-overlay-divider);
+    }
+    .avs-xray-block:first-child { border-top: 0; padding-top: 0; }
+    .avs-xray-heading {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--avs-overlay-muted);
+    }
+    .avs-xray-quote {
+      margin: 0;
+      padding: ${spacing.xs} ${spacing.sm};
+      border-left: 2px solid var(--avs-overlay-accent);
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface-alt);
+      font-size: 13px;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-xray-representation {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.5;
+      color: var(--avs-overlay-accent);
+      word-break: break-word;
+    }
+    .avs-xray-simple,
+    .avs-xray-layer-explain,
+    .avs-xray-full {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-xray-layer {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: ${spacing.xs};
+    }
+    .avs-xray-relates,
+    .avs-xray-relationship {
+      margin: 0;
+      font-size: 13px;
+      color: var(--avs-overlay-muted);
+      word-break: break-word;
+    }
+    .avs-xray-meta {
+      margin: 0;
+      font-size: 11px;
+      color: var(--avs-overlay-muted);
+    }
     .avs-selection-card-settings {
       align-self: flex-start;
       margin-top: ${spacing.xs};

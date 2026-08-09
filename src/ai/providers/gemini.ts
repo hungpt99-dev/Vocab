@@ -32,7 +32,12 @@ export class GeminiProvider implements AiProvider {
       buildExplainWordUserPrompt(request),
       'application/json',
     );
-    return toExplanation(content, { provider: this.id, model: config.model || this.defaultModel });
+    return toExplanation(content, {
+      provider: this.id,
+      model: config.model || this.defaultModel,
+      kind: request.kind,
+      text: request.word,
+    });
   }
 
   async translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult> {

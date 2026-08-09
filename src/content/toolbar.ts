@@ -35,7 +35,14 @@ export interface ToolbarState {
 }
 
 /** Every action the toolbar can emit. */
-export type ToolbarAnyActionId = 'generate' | 'explain' | 'simplify' | 'save' | 'copy' | 'more';
+export type ToolbarAnyActionId =
+  | 'generate'
+  | 'explain'
+  | 'xray'
+  | 'simplify'
+  | 'save'
+  | 'copy'
+  | 'more';
 
 /** The smart-AI actions exposed on a translated/selected sentence. */
 export type SmartAssistActionId =

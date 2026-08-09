@@ -166,6 +166,12 @@ async function handleToolbarAction(
       if (state) showInlineExplain(state, 'word');
       return;
     }
+    // X-Ray Reading (VOC-121): reveal the simple idea hidden inside the
+    // selected text. The card stays open so the result renders inline.
+    case 'xray': {
+      if (state) showInlineExplain(state, 'xray');
+      return;
+    }
     case 'simplify': {
       toolbar.hide();
       if (state) showInlineExplain(state, 'simplify');

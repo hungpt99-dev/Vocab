@@ -28,6 +28,8 @@ export interface Explanation {
   etymology?: string;
   /** A few related phrases or fixed expressions. */
   relatedPhrases?: string[];
+  /** Structured X-Ray Reading analysis; present only for the 'xray' kind. */
+  xray?: import('./xray').XRayReadingResult;
   /** Provider id that generated this explanation. */
   provider: string;
   /** Model identifier used, when reported. */
