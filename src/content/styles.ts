@@ -282,15 +282,21 @@ export function injectStyles(doc: Document = document): void {
       padding: ${spacing.md} ${spacing.lg};
       border-radius: ${radius.md};
       font: ${typography.overlayCompact} ${typography.systemStack};
-      color: var(--avs-overlay-text);
-      background: var(--avs-overlay-surface-alt);
+      /* Fixed dark surface + light text so the toast stays readable on any page
+         theme (the default used var(--avs-overlay-text), which resolves to a dark
+         colour on light-mode pages and became unreadable on the dark variant
+         backgrounds). See VOC-121. */
+      color: ${color.overlayText};
+      background: ${color.overlaySurfaceActive};
       box-shadow: ${elevation.overlay};
     }
     @media (max-width: 480px) {
       .avs-toast { right: ${spacing.sm}; bottom: ${spacing.sm}; left: ${spacing.sm}; }
     }
-    .avs-toast[data-variant='success'] { background: ${color.status.success}; }
-    .avs-toast[data-variant='error'] { background: ${color.status.danger}; }
+    /* Variant backgrounds are dark (green/red), so force light text on every variant
+       to guarantee contrast regardless of the page's light/dark theme. */
+    .avs-toast[data-variant='success'] { background: ${color.status.success}; color: ${color.overlayText}; }
+    .avs-toast[data-variant='error'] { background: ${color.status.danger}; color: ${color.overlayText}; }
     .avs-toolbar {
       position: fixed;
       z-index: ${zIndex.overlay};
