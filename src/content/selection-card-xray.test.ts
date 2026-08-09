@@ -213,3 +213,117 @@ describe('SelectionCard X-Ray Reading', () => {
     card.destroy();
   });
 });
+
+const JAPANESE_XRAY: XRayReadingResult = {
+  detectedLanguage: 'Japanese',
+  originalText: '委員会が昨日公表した報告書が懸念を呼んでいる。',
+  core: {
+    representation: '報告書 → 呼んでいる → 懸念',
+    simpleMeaning: '報告書が懸念を招いている。',
+  },
+  complexity: [{ text: '委員会が昨日公表した', explanation: '報告書を説明する連体修飾節。' }],
+  relationships: [],
+  fullExplanation: '委員会が昨日報告書を公表し、その報告書が今、懸念を招いている。',
+  // Structure described with Japanese categories, not subject-verb-object.
+  structure: '連体修飾節が「報告書」を修飾し、その報告書が主節の主語になっている。',
+  grammar: '連体修飾節と、継続を表すテイル形。',
+  why: '報告書を前に置くことで、委員会ではなく報告書が話題になる。',
+  vocabulary: [{ term: '懸念を呼ぶ', note: '心配を引き起こす', kind: '慣用表現' }],
+  difficulty: { cefr: 'B2', reason: '連体修飾節が長い。' },
+  simplerVersion: '委員会が昨日報告書を出した。それが心配を招いている。',
+};
+
+const FULL_XRAY: XRayReadingResult = {
+  ...ENGLISH_XRAY,
+  structure: 'One main clause; a relative clause modifies the subject.',
+  grammar: 'Relative clause plus present perfect.',
+  meaning: 'The publication has produced worry among readers.',
+  why: 'Fronting the report makes it the topic, not the committee.',
+  vocabulary: [
+    { term: 'raise concerns', note: 'to cause worry', kind: 'collocation' },
+    { term: 'release', note: 'to publish officially' },
+  ],
+  difficulty: { cefr: 'B2', reason: 'Embedded clause and abstract nouns.' },
+  simplerVersion: 'The committee published a report yesterday. People are worried.',
+};
+
+describe('SelectionCard X-Ray whole-sentence anatomy (VOC-122)', () => {
+  async function renderFull(xray: XRayReadingResult): Promise<HTMLElement> {
+    vi.mocked(sendMessage).mockResolvedValue(explanationWithXRay(xray) as never);
+    const card = new SelectionCard();
+    const state = makeState(xray.originalText);
+    card.show(state);
+    await card.showExplain(state, 'xray');
+    return document.querySelector<HTMLElement>('.avs-selection-card-body')!;
+  }
+
+  it('renders every anatomy section', async () => {
+    const body = await renderFull(FULL_XRAY);
+    const labels = [...body.querySelectorAll('.avs-xray-summary')].map((s) => s.textContent);
+    expect(labels).toEqual([
+      'Structure',
+      'Grammar',
+      'Meaning',
+      'Why it is written this way',
+      'Vocabulary',
+      'Simpler version',
+    ]);
+    const text = body.textContent ?? '';
+    expect(text).toContain('a relative clause modifies the subject');
+    expect(text).toContain('present perfect');
+    expect(text).toContain('produced worry among readers');
+    expect(text).toContain('makes it the topic');
+    expect(text).toContain('raise concerns');
+    expect(text).toContain('collocation');
+    expect(text).toContain('People are worried');
+  });
+
+  it('keeps the sections collapsed so the panel stays compact', async () => {
+    const body = await renderFull(FULL_XRAY);
+    const sections = [...body.querySelectorAll<HTMLDetailsElement>('.avs-xray-section')];
+    expect(sections.length).toBeGreaterThan(0);
+    expect(sections.every((s) => !s.open)).toBe(true);
+    // The core summary is NOT hidden behind a disclosure.
+    expect(body.textContent).toContain('The report → has raised → concerns');
+  });
+
+  it('shows the CEFR difficulty as a glanceable chip, outside the sections', async () => {
+    const body = await renderFull(FULL_XRAY);
+    const chip = body.querySelector('.avs-xray-cefr');
+    expect(chip?.textContent).toBe('B2');
+    expect(chip?.closest('.avs-xray-section')).toBeNull();
+    expect(body.textContent).toContain('Embedded clause and abstract nouns.');
+  });
+
+  it('omits sections the model did not return', async () => {
+    const body = await renderFull(ENGLISH_XRAY);
+    expect(body.querySelector('.avs-xray-section')).toBeNull();
+    expect(body.querySelector('.avs-xray-cefr')).toBeNull();
+    // The VOC-121 view still renders in full.
+    expect(body.textContent).toContain('Core Meaning');
+    expect(body.textContent).toContain('Put It Together');
+  });
+
+  it('renders anatomy for a third language through identical code', async () => {
+    const body = await renderFull(JAPANESE_XRAY);
+    const text = body.textContent ?? '';
+    // Japanese grammatical categories survive verbatim; nothing is anglicised.
+    expect(text).toContain('連体修飾節');
+    expect(text).toContain('テイル形');
+    expect(text).toContain('懸念を呼ぶ');
+    expect(text).toContain('慣用表現');
+    expect(text).toContain('Detected language: Japanese');
+    expect(body.querySelector('.avs-xray-cefr')?.textContent).toBe('B2');
+    // Same section labels as English: one universal frontend, no per-language branch.
+    const labels = [...body.querySelectorAll('.avs-xray-summary')].map((s) => s.textContent);
+    expect(labels).toContain('Structure');
+    expect(labels).toContain('Vocabulary');
+  });
+
+  it('drops the vocabulary section when there are no items', async () => {
+    const body = await renderFull({ ...FULL_XRAY, vocabulary: [] });
+    const labels = [...body.querySelectorAll('.avs-xray-summary')].map((s) => s.textContent);
+    expect(labels).not.toContain('Vocabulary');
+    expect(labels).toContain('Structure');
+  });
+});

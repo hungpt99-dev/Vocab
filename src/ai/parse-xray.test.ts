@@ -80,6 +80,136 @@ describe('toXRayResult', () => {
   });
 });
 
+describe('whole-sentence anatomy (VOC-122)', () => {
+  const anatomy = {
+    core: { representation: 'A → B', simpleMeaning: 'A causes B' },
+    structure: 'One main clause with a relative clause attached to the subject.',
+    grammar: 'Relative clause; present perfect for a result that still stands.',
+    meaning: 'The publication has produced worry.',
+    why: 'Front-loading the report makes it the topic rather than the committee.',
+    vocabulary: [
+      { term: 'raise concerns', note: 'to cause worry', kind: 'collocation' },
+      { term: 'release', note: 'to publish officially' },
+    ],
+    difficulty: { cefr: 'B2', reason: 'Embedded clause plus abstract nouns.' },
+    simplerVersion: 'The committee published a report yesterday. People are worried.',
+  };
+
+  it('parses every anatomy field', () => {
+    const r = toXRayResult(JSON.stringify(anatomy), 'orig');
+    expect(r?.structure).toContain('relative clause');
+    expect(r?.grammar).toContain('present perfect');
+    expect(r?.meaning).toBe('The publication has produced worry.');
+    expect(r?.why).toContain('topic');
+    expect(r?.vocabulary).toHaveLength(2);
+    expect(r?.vocabulary?.[0]).toEqual({
+      term: 'raise concerns',
+      note: 'to cause worry',
+      kind: 'collocation',
+    });
+    // kind is optional and omitted rather than blank.
+    expect(r?.vocabulary?.[1]).toEqual({ term: 'release', note: 'to publish officially' });
+    expect(r?.difficulty).toEqual({ cefr: 'B2', reason: 'Embedded clause plus abstract nouns.' });
+    expect(r?.simplerVersion).toContain('published a report');
+  });
+
+  it('omits sections the model did not provide', () => {
+    const r = toXRayResult(JSON.stringify({ core: { representation: 'A → B' } }), 'orig');
+    expect(r).not.toBeNull();
+    expect(r?.structure).toBeUndefined();
+    expect(r?.grammar).toBeUndefined();
+    expect(r?.why).toBeUndefined();
+    expect(r?.vocabulary).toBeUndefined();
+    expect(r?.difficulty).toBeUndefined();
+    expect(r?.simplerVersion).toBeUndefined();
+  });
+
+  it('recognises an X-Ray made only of anatomy fields', () => {
+    const r = toXRayResult(JSON.stringify({ structure: 'Two coordinated clauses.' }), 'orig');
+    expect(r?.structure).toBe('Two coordinated clauses.');
+  });
+
+  it('normalises loosely-written CEFR levels', () => {
+    for (const [written, expected] of [
+      ['b2', 'B2'],
+      ['B2 (upper intermediate)', 'B2'],
+      ['Level C1', 'C1'],
+      ['a1', 'A1'],
+    ] as const) {
+      const r = toXRayResult(JSON.stringify({ structure: 's', difficulty: { cefr: written } }), 'o');
+      expect(r?.difficulty?.cefr).toBe(expected);
+    }
+  });
+
+  it('drops a difficulty it cannot map to a CEFR level', () => {
+    for (const bogus of ['intermediate', 'D9', '', 'hard']) {
+      const r = toXRayResult(JSON.stringify({ structure: 's', difficulty: { cefr: bogus } }), 'o');
+      expect(r?.difficulty).toBeUndefined();
+    }
+  });
+
+  it('drops incomplete vocabulary items and caps the list at five', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ term: `t${i}`, note: `n${i}` }));
+    const r = toXRayResult(
+      JSON.stringify({
+        structure: 's',
+        vocabulary: [{ term: 'no note' }, { note: 'no term' }, ...many],
+      }),
+      'o',
+    );
+    expect(r?.vocabulary).toHaveLength(5);
+    expect(r?.vocabulary?.[0]?.term).toBe('t0');
+  });
+
+  it('suppresses a simpler version identical to the original text', () => {
+    const same = 'Đây là một câu đơn giản.';
+    const r = toXRayResult(JSON.stringify({ structure: 's', simplerVersion: same }), same);
+    expect(r?.simplerVersion).toBeUndefined();
+  });
+
+  it('does not duplicate the core meaning as the natural meaning', () => {
+    const r = toXRayResult(
+      JSON.stringify({ core: { simpleMeaning: 'Same text' }, meaning: 'Same text' }),
+      'o',
+    );
+    expect(r?.core.simpleMeaning).toBe('Same text');
+    expect(r?.meaning).toBeUndefined();
+  });
+
+  it('carries anatomy for languages that are neither English nor Vietnamese', () => {
+    // Japanese: topic-comment framing, terms kept in the original script.
+    const ja = toXRayResult(
+      JSON.stringify({
+        detectedLanguage: 'Japanese',
+        core: { representation: '報告書 → 呼んでいる → 懸念', simpleMeaning: '報告書が懸念を招いた。' },
+        structure: '主題が助詞「が」で示され、連体修飾節が報告書を説明している。',
+        grammar: '連体修飾節と継続を表すテイル形。',
+        vocabulary: [{ term: '懸念を呼ぶ', note: '心配を引き起こす', kind: '慣用表現' }],
+        difficulty: { cefr: 'B2' },
+      }),
+      '',
+    );
+    expect(ja?.structure).toContain('連体修飾節');
+    expect(ja?.vocabulary?.[0]?.term).toBe('懸念を呼ぶ');
+    expect(ja?.difficulty?.cefr).toBe('B2');
+
+    // Arabic: verb-initial ordering, right-to-left script preserved verbatim.
+    const ar = toXRayResult(
+      JSON.stringify({
+        detectedLanguage: 'Arabic',
+        core: { representation: 'التقرير → أثار → مخاوف', simpleMeaning: 'التقرير سبب القلق.' },
+        structure: 'جملة فعلية تبدأ بالفعل ثم الفاعل.',
+        vocabulary: [{ term: 'أثار مخاوف', note: 'سبب القلق', kind: 'تلازم لفظي' }],
+        difficulty: { cefr: 'B1' },
+      }),
+      '',
+    );
+    expect(ar?.structure).toContain('جملة فعلية');
+    expect(ar?.vocabulary?.[0]?.term).toBe('أثار مخاوف');
+    expect(ar?.difficulty?.cefr).toBe('B1');
+  });
+});
+
 describe('toExplanation with the xray kind', () => {
   const meta = { provider: 'openai', model: 'gpt-4o-mini' };
 
