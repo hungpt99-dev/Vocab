@@ -160,6 +160,11 @@ export function injectStyles(doc: Document = document): void {
       gap: ${spacing.xs};
       padding: ${spacing.md} ${spacing.lg};
       overflow-y: auto;
+      /* A flex item defaults to min-height:auto, which refuses to shrink below
+         its content — that made overflow-y inert and let long X-Ray results
+         (VOC-122) render past the card's max-height, out of reach. */
+      flex: 1 1 auto;
+      min-height: 0;
     }
     .avs-selection-card-status {
       font-size: 13px;
@@ -249,6 +254,94 @@ export function injectStyles(doc: Document = document): void {
       margin: 0;
       font-size: 11px;
       color: var(--avs-overlay-muted);
+    }
+    /* Whole-sentence anatomy: compact expandable sections (VOC-122). */
+    .avs-xray-section {
+      border-top: 1px solid var(--avs-overlay-divider);
+      padding: ${spacing.xs} 0;
+    }
+    .avs-xray-summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: ${spacing.xs};
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--avs-overlay-text);
+      padding: 2px 0;
+    }
+    .avs-xray-summary::-webkit-details-marker { display: none; }
+    .avs-xray-summary::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-left: 4px solid var(--avs-overlay-muted);
+      border-top: 3.5px solid transparent;
+      border-bottom: 3.5px solid transparent;
+      transition: transform 120ms ease;
+    }
+    .avs-xray-section[open] > .avs-xray-summary::before { transform: rotate(90deg); }
+    .avs-xray-summary:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 2px; }
+    .avs-xray-section-text {
+      margin: ${spacing.xs} 0 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-xray-vocab {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: ${spacing.xs};
+      margin-top: ${spacing.xs};
+    }
+    .avs-xray-vocab-term {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--avs-overlay-text);
+      word-break: break-word;
+    }
+    .avs-xray-vocab-kind {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 1px 5px;
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-surface-alt);
+      color: var(--avs-overlay-muted);
+    }
+    .avs-xray-vocab-note {
+      flex-basis: 100%;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--avs-overlay-muted);
+      word-break: break-word;
+    }
+    .avs-xray-difficulty {
+      display: flex;
+      align-items: baseline;
+      gap: ${spacing.xs};
+      padding-top: ${spacing.xs};
+      border-top: 1px solid var(--avs-overlay-divider);
+    }
+    .avs-xray-cefr {
+      flex: none;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 2px 7px;
+      border-radius: ${radius.sm};
+      background: var(--avs-overlay-accent);
+      color: var(--avs-overlay-surface);
+    }
+    .avs-xray-difficulty-reason {
+      margin: 0;
+      font-size: 12px;
+      color: var(--avs-overlay-muted);
+      word-break: break-word;
     }
     .avs-selection-card-settings {
       align-self: flex-start;

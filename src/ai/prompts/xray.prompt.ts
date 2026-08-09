@@ -29,6 +29,8 @@ export const XRAY_SYSTEM_PROMPT = [
   'how the text is actually built.',
   'You analyse the selected text as a whole. You are NOT a grammar checker: never look for mistakes,',
   'never correct the text, never produce a syntax tree, and never list the part of speech of every word.',
+  'Do not explain every word, and do not overload the user with academic grammar terminology. Explain',
+  'only what actually stands between the reader and the meaning.',
   // ---- language agnosticism, stated up front and repeated where it matters ----
   'The selected text may be in ANY language. Never assume it is English, Vietnamese, or any specific',
   'language. Detect the language yourself and analyse the text in its original language, preserving',

@@ -338,6 +338,67 @@ export class SelectionCard {
       );
     }
 
+    // ---- Whole-sentence anatomy (VOC-122) -------------------------------
+    // Compact, collapsed-by-default sections so the panel still reads as an
+    // x-ray at a glance instead of a wall of AI prose. Nothing here is
+    // language-specific: the model already described the text using the
+    // categories that fit its own language.
+    const details = (label: string, build: () => HTMLElement[]): void => {
+      const children = build();
+      if (children.length === 0) return;
+      const section = document.createElement('details');
+      section.className = 'avs-xray-section';
+      const summary = document.createElement('summary');
+      summary.className = 'avs-xray-summary';
+      summary.textContent = label;
+      section.append(summary, ...children);
+      rows.push(section);
+    };
+    const textSection = (label: string, value: string | undefined): void => {
+      if (!value) return;
+      details(label, () => [para('avs-xray-section-text', value)]);
+    };
+
+    textSection('Structure', xray.structure);
+    textSection('Grammar', xray.grammar);
+    textSection('Meaning', xray.meaning);
+    textSection('Why it is written this way', xray.why);
+
+    details('Vocabulary', () =>
+      (xray.vocabulary ?? []).map((item) => {
+        const row = document.createElement('div');
+        row.className = 'avs-xray-vocab';
+        const term = document.createElement('span');
+        term.className = 'avs-xray-vocab-term';
+        term.textContent = item.term;
+        row.append(term);
+        if (item.kind) {
+          const kind = document.createElement('span');
+          kind.className = 'avs-xray-vocab-kind';
+          kind.textContent = item.kind;
+          row.append(kind);
+        }
+        row.append(para('avs-xray-vocab-note', item.note));
+        return row;
+      }),
+    );
+
+    textSection('Simpler version', xray.simplerVersion);
+
+    // Difficulty is a single glanceable chip rather than a section.
+    if (xray.difficulty) {
+      const wrap = document.createElement('div');
+      wrap.className = 'avs-xray-difficulty';
+      const chip = document.createElement('span');
+      chip.className = 'avs-xray-cefr';
+      chip.textContent = xray.difficulty.cefr;
+      wrap.append(chip);
+      if (xray.difficulty.reason) {
+        wrap.append(para('avs-xray-difficulty-reason', xray.difficulty.reason));
+      }
+      rows.push(wrap);
+    }
+
     if (xray.detectedLanguage) {
       rows.push(para('avs-xray-meta', `Detected language: ${xray.detectedLanguage}`));
     }
