@@ -69,6 +69,9 @@ export interface Settings {
   autoExplainOnSave: boolean;
   /** Bilingual mode: show translations/meanings inline in the user's language. */
   bilingualMode: boolean;
+  /** Domains (hostnames) that automatically turn on bilingual mode, regardless
+   *  of the global `bilingualMode` setting. Empty = only the global switch applies. */
+  bilingualDomains: string[];
   /** Popup: auto-fetch the keyless translation of the highlighted word on open. */
   popupShowTranslation: boolean;
   /** Popup: show the Simplify action for the highlighted word. */

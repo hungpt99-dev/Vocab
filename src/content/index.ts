@@ -264,7 +264,7 @@ async function refresh(): Promise<void> {
 
   // Bilingual (inline) reading is independent of word highlighting: sync it first
   // so the headbar + inline translations appear even when no words are saved.
-  syncBilingual(data.bilingualMode);
+  syncBilingual(data.bilingualMode, data.bilingualDomains);
 
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
@@ -280,15 +280,36 @@ async function refresh(): Promise<void> {
   startObserving();
 }
 
-function syncBilingual(enabled: boolean): void {
-  if (!enabled) {
-    // Global default is off: every tab follows it, and any local opt-out is moot.
+/**
+ * Whether `hostname` matches any entry in `domains`. Each domain is matched as a
+ * bare hostname or as a subdomain of it, with a leading `www.` ignored on both
+ * sides so `example.com` and `www.example.com` are equivalent.
+ */
+export function matchesDomain(hostname: string, domains: readonly string[]): boolean {
+  const host = hostname.replace(/^www\./i, '').toLowerCase();
+  return domains.some((raw) => {
+    // A stored rule may be a bare hostname or a full URL the user pasted; normalise it.
+    const domain = raw
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/.*$/, '')
+      .replace(/^www\./i, '')
+      .toLowerCase();
+    return domain !== '' && (host === domain || host.endsWith(`.${domain}`));
+  });
+}
+
+function syncBilingual(enabled: boolean, domains: readonly string[]): void {
+  // Auto-enable for configured domains even when the global switch is off.
+  const active = enabled || matchesDomain(location.hostname, domains);
+  if (!active) {
+    // Bilingual is off for this page: any local opt-out is moot.
     localBilingualOff = false;
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
     return;
   }
-  // Global default is on, but this tab may have opted out locally.
+  // Bilingual is on, but this tab may have opted out locally.
   if (localBilingualOff) {
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();

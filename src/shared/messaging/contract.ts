@@ -83,6 +83,8 @@ export interface HighlightData {
   /** Whether bilingual (inline) reading is enabled; the content script shows the
    * headbar and injects translations on the page when this is true. */
   bilingualMode: boolean;
+  /** Domains (hostnames) that auto-enable bilingual mode on matching pages. */
+  bilingualDomains: string[];
   /** Target language for inline translations. */
   targetLanguage: string;
   /** Reading overlay presentation, applied live via CSS custom properties. */
