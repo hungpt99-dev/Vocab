@@ -562,18 +562,24 @@ export function App() {
     <ToastProvider>
       <div className="flex min-h-[440px] w-full min-w-[300px] max-w-[400px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         {/* App bar */}
-        <header className="flex items-center justify-between gap-2 border-b border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+        <header className="flex items-center gap-3 border-b border-slate-200/80 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+          {/* Brand: logo + name + subtitle grouped together */}
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
               <BookIcon size={16} />
             </span>
-            <div className="leading-tight">
-              <h1 className="text-sm font-semibold tracking-tight">AI Vocabulary Saver</h1>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Read, save, learn</p>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-sm font-semibold tracking-tight">AI Vocabulary Saver</h1>
+              <p className="max-[360px]:hidden truncate text-[11px] text-slate-500 dark:text-slate-400">
+                Read, save, learn
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400" title="Bilingual mode">
+
+          {/* Controls, pinned right, never squeezed, consistent gaps */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {/* Translate icon + toggle as a compact control group */}
+            <span className="flex shrink-0 items-center gap-1.5 text-slate-500 dark:text-slate-400" title="Bilingual mode">
               <LanguagesIcon size={15} aria-hidden="true" />
               <Switch
                 checked={settings.bilingualMode}
@@ -585,14 +591,20 @@ export function App() {
             <Button
               size="sm"
               variant="ghost"
+              className="whitespace-nowrap"
               onClick={() => void addCurrentSiteToBilingual()}
               title="Auto-enable bilingual mode on the current site"
             >
-              <PlusIcon size={14} className="mr-1" aria-hidden="true" />
+              <PlusIcon size={14} className="shrink-0" aria-hidden="true" />
               Auto site
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => chrome.runtime.openOptionsPage()}>
-              <SettingsIcon size={14} />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="whitespace-nowrap"
+              onClick={() => chrome.runtime.openOptionsPage()}
+            >
+              <SettingsIcon size={14} className="shrink-0" aria-hidden="true" />
               Settings
             </Button>
           </div>
