@@ -9,5 +9,6 @@ export {
   EXPLAIN_SENTENCE_SYSTEM_PROMPT,
   buildExplainUserPrompt,
 } from './explain-selection.prompt';
+export { XRAY_SYSTEM_PROMPT, buildXRayUserPrompt } from './xray.prompt';
 export { TRANSLATE_SYSTEM_PROMPT, buildTranslateUserPrompt } from './translate.prompt';
 export { ALIGN_SYSTEM_PROMPT, buildAlignUserPrompt } from './translate.prompt';

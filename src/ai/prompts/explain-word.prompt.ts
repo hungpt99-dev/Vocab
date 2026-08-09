@@ -1,5 +1,6 @@
 import type { ExplainKind } from '@/shared/types/ai';
 import type { ExplainRequest } from '@/shared/types/explain';
+import { XRAY_SYSTEM_PROMPT, buildXRayUserPrompt } from './xray.prompt';
 
 /**
  * Context lines shared by every unit prompt: the surrounding paragraph, source
@@ -111,6 +112,9 @@ const EXPLAIN_KIND_SYSTEM_PROMPTS: Record<ExplainKind, string> = {
       ' synonyms, antonyms, relatedWords, collocations, pronunciation, grammar, register and' +
       ' etymology are empty.',
   ),
+  // X-Ray Reading owns its full prompt (it does not return the lexicographer
+  // JSON shape), so it is registered as-is rather than via buildSystemPrompt.
+  xray: XRAY_SYSTEM_PROMPT,
   related: buildSystemPrompt(
     'You are a concise bilingual lexicographer expanding a learner’s vocabulary around one word.',
     'Rules: relatedWords lists up to 8 words or short phrases semantically related to the input' +
@@ -127,7 +131,9 @@ export const EXPLAIN_WORD_SYSTEM_PROMPT_KIND = EXPLAIN_KIND_SYSTEM_PROMPTS.word;
 
 /** System prompt for a specific analysis kind. Defaults to the word prompt. */
 export function buildExplainSystemPrompt(kind: ExplainKind = 'word', template?: string): string {
-  if (template && template.trim()) {
+  // The user's custom template describes the word-explanation JSON shape, so it
+  // must not hijack X-Ray Reading, which returns a different structure.
+  if (kind !== 'xray' && template && template.trim()) {
     return substituteTemplate(template, kind);
   }
   return EXPLAIN_KIND_SYSTEM_PROMPTS[kind];
@@ -164,6 +170,19 @@ export function buildExplainWordUserPrompt({
   language = 'English',
   kind = 'word',
 }: ExplainRequest): string {
+  if (kind === 'xray') {
+    return buildXRayUserPrompt({
+      word,
+      context,
+      pageTitle,
+      precedingText,
+      sourceTitle,
+      sourceUrl,
+      sourceLanguage,
+      language,
+      kind,
+    });
+  }
   const label = kind === 'word' ? 'Word or phrase' : 'Text';
   const lines = [`${label}: "${word}"`];
   if (context) lines.push(`It appeared in this context: "${context}"`);

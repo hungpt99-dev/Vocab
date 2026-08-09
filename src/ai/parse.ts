@@ -1,4 +1,6 @@
+import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation } from '@/shared/types/vocabulary';
+import { xrayFromObject } from './parse-xray';
 import { AiError } from './types';
 
 /** Pull a JSON object out of a model response that may be fenced or padded. */
@@ -49,16 +51,20 @@ function asStringArray(value: unknown): string[] {
 /** Coerce an arbitrary model response into a well-formed Explanation. */
 export function toExplanation(
   raw: string,
-  meta: { provider: string; model: string },
+  meta: { provider: string; model: string; kind?: ExplainKind; text?: string },
 ): Explanation {
   const parsed = extractJsonObject(raw) as Record<string, unknown>;
-  const meaning = asString(parsed.meaning);
+  // X-Ray Reading returns its own structure; its core.simpleMeaning stands in
+  // for `meaning` so the shared Explanation contract still holds.
+  const xray = meta.kind === 'xray' ? xrayFromObject(parsed, meta.text ?? '') : null;
+  const meaning = asString(parsed.meaning) || xray?.core.simpleMeaning || '';
   if (!meaning) {
     throw new AiError('bad_response', 'The AI response was missing a meaning.');
   }
 
   return {
     meaning,
+    ...(xray ? { xray } : {}),
     simpleExplanation: asString(parsed.simpleExplanation) || meaning,
     translation: asString(parsed.translation),
     examples: asStringArray(parsed.examples),

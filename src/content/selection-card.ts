@@ -1,6 +1,7 @@
 import { detectLanguage } from '@/shared/lib/text';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { Explanation } from '@/shared/types/vocabulary';
+import type { XRayReadingResult } from '@/shared/types/xray';
 import { aiErrorMessage } from '@/ai/types';
 import type { SelectionPayload } from '@/shared/messaging/contract';
 import { computePosition } from './hover-card';
@@ -10,6 +11,7 @@ import {
   ICON_BOOKMARK,
   ICON_COPY,
   ICON_SPARKLES,
+  ICON_XRAY,
 } from './icons';
 
 const CARD_ID = 'avs-selection-card';
@@ -28,6 +30,8 @@ export interface CardState {
 
 const CARD_ACTIONS = [
   { id: 'generate', label: 'Generate with AI', icon: ICON_SPARKLES },
+  // X-Ray Reading: see through complexity to the simple idea inside the text.
+  { id: 'xray', label: 'X-Ray Reading', icon: ICON_XRAY },
   { id: 'save', label: 'Save to Vocabulary', icon: ICON_BOOKMARK },
   { id: 'copy', label: 'Copy', icon: ICON_COPY },
 ] as const;
@@ -48,6 +52,15 @@ export class SelectionCard {
   private state: CardState | null = null;
   /** Monotonic id for the current selection; stale async results are discarded. */
   private selectionToken = 0;
+  /** Analysis currently in flight, so a second click cannot fire a duplicate request. */
+  private pendingKind: ExplainKind | null = null;
+  /**
+   * Separate token for AI analyses. Unlike `selectionToken` it is bumped ONLY
+   * when a new selection is shown — clicking a card button collapses the page
+   * selection, which hides the card, and that must not throw away the analysis
+   * the click just started (VOC-121).
+   */
+  private analysisToken = 0;
   private scrollHandler = (): void => this.reposition();
 
   private ensureElement(): HTMLElement {
@@ -114,6 +127,11 @@ export class SelectionCard {
   }
 
   show(state: CardState): void {
+    // The page fires mouseup/selectionchange again for the SAME selection (e.g.
+    // right after a card button is clicked). Re-showing then must not discard an
+    // analysis the user just started, so only a genuinely different selection
+    // invalidates in-flight work (VOC-121).
+    const sameSelection = this.state?.text === state.text;
     this.state = state;
     // Invalidate any in-flight explain/translate for a previous selection so it
     // can't paint stale content into this card (VOC-120).
@@ -129,12 +147,17 @@ export class SelectionCard {
       translationEl.textContent = 'Translating…';
       void this.loadTranslation(state.text, translationEl);
     }
-    // Collapse AND clear any expanded body from a previous selection.
-    if (this.body) {
-      this.body.replaceChildren();
-      this.body.hidden = true;
+    if (!sameSelection) {
+      // A new selection ends any in-flight analysis for the previous one.
+      this.pendingKind = null;
+      this.analysisToken += 1;
+      // Collapse AND clear any expanded body from a previous selection.
+      if (this.body) {
+        this.body.replaceChildren();
+        this.body.hidden = true;
+      }
+      card.classList.remove('avs-selection-card--expanded');
     }
-    card.classList.remove('avs-selection-card--expanded');
     card.hidden = false;
     this.reposition();
     window.addEventListener('scroll', this.scrollHandler, true);
@@ -158,10 +181,18 @@ export class SelectionCard {
   async showExplain(state: CardState, kind: ExplainKind): Promise<void> {
     const card = this.ensureElement();
     if (!this.body) return;
-    const token = this.selectionToken;
+    // Prevent duplicate requests: ignore repeat clicks while one is in flight.
+    if (this.pendingKind !== null) return;
+    this.pendingKind = kind;
+    const token = this.analysisToken;
+    // Re-show the card: clicking the button collapses the page selection, which
+    // hides it, but the user explicitly asked for this analysis.
+    card.hidden = false;
     this.body.hidden = false;
     card.classList.add('avs-selection-card--expanded');
-    this.body.replaceChildren(this.statusRow('Asking the AI…'));
+    this.body.replaceChildren(
+      this.statusRow(kind === 'xray' ? 'X-raying this text…' : 'Asking the AI…'),
+    );
     this.reposition();
 
     try {
@@ -173,18 +204,39 @@ export class SelectionCard {
           context: state.sentence ?? '',
           pageTitle: state.sourceTitle ?? '',
           precedingText: '',
-          language: detectLanguage(state.text),
+          // X-Ray Reading is language-agnostic: the model detects the source
+          // language itself and explains in the user's configured language, so
+          // the content script must not pin the language to the selection's.
+          ...(kind === 'xray' ? {} : { language: detectLanguage(state.text) }),
           kind,
         },
       });
       // A newer selection opened while the request was in flight — drop the stale result.
-      if (token !== this.selectionToken) return;
-      this.body.replaceChildren(...this.renderExplanation(explanation, kind));
+      if (token !== this.analysisToken) return;
+      card.hidden = false;
+      this.body.hidden = false;
+      this.body.replaceChildren(
+        ...(kind === 'xray'
+          ? this.renderXRay(explanation, state.text)
+          : this.renderExplanation(explanation, kind)),
+      );
     } catch (cause) {
-      if (token !== this.selectionToken) return;
+      if (token !== this.analysisToken) return;
+      card.hidden = false;
+      this.body.hidden = false;
       const message = aiErrorMessage(cause);
       const frag = document.createDocumentFragment();
       frag.append(this.statusRow(message));
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'avs-selection-card-settings';
+      retry.dataset.action = 'retry';
+      retry.textContent = 'Try again';
+      retry.addEventListener('click', () => {
+        // The failed attempt already cleared pendingKind, so this re-runs cleanly.
+        void this.showExplain(state, kind);
+      });
+      frag.append(retry);
       if (/no ai provider|provider is configured|api key/i.test(message)) {
         const settings = document.createElement('button');
         settings.type = 'button';
@@ -197,8 +249,99 @@ export class SelectionCard {
         frag.append(settings);
       }
       this.body.replaceChildren(frag);
+    } finally {
+      // Release the in-flight guard whether we succeeded, failed, or went stale.
+      if (this.pendingKind === kind) this.pendingKind = null;
     }
     this.reposition();
+  }
+
+  /**
+   * Render an X-Ray Reading result: original text, core meaning, what makes it
+   * complex, and the reconstruction. Purely structural — no language-specific
+   * branching lives here, because the model already adapted its representation
+   * to the text's own language and shape.
+   */
+  private renderXRay(explanation: Explanation, originalText: string): HTMLElement[] {
+    const xray: XRayReadingResult | undefined = explanation.xray;
+    const rows: HTMLElement[] = [];
+
+    // No structured payload (older model / odd response): fall back to the
+    // plain explanation rather than showing an empty panel.
+    if (!xray) {
+      return this.renderExplanation(explanation, 'sentence');
+    }
+
+    const block = (className: string, children: HTMLElement[]): HTMLElement => {
+      const wrap = document.createElement('div');
+      wrap.className = `avs-xray-block ${className}`;
+      wrap.append(...children);
+      return wrap;
+    };
+    const heading = (text: string): HTMLElement => {
+      const h = document.createElement('div');
+      h.className = 'avs-xray-heading';
+      h.textContent = text;
+      return h;
+    };
+    const para = (className: string, text: string): HTMLElement => {
+      const p = document.createElement('p');
+      p.className = className;
+      p.textContent = text;
+      return p;
+    };
+
+    const original = xray.originalText || originalText;
+    if (original) {
+      rows.push(block('avs-xray-original', [para('avs-xray-quote', original)]));
+    }
+
+    const coreChildren: HTMLElement[] = [heading('Core Meaning')];
+    if (xray.core.representation) {
+      coreChildren.push(para('avs-xray-representation', xray.core.representation));
+    }
+    if (xray.core.simpleMeaning) {
+      coreChildren.push(para('avs-xray-simple', xray.core.simpleMeaning));
+    }
+    if (coreChildren.length > 1) rows.push(block('avs-xray-core', coreChildren));
+
+    if (xray.complexity.length > 0) {
+      const children: HTMLElement[] = [heading('What Makes It Complex?')];
+      for (const layer of xray.complexity) {
+        const item = document.createElement('div');
+        item.className = 'avs-xray-layer';
+        if (layer.text) item.append(para('avs-xray-quote', layer.text));
+        if (layer.explanation) item.append(para('avs-xray-layer-explain', layer.explanation));
+        if (layer.relatesTo) {
+          item.append(para('avs-xray-relates', `→ ${layer.relatesTo}`));
+        }
+        children.push(item);
+      }
+      rows.push(block('avs-xray-complexity', children));
+    }
+
+    if (xray.relationships.length > 0) {
+      const children: HTMLElement[] = [heading('How It Connects')];
+      for (const link of xray.relationships) {
+        const middle = link.relation ? `${link.relation} → ` : '';
+        children.push(para('avs-xray-relationship', `${link.from} → ${middle}${link.to}`));
+      }
+      rows.push(block('avs-xray-relationships', children));
+    }
+
+    if (xray.fullExplanation) {
+      rows.push(
+        block('avs-xray-together', [
+          heading('Put It Together'),
+          para('avs-xray-full', xray.fullExplanation),
+        ]),
+      );
+    }
+
+    if (xray.detectedLanguage) {
+      rows.push(para('avs-xray-meta', `Detected language: ${xray.detectedLanguage}`));
+    }
+    return rows;
   }
 
   private statusRow(message: string): HTMLElement {
