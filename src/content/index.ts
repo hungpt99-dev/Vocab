@@ -13,6 +13,11 @@ import {
   type ToolbarState,
 } from './toolbar';
 import { SelectionCard } from './selection-card';
+import {
+  cardOwnsInteraction,
+  isInsideCard,
+  shouldHideOnSelectionChange,
+} from './selection-dismiss';
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
@@ -75,6 +80,8 @@ async function bootstrap(): Promise<void> {
 /** True after a keyboard-driven selection (Shift+arrows etc.), so the toolbar
  * is surfaced for keyboard-only users even though no `mouseup` ever fires. */
 let selectionViaKeyboard = false;
+/** True while the pointer is held down inside the card (VOC-123). */
+let pointerInsideCard = false;
 
 function attachSelectionToolbar(): void {
   document.addEventListener('mouseup', () => {
@@ -87,8 +94,16 @@ function attachSelectionToolbar(): void {
 
   document.addEventListener('selectionchange', () => {
     const selection = document.getSelection();
-    if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-      toolbar.hide();
+    const selectionEmpty = !selection || selection.isCollapsed || !selection.toString().trim();
+    if (selectionEmpty) {
+      // Interacting with the card collapses the page selection; that must not
+      // close the card out from under the user (VOC-123).
+      const interactingWithCard = cardOwnsInteraction(
+        toolbarElement(),
+        document.activeElement,
+        pointerInsideCard,
+      );
+      if (shouldHideOnSelectionChange({ selectionEmpty, interactingWithCard })) toolbar.hide();
       return;
     }
     if (selectionViaKeyboard && !toolbar.isVisible) {
@@ -99,9 +114,21 @@ function attachSelectionToolbar(): void {
 
   document.addEventListener('mousedown', (event) => {
     selectionViaKeyboard = false;
-    if (event.target instanceof Node && !toolbarElementContains(event.target)) {
-      toolbar.hide();
+    const inside = event.target instanceof Node && toolbarElementContains(event.target);
+    pointerInsideCard = inside;
+    if (!inside) toolbar.hide();
+  });
+
+  // Release the pointer guard only after the click has been fully dispatched,
+  // so the selectionchange it triggers still sees the interaction as ours.
+  document.addEventListener('mouseup', (event) => {
+    if (event.target instanceof Node && toolbarElementContains(event.target)) {
+      setTimeout(() => {
+        pointerInsideCard = false;
+      }, 0);
+      return;
     }
+    pointerInsideCard = false;
   });
 
   document.addEventListener('keydown', (event) => {
@@ -126,7 +153,7 @@ function attachSelectionToolbar(): void {
 }
 
 function toolbarElementContains(node: Node): boolean {
-  return !!toolbarElement()?.contains(node);
+  return isInsideCard(node, toolbarElement());
 }
 
 function toolbarElement(): HTMLElement | null {
