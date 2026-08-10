@@ -603,8 +603,13 @@ export function App() {
           {/* Row 1 — brand + settings */}
           <div className="flex items-center justify-between gap-4 px-7 pb-2 pt-2.5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-                <BookIcon size={20} />
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+                <img
+                  src={chrome.runtime.getURL('assets/icon128.png')}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  aria-hidden="true"
+                />
               </span>
               <div className="min-w-0 leading-tight">
                 <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
