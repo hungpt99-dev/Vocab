@@ -1,7 +1,8 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { Settings } from '@/shared/types/settings';
 import { LANGUAGES } from '@/storage/settings-repository';
-import { TextField } from '@/shared/ui/TextField';
+import type { SelectOption } from '@/shared/ui/Select';
+import { Select } from '@/shared/ui/Select';
 import { Checkbox } from '@/shared/ui/Checkbox';
 import { Button } from '@/shared/ui/Button';
 
@@ -23,9 +24,38 @@ function normalizeDomain(value: string): string {
     .toLowerCase();
 }
 
+const LANGUAGE_OPTIONS: readonly SelectOption[] = LANGUAGES.map((language) => ({
+  value: language,
+  label: language,
+}));
+
+interface TargetLanguageSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function TargetLanguageSelect({ value, onChange }: TargetLanguageSelectProps) {
+  const options = useMemo<readonly SelectOption[]>(() => {
+    const known = LANGUAGE_OPTIONS;
+    if (value && !known.some((option) => option.value === value)) {
+      return [...known, { value, label: `${value} (custom)` }];
+    }
+    return known;
+  }, [value]);
+
+  return (
+    <Select
+      label="Target language"
+      options={options}
+      hint="Pick the language you want explanations and translations in."
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
 export function BilingualSettings({ settings, onChange }: BilingualSettingsProps) {
   const textareaId = useId();
-  const languageListId = useId();
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
 
@@ -76,19 +106,8 @@ export function BilingualSettings({ settings, onChange }: BilingualSettingsProps
       </p>
 
       <div className="mt-4 flex flex-col gap-4">
-        <TextField
-          label="Target language"
-          value={settings.targetLanguage}
-          list={languageListId}
-          placeholder="e.g. Vietnamese, Spanish, Korean…"
-          hint="Any language works — pick a suggestion or type your own."
-          onChange={(event) => void onChange({ targetLanguage: event.target.value })}
-        />
-        <datalist id={languageListId}>
-          {LANGUAGES.map((language) => (
-            <option key={language} value={language} />
-          ))}
-        </datalist>
+        <TargetLanguageSelect value={settings.targetLanguage} onChange={(value) => void onChange({ targetLanguage: value })} />
+
 
         <Checkbox
           label="Bilingual mode (show translations inline)"
