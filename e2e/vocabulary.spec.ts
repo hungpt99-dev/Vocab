@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 /** Open the extension popup as a normal page. */
 async function openPopup(page: Page, extensionId: string) {
   await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
-  await expect(page.getByRole('heading', { name: 'AI Vocabulary Saver' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vocab Saver' })).toBeVisible();
   return page;
 }
 

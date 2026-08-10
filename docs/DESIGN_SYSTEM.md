@@ -135,7 +135,7 @@ contexts are unknown; any lower value can be beaten by a host page's sticky head
 
 | Token | Value | Notes |
 | --- | --- | --- |
-| `layout.popupWidth` | `384px` | Default popup width |
+| `layout.popupWidth` | `440px` | Default popup width |
 | `layout.popupMinWidth` | `320px` | Narrowest supported; asserted by an E2E test |
 | `layout.overlayMaxWidth` | `320px` | Hover card and toast |
 | `layout.readingMaxWidth` | `720px` | Comfortable measure for the reading-mode text column |
@@ -165,7 +165,7 @@ design targets a fixed comfortable width with a hard floor at 320 px.
 | Breakpoint | Applies to |
 | --- | --- |
 | 320 px | Popup floor; **no horizontal overflow permitted** (asserted by E2E) |
-| 384 px | Default popup width |
+| 440 px | Default popup width |
 | Tailwind `sm:` and up | Options page, which renders in a full tab |
 
 ---

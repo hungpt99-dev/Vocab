@@ -10,9 +10,9 @@ describe('StatsRow', () => {
     expect(screen.getByText('12')).toBeTruthy();
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByText('5')).toBeTruthy();
-    expect(screen.getByText('total words saved')).toBeTruthy();
-    expect(screen.getByText('words added today')).toBeTruthy();
-    expect(screen.getByText('day streak')).toBeTruthy();
+    expect(screen.getByText('Words')).toBeTruthy();
+    expect(screen.getByText('Today')).toBeTruthy();
+    expect(screen.getByText('Streak')).toBeTruthy();
   });
 
   it('handles zero stats without throwing', () => {

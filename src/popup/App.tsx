@@ -12,7 +12,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, LanguagesIcon, PlusIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
+import { BookIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -597,33 +597,61 @@ export function App() {
 
   return (
     <ToastProvider>
-      <div className="flex min-h-[480px] w-full min-w-[340px] max-w-[760px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        {/* App bar: premium 3-section header */}
-        <header className="flex items-center gap-4 border-b border-slate-200/70 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
-          {/* LEFT — brand */}
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-              <BookIcon size={18} />
-            </span>
-            <div className="min-w-0 leading-tight">
-              <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                Vocab Saver
-              </h1>
-              <p className="max-[460px]:hidden truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                Save&nbsp;•&nbsp;Learn&nbsp;•&nbsp;Remember
-              </p>
+      <div className="flex min-h-[480px] w-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        {/* App bar: brand | auto site + bilingual | settings */}
+        <header className="border-b border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900">
+          {/* Row 1 — brand + settings */}
+          <div className="flex items-center justify-between gap-4 px-7 pb-2 pt-2.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+                <BookIcon size={20} />
+              </span>
+              <div className="min-w-0 leading-tight">
+                <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                  Vocab Saver
+                </h1>
+                <p className="max-[380px]:hidden truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                  Save&nbsp;•&nbsp;Learn&nbsp;•&nbsp;Remember
+                </p>
+              </div>
             </div>
+
+            <Button
+              variant="ghost"
+              className="h-9 w-9 shrink-0 rounded-lg p-0"
+              onClick={() => chrome.runtime.openOptionsPage()}
+              title="Settings"
+              aria-label="Settings"
+            >
+              <SettingsIcon size={18} className="shrink-0" aria-hidden="true" />
+            </Button>
           </div>
 
-          {/* CENTER — primary controls (grouped, with a subtle divider) */}
-          <div className="flex flex-1 items-center justify-center gap-3">
-            {/* Global bilingual toggle (language / translation) */}
+          {/* Row 2 — Auto site (primary) + Bilingual (secondary) */}
+          <div className="flex items-center justify-center gap-2 border-t border-slate-100 px-7 py-2 dark:border-slate-800">
             <span
-              className="flex shrink-0 items-center gap-2 rounded-full px-2.5 py-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              className={`flex shrink-0 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                autoSiteOn
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-900/60 dark:text-brand-200 dark:hover:bg-brand-900'
+              }`}
+              title={
+                autoSiteOn
+                  ? `Auto-bilingual is on for ${currentHost || 'this site'} — toggle to turn off`
+                  : 'Auto-enable bilingual mode on the current site'
+              }
+            >
+              <GlobeIcon size={15} className="shrink-0" aria-hidden="true" />
+              <span className="max-[360px]:hidden whitespace-nowrap">Auto site</span>
+              <Switch checked={autoSiteOn} onChange={() => void toggleAutoSite()} label="Auto site" />
+            </span>
+
+            <span
+              className="flex shrink-0 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               title="Bilingual mode (inline translations)"
             >
-              <LanguagesIcon size={16} aria-hidden="true" />
-              <span className="max-[520px]:hidden text-xs font-medium">Bilingual</span>
+              <LanguagesIcon size={15} aria-hidden="true" />
+              <span className="max-[360px]:hidden whitespace-nowrap">Bilingual</span>
               <Switch
                 checked={settings.bilingualMode}
                 loading={activating}
@@ -631,45 +659,6 @@ export function App() {
                 label="Bilingual mode"
               />
             </span>
-
-            <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-
-            {/* Prominent per-site auto-bilingual toggle */}
-            <button
-              type="button"
-              onClick={() => void toggleAutoSite()}
-              className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                autoSiteOn
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-900/60 dark:text-brand-200 dark:hover:bg-brand-900'
-              }`}
-              title={
-                autoSiteOn
-                  ? `Auto-bilingual is on for ${currentHost || 'this site'} — click to turn off`
-                  : 'Auto-enable bilingual mode on the current site'
-              }
-              aria-pressed={autoSiteOn}
-            >
-              <PlusIcon size={14} className="shrink-0" aria-hidden="true" />
-              <span className="whitespace-nowrap">Auto site</span>
-              <span onClick={(event) => event.stopPropagation()} className="shrink-0">
-                <Switch checked={autoSiteOn} onChange={() => void toggleAutoSite()} label="Auto site" />
-              </span>
-            </button>
-          </div>
-
-          {/* RIGHT — settings */}
-          <div className="flex shrink-0 items-center">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 rounded-full p-0"
-              onClick={() => chrome.runtime.openOptionsPage()}
-              title="Settings"
-              aria-label="Settings"
-            >
-              <SettingsIcon size={16} className="shrink-0" aria-hidden="true" />
-            </Button>
           </div>
         </header>
 

@@ -29,6 +29,7 @@ describe('design tokens', () => {
 
   it('exposes the popup widths asserted by the responsive E2E test', () => {
     expect(layout.popupMinWidth).toBe('320px');
+    expect(layout.popupWidth).toBe('440px');
   });
 
   it('injects a stylesheet built only from token values', () => {

@@ -159,5 +159,6 @@ export const layout = {
   overlayMaxWidth: `${reading.width}px`,
   /** Narrowest supported popup width, asserted by an E2E test. */
   popupMinWidth: '320px',
-  popupWidth: '384px',
+  /** Popup document width; the real extension popup is sized from this. */
+  popupWidth: '440px',
 } as const;
