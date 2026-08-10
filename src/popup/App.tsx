@@ -690,7 +690,7 @@ export function App() {
             Book
           </a>
           <a
-            href="https://github.com/hungpt99-dev/open-vocab"
+            href="https://github.com/hungpt99-dev/vocab"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
