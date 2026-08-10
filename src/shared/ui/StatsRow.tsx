@@ -24,7 +24,7 @@ function Stat({ icon, value, label }: { icon: React.ReactNode; value: number; la
 export function StatsRow({ total, addedToday, streak }: StatsRowProps) {
   return (
     <div
-      className="flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900"
+      className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-2 dark:border-slate-800 dark:bg-slate-900"
       aria-label="Your vocabulary progress"
     >
       <Stat icon={<BookIcon size={14} />} value={total} label="total words saved" />
