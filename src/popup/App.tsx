@@ -12,7 +12,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
+import { BookIcon, GithubIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, UsersIcon, WandIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -597,7 +597,7 @@ export function App() {
 
   return (
     <ToastProvider>
-      <div className="flex min-h-[480px] w-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="flex min-h-[480px] max-h-[600px] w-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         {/* App bar: brand | auto site + bilingual | settings */}
         <header className="border-b border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900">
           {/* Row 1 — brand + settings */}
@@ -666,7 +666,39 @@ export function App() {
           <StatsRow total={stats.total} addedToday={stats.addedToday} streak={stats.streak} />
         )}
 
-        <LibraryScreen onVocabularyChanged={refreshStats} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <LibraryScreen onVocabularyChanged={refreshStats} />
+        </div>
+
+        <footer className="flex items-center justify-center gap-1 border-t border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900">
+          <a
+            href="https://github.com/hungpt99-dev"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <GithubIcon size={13} aria-hidden="true" />
+            About me
+          </a>
+          <a
+            href="https://github.com/hungpt99-dev/awesome-books"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <BookIcon size={13} aria-hidden="true" />
+            Book
+          </a>
+          <a
+            href="https://github.com/hungpt99-dev/open-vocab"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <UsersIcon size={13} aria-hidden="true" />
+            Community
+          </a>
+        </footer>
       </div>
     </ToastProvider>
   );
