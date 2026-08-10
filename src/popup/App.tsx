@@ -407,11 +407,11 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         </p>
       )}
 
-      <div className="flex items-center gap-1 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+      <div className="flex items-center gap-1.5 border-b border-slate-200 px-5 py-2 dark:border-slate-700">
         <button
           type="button"
           onClick={() => setTab('library')}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+          className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
             tab === 'library'
               ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -422,7 +422,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         <button
           type="button"
           onClick={() => setTab('review')}
-          className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium ${
             tab === 'review'
               ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -438,7 +438,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         <button
           type="button"
           onClick={() => setTab('quiz')}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+          className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
             tab === 'quiz'
               ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -449,7 +449,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         <button
           type="button"
           onClick={() => setTab('progress')}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+          className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
             tab === 'progress'
               ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -519,6 +519,8 @@ export function App() {
   const { settings, update } = useSettings();
   const [activating, setActivating] = useState(false);
   const [stats, setStats] = useState<{ total: number; addedToday: number; streak: number } | null>(null);
+  // Hostname of the active tab, used to reflect/steer the per-site auto-bilingual toggle.
+  const [currentHost, setCurrentHost] = useState('');
 
   const refreshStats = useCallback(() => {
     void vocabularyRepository.stats().then(setStats).catch(() => undefined);
@@ -529,6 +531,29 @@ export function App() {
     window.addEventListener('focus', refreshStats);
     return () => window.removeEventListener('focus', refreshStats);
   }, [refreshStats]);
+
+  // Track the active tab's hostname so the "Auto site" toggle can show whether
+  // the current site is already auto-enabled.
+  useEffect(() => {
+    let cancelled = false;
+    void chrome.tabs
+      .query({ active: true, currentWindow: true })
+      .then((tabs) => {
+        const url = tabs[0]?.url;
+        if (cancelled || !url) return;
+        try {
+          setCurrentHost(new URL(url).hostname.replace(/^www\./i, '').toLowerCase());
+        } catch {
+          /* ignore unparsable urls (e.g. chrome://) */
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const autoSiteOn = currentHost ? (settings.bilingualDomains ?? []).includes(currentHost) : false;
 
   const toggleBilingual = useCallback(
     async (next: boolean) => {
@@ -558,29 +583,47 @@ export function App() {
     await update({ bilingualDomains: [...current, hostname] });
   }, [settings.bilingualDomains, update]);
 
+  const removeCurrentSiteFromBilingual = useCallback(async () => {
+    const host = currentHost;
+    if (!host) return;
+    const current = settings.bilingualDomains ?? [];
+    await update({ bilingualDomains: current.filter((domain) => domain !== host) });
+  }, [currentHost, settings.bilingualDomains, update]);
+
+  const toggleAutoSite = useCallback(() => {
+    if (autoSiteOn) void removeCurrentSiteFromBilingual();
+    else void addCurrentSiteToBilingual();
+  }, [autoSiteOn, addCurrentSiteToBilingual, removeCurrentSiteFromBilingual]);
+
   return (
     <ToastProvider>
-      <div className="flex min-h-[440px] w-full min-w-[300px] max-w-[400px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        {/* App bar */}
-        <header className="flex items-center gap-3 border-b border-slate-200/80 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900">
-          {/* Brand: logo + name + subtitle grouped together */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
-              <BookIcon size={16} />
+      <div className="flex min-h-[480px] w-full min-w-[340px] max-w-[760px] flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        {/* App bar: premium 3-section header */}
+        <header className="flex items-center gap-4 border-b border-slate-200/70 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
+          {/* LEFT — brand */}
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+              <BookIcon size={18} />
             </span>
             <div className="min-w-0 leading-tight">
-              <h1 className="truncate text-sm font-semibold tracking-tight">AI Vocabulary Saver</h1>
-              <p className="max-[360px]:hidden truncate text-[11px] text-slate-500 dark:text-slate-400">
-                Read, save, learn
+              <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                Vocab Saver
+              </h1>
+              <p className="max-[460px]:hidden truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                Save&nbsp;•&nbsp;Learn&nbsp;•&nbsp;Remember
               </p>
             </div>
           </div>
 
-          {/* Controls, pinned right, never squeezed, consistent gaps */}
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {/* Translate icon + toggle as a compact control group */}
-            <span className="flex shrink-0 items-center gap-1.5 text-slate-500 dark:text-slate-400" title="Bilingual mode">
-              <LanguagesIcon size={15} aria-hidden="true" />
+          {/* CENTER — primary controls (grouped, with a subtle divider) */}
+          <div className="flex flex-1 items-center justify-center gap-3">
+            {/* Global bilingual toggle (language / translation) */}
+            <span
+              className="flex shrink-0 items-center gap-2 rounded-full px-2.5 py-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              title="Bilingual mode (inline translations)"
+            >
+              <LanguagesIcon size={16} aria-hidden="true" />
+              <span className="max-[520px]:hidden text-xs font-medium">Bilingual</span>
               <Switch
                 checked={settings.bilingualMode}
                 loading={activating}
@@ -588,24 +631,44 @@ export function App() {
                 label="Bilingual mode"
               />
             </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="whitespace-nowrap"
-              onClick={() => void addCurrentSiteToBilingual()}
-              title="Auto-enable bilingual mode on the current site"
+
+            <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+
+            {/* Prominent per-site auto-bilingual toggle */}
+            <button
+              type="button"
+              onClick={() => void toggleAutoSite()}
+              className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                autoSiteOn
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-900/60 dark:text-brand-200 dark:hover:bg-brand-900'
+              }`}
+              title={
+                autoSiteOn
+                  ? `Auto-bilingual is on for ${currentHost || 'this site'} — click to turn off`
+                  : 'Auto-enable bilingual mode on the current site'
+              }
+              aria-pressed={autoSiteOn}
             >
               <PlusIcon size={14} className="shrink-0" aria-hidden="true" />
-              Auto site
-            </Button>
+              <span className="whitespace-nowrap">Auto site</span>
+              <span onClick={(event) => event.stopPropagation()} className="shrink-0">
+                <Switch checked={autoSiteOn} onChange={() => void toggleAutoSite()} label="Auto site" />
+              </span>
+            </button>
+          </div>
+
+          {/* RIGHT — settings */}
+          <div className="flex shrink-0 items-center">
             <Button
               size="sm"
               variant="ghost"
-              className="whitespace-nowrap"
+              className="h-8 w-8 rounded-full p-0"
               onClick={() => chrome.runtime.openOptionsPage()}
+              title="Settings"
+              aria-label="Settings"
             >
-              <SettingsIcon size={14} className="shrink-0" aria-hidden="true" />
-              Settings
+              <SettingsIcon size={16} className="shrink-0" aria-hidden="true" />
             </Button>
           </div>
         </header>

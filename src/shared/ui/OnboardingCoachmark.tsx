@@ -34,7 +34,7 @@ export function OnboardingCoachmark({ onStartSaving }: { onStartSaving?: () => v
     <div
       role="status"
       aria-label="Getting started"
-      className="m-3 rounded-xl border border-brand-200 bg-brand-50 p-3 dark:border-brand-800 dark:bg-brand-950"
+      className="m-4 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-950"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 text-brand-700 dark:text-brand-300">
