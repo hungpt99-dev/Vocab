@@ -11,9 +11,21 @@ export function buildManifest(): Record<string, unknown> {
     permissions: ['storage', 'contextMenus', 'activeTab', 'scripting', 'unlimitedStorage'],
     host_permissions: ['<all_urls>'],
     background: { service_worker: 'background.js', type: 'module' },
+    icons: {
+      16: 'assets/icon16.png',
+      32: 'assets/icon32.png',
+      48: 'assets/icon48.png',
+      128: 'assets/icon128.png',
+    },
     action: {
       default_popup: 'src/popup/index.html',
       default_title: 'AI Vocabulary Saver',
+      default_icon: {
+        16: 'assets/icon16.png',
+        32: 'assets/icon32.png',
+        48: 'assets/icon48.png',
+        128: 'assets/icon128.png',
+      },
     },
     options_page: 'src/options/index.html',
     content_scripts: [
