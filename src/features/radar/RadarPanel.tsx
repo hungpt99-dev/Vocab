@@ -8,7 +8,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { Button } from '@/shared/ui/Button';
-import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, XIcon } from '@/shared/ui/Icons';
+import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, XIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { tints } from '@/shared/styles/tokens';
 
 type ScanState =
@@ -24,12 +24,11 @@ const MIN_QUERY_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 350;
 
 export function RadarPanel() {
-  const { settings, update } = useSettings();
+  const { settings } = useSettings();
   const { available: aiAvailable } = useAiAvailable();
   const [scan, setScan] = useState<ScanState>({ status: 'idle' });
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const [currentHost, setCurrentHost] = useState('');
 
   // Quick Search bar state. Reuses the exact Radar scan pipeline — the query is
   // passed as a one-off goal override, so nothing about the search/AI/result
@@ -39,22 +38,6 @@ export function RadarPanel() {
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   const goal = settings.radar?.goal ?? '';
-  const autoScan = Boolean(settings.radar?.autoScan);
-
-  useEffect(() => {
-    void chrome.tabs
-      .query({ active: true, currentWindow: true })
-      .then((tabs) => {
-        const url = tabs[0]?.url;
-        if (!url) return;
-        try {
-          setCurrentHost(new URL(url).hostname.replace(/^www\./i, '').toLowerCase());
-        } catch {
-          /* ignore unparsable urls */
-        }
-      })
-      .catch(() => undefined);
-  }, []);
 
   /**
    * Run a Radar scan against the current page, optionally with a one-off goal
@@ -218,81 +201,44 @@ export function RadarPanel() {
         )}
       </div>
 
-      {!goal.trim() && (
-        <p className={`rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300`} role="alert">
-          Set a Radar goal in Settings to use this feature.
-        </p>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <Button
-          variant="primary"
-          disabled={!goal.trim() || !aiAvailable || scan.status === 'scanning'}
-          onClick={() => void runScan()}
-          title={
-            !goal.trim()
-              ? 'Set a Radar goal in Settings first'
-              : !aiAvailable
-                ? 'AI actions need an API key in settings'
-                : 'Find vocabulary relevant to your Radar goal on this page'
-          }
-        >
-          <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />
-          {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
-        </Button>
-
-        {goal.trim() && !aiAvailable && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            AI actions need an API key — open settings.
+      {!goal.trim() ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Set a learning goal in Settings to use Vocab Radar.
           </p>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
-              <TargetIcon size={14} className="text-brand-600" aria-hidden="true" />
-              Radar auto-find
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {settings.radar?.domains?.length
-                ? `On ${settings.radar.domains.length} site${settings.radar.domains.length === 1 ? '' : 's'}`
-                : 'On every readable page'}
-            </p>
-          </div>
           <Button
             size="sm"
-            variant={autoScan ? 'primary' : 'secondary'}
-            disabled={!goal.trim()}
-            onClick={() => void update({ radar: { ...settings.radar, autoScan: !autoScan } })}
+            variant="secondary"
+            className="mt-2"
+            onClick={() => void chrome.runtime.openOptionsPage()}
           >
-            {autoScan ? 'On' : 'Off'}
+            <SettingsIcon size={13} className="mr-1.5" aria-hidden="true" />
+            Open Settings
           </Button>
         </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="primary"
+            disabled={!aiAvailable || scan.status === 'scanning'}
+            onClick={() => void runScan()}
+            title={
+              !aiAvailable
+                ? 'AI actions need an API key in settings'
+                : 'Find vocabulary relevant to your Radar goal on this page'
+            }
+          >
+            <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />
+            {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
+          </Button>
 
-        {autoScan && currentHost && (
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-              Current site: {currentHost}
-            </span>
-            <button
-              type="button"
-              className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-900/50"
-              onClick={() => {
-                const current = settings.radar?.domains ?? [];
-                if (current.includes(currentHost)) return;
-                void update({ radar: { ...settings.radar, domains: [...current, currentHost] } });
-              }}
-            >
-              {settings.radar?.domains?.includes(currentHost) ? 'Site included' : 'Only on this site'}
-            </button>
-          </div>
-        )}
-        {!goal.trim() && (
-          <p className="mt-2 text-[11px] text-slate-400">Set a goal first to enable auto-find.</p>
-        )}
-      </div>
+          {!aiAvailable && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              AI actions need an API key — open settings.
+            </p>
+          )}
+        </div>
+      )}
 
       {showPrivacy && goal.trim() && !debouncedQuery.trim() && (
         <p className="rounded-md bg-slate-100 px-3 py-2 text-[11px] leading-snug text-slate-500 dark:bg-slate-800 dark:text-slate-400">

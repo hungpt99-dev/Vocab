@@ -9,6 +9,7 @@ export interface PopupSettingsProps {
 
 const TAB_OPTIONS: ReadonlyArray<{ value: Settings['popupDefaultTab']; label: string }> = [
   { value: 'library', label: 'Library' },
+  { value: 'radar', label: 'Radar' },
   { value: 'review', label: 'Review' },
   { value: 'quiz', label: 'Quiz' },
   { value: 'progress', label: 'Progress' },

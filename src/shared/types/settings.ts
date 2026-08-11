@@ -77,7 +77,7 @@ export interface Settings {
   /** Popup: show the Simplify action for the highlighted word. */
   popupShowSimplify: boolean;
   /** Popup: which tab to open on launch. */
-  popupDefaultTab: 'library' | 'review' | 'quiz' | 'progress';
+  popupDefaultTab: 'library' | 'radar' | 'review' | 'quiz' | 'progress';
   /** Editable system-prompt template for explanations. Tokens:
    *  {{language}} {{word}} {{context}} {{kind}} — empty falls back to built-in. */
   explainPromptTemplate: string;
