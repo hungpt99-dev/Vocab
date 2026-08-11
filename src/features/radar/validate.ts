@@ -1,4 +1,4 @@
-import type { GoalCandidate } from './types';
+import type { RadarCandidate } from './types';
 import { extractJsonObject } from '@/ai/parse';
 import { AiError } from '@/ai/types';
 import { collapseWhitespace } from '@/shared/lib/text';
@@ -60,7 +60,7 @@ function normalizeScore(value: unknown): number | null {
 export function validateCandidate(
   raw: unknown,
   contains: (needle: string) => boolean,
-): GoalCandidate | null {
+): RadarCandidate | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
 
@@ -89,10 +89,10 @@ export function validateCandidate(
  * Candidates not passing validation are dropped rather than failing the whole
  * analysis (partial quality over total failure).
  */
-export function parseGoalAnalysis(
+export function parseRadarAnalysis(
   raw: string,
   sourceText: string,
-): GoalCandidate[] {
+): RadarCandidate[] {
   let parsed: unknown;
   try {
     parsed = extractJsonObject(raw);
@@ -107,7 +107,7 @@ export function parseGoalAnalysis(
   }
 
   const contains = makeTextContains(sourceText);
-  const candidates: GoalCandidate[] = [];
+  const candidates: RadarCandidate[] = [];
   for (const item of list) {
     const valid = validateCandidate(item, contains);
     if (valid) candidates.push(valid);

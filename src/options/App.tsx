@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { ProviderSettings } from '@/features/settings/ProviderSettings';
 import { BilingualSettings } from '@/features/settings/BilingualSettings';
+import { RadarSettings } from '@/features/settings/RadarSettings';
 import { AppearanceSettings } from '@/features/settings/AppearanceSettings';
 import { PopupSettings } from '@/features/settings/PopupSettings';
 import { DataSettings } from '@/features/settings/DataSettings';
 import { Spinner } from '@/shared/ui/Spinner';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
-import { SettingsIcon, KeyIcon, LanguagesIcon, PaletteIcon, DatabaseIcon, SlidersIcon } from '@/shared/ui/Icons';
+import { SettingsIcon, KeyIcon, LanguagesIcon, TargetIcon, PaletteIcon, DatabaseIcon, SlidersIcon } from '@/shared/ui/Icons';
 
-type SectionId = 'providers' | 'bilingual' | 'popup' | 'appearance' | 'data';
+type SectionId = 'providers' | 'bilingual' | 'radar' | 'popup' | 'appearance' | 'data';
 
 interface NavItem {
   id: SectionId;
@@ -20,6 +21,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'providers', label: 'AI providers', icon: KeyIcon },
   { id: 'bilingual', label: 'Bilingual reading', icon: LanguagesIcon },
+  { id: 'radar', label: 'Vocabulary Radar', icon: TargetIcon },
   { id: 'popup', label: 'Popup', icon: SlidersIcon },
   { id: 'appearance', label: 'Appearance', icon: PaletteIcon },
   { id: 'data', label: 'Your data', icon: DatabaseIcon },
@@ -98,6 +100,15 @@ function SettingsScreen() {
                 className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
               >
                 <BilingualSettings settings={settings} onChange={update} />
+              </div>
+            )}
+
+            {active === 'radar' && (
+              <div
+                id="radar"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <RadarSettings settings={settings} onChange={update} />
               </div>
             )}
 

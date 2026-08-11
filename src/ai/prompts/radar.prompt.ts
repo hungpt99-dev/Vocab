@@ -1,11 +1,9 @@
-import type { VocabularyGoal } from '@/features/goal/types';
-
 /**
- * System prompt for Vocabulary Goal Mode. Centralised and versioned so the
- * strategy can evolve without touching the service or UI. Returns ONLY the
- * documented JSON shape — no prose, no markdown fences.
+ * System prompt for Vocabulary Radar. Centralised and versioned so the strategy
+ * can evolve without touching the service or UI. Returns ONLY the documented
+ * JSON shape — no prose, no markdown fences.
  */
-export const GOAL_SYSTEM_PROMPT_V1 = [
+export const RADAR_SYSTEM_PROMPT_V1 = [
   'You are helping a language learner discover English words and phrases that are useful for their personal learning goal.',
   'You are given a user goal and a portion of text from a web page the learner is reading.',
   'Select only vocabulary (single words or short multi-word expressions) that actually appears in the provided text.',
@@ -22,29 +20,20 @@ export const GOAL_SYSTEM_PROMPT_V1 = [
   'Return at most 5 high-quality candidates for the given text. If nothing is worth suggesting, return {"candidates":[]}.',
 ].join(' ');
 
-export const GOAL_PROMPT_VERSION = 'goal-v1';
+export const RADAR_PROMPT_VERSION = 'radar-v1';
 
-/** Build the user turn for a goal analysis request. */
-export function buildGoalUserPrompt(params: {
-  goal: VocabularyGoal;
+/** Build the user turn for a radar analysis request. */
+export function buildRadarUserPrompt(params: {
+  goal: string;
   text: string;
 }): string {
   const { goal, text } = params;
-  const lines: string[] = [];
-
-  lines.push(`User goal: ${goal.text}`);
-
-  const metaBits: string[] = [];
-  if (goal.domains?.length) metaBits.push(`domains: ${goal.domains.join(', ')}`);
-  if (goal.topics?.length) metaBits.push(`topics: ${goal.topics.join(', ')}`);
-  if (goal.situations?.length) metaBits.push(`situations: ${goal.situations.join(', ')}`);
-  if (metaBits.length) lines.push(`Goal details (optional hints): ${metaBits.join('; ')}`);
-
-  lines.push('');
-  lines.push('Page text (analyze only this):');
-  lines.push(text);
-  lines.push('');
-  lines.push('Respond with JSON only.');
-
-  return lines.join('\n');
+  return [
+    `User goal: ${goal}`,
+    '',
+    'Page text (analyze only this):',
+    text,
+    '',
+    'Respond with JSON only.',
+  ].join('\n');
 }

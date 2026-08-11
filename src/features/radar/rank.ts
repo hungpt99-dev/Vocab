@@ -1,4 +1,4 @@
-import type { GoalCandidate, RankedCandidate, GoalRelevanceTier } from './types';
+import type { RadarCandidate, RankedCandidate, RadarRelevanceTier } from './types';
 import { collapseWhitespace } from '@/shared/lib/text';
 
 /** Minimum score a candidate must have to be shown to the user by default. */
@@ -10,7 +10,7 @@ export function normalizeCandidateKey(text: string): string {
   return collapseWhitespace(text).toLowerCase();
 }
 
-function tierFor(score: number): GoalRelevanceTier {
+function tierFor(score: number): RadarRelevanceTier {
   return score >= HIGH_RELEVANCE_SCORE ? 'high' : 'relevant';
 }
 
@@ -22,7 +22,7 @@ function tierFor(score: number): GoalRelevanceTier {
  * - Returns at most `limit` candidates (default 5) scoring >= MIN_DISPLAY_SCORE.
  */
 export function mergeAndRank(
-  candidates: GoalCandidate[],
+  candidates: RadarCandidate[],
   limit = 5,
 ): RankedCandidate[] {
   const byKey = new Map<string, RankedCandidate>();

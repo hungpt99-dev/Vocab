@@ -1,18 +1,18 @@
-/** Local cache for goal-page analyses.
+/** Local cache for radar-page analyses.
  *
- * Key = normalised URL + active goal id + content hash, so a repeat scan of the
- * same page with the same goal reuses the result without another AI call.
+ * Key = normalised URL + goal text + content hash, so a repeat scan of the same
+ * page with the same goal reuses the result without another AI call.
  * Invalidation is implicit: changing the goal, the page content, or the URL
  * produces a different key and therefore a cache miss. Credentials are never
  * cached.
  */
-export interface GoalAnalysisCacheEntry {
-  candidates: import('./types').GoalCandidate[];
+export interface RadarAnalysisCacheEntry {
+  candidates: import('./types').RadarCandidate[];
   expiresAt: number;
 }
 
-export class GoalAnalysisCache {
-  private readonly store = new Map<string, GoalAnalysisCacheEntry>();
+export class RadarAnalysisCache {
+  private readonly store = new Map<string, RadarAnalysisCacheEntry>();
   private readonly ttlMs: number;
 
   constructor(ttlMs = 1000 * 60 * 60 * 24) {
@@ -29,13 +29,13 @@ export class GoalAnalysisCache {
     return (hash >>> 0).toString(36);
   }
 
-  static key(url: string, goalId: string, content: string): string {
+  static key(url: string, goal: string, content: string): string {
     const norm = url.trim().toLowerCase().replace(/[#?].*$/, '');
-    return `${norm}|${goalId}|${GoalAnalysisCache.contentHash(content)}`;
+    return `${norm}|${goal.trim().toLowerCase()}|${RadarAnalysisCache.contentHash(content)}`;
   }
 
-  get(url: string, goalId: string, content: string): import('./types').GoalCandidate[] | null {
-    const key = GoalAnalysisCache.key(url, goalId, content);
+  get(url: string, goal: string, content: string): import('./types').RadarCandidate[] | null {
+    const key = RadarAnalysisCache.key(url, goal, content);
     const entry = this.store.get(key);
     if (entry && entry.expiresAt > Date.now()) return entry.candidates;
     this.store.delete(key);
@@ -44,11 +44,11 @@ export class GoalAnalysisCache {
 
   set(
     url: string,
-    goalId: string,
+    goal: string,
     content: string,
-    candidates: import('./types').GoalCandidate[],
+    candidates: import('./types').RadarCandidate[],
   ): void {
-    const key = GoalAnalysisCache.key(url, goalId, content);
+    const key = RadarAnalysisCache.key(url, goal, content);
     this.store.set(key, { candidates, expiresAt: Date.now() + this.ttlMs });
   }
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mergeAndRank, normalizeCandidateKey, MIN_DISPLAY_SCORE } from './rank';
-import type { GoalCandidate } from './types';
+import type { RadarCandidate } from './types';
 
-const c = (text: string, score: number, extra: Partial<GoalCandidate> = {}): GoalCandidate => ({
+const c = (text: string, score: number, extra: Partial<RadarCandidate> = {}): RadarCandidate => ({
   text,
   type: 'word',
   score,

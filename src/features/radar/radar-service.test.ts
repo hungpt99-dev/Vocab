@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { GoalVocabularyService } from './goal-service';
+import { RadarVocabularyService } from './radar-service';
 import type { Settings } from '@/shared/types/settings';
 
-const service = new GoalVocabularyService();
+const service = new RadarVocabularyService();
 
 // Minimal settings; only used by analyzePage to choose a provider. The tests
 // below exercise the network-free paths (rankFromText, empty input). The AI
@@ -12,7 +12,7 @@ const settings = {
   providers: [],
 } as unknown as Settings;
 
-describe('GoalVocabularyService.rankFromText', () => {
+describe('RadarVocabularyService.rankFromText', () => {
   const page = 'The API must be idempotent. The system can gracefully degrade under load.';
 
   it('validates, dedupes and ranks from a raw AI response', () => {
@@ -42,10 +42,10 @@ describe('GoalVocabularyService.rankFromText', () => {
   });
 });
 
-describe('GoalVocabularyService.analyzePage', () => {
+describe('RadarVocabularyService.analyzePage', () => {
   it('returns no candidates for empty page text (no AI call)', async () => {
     const result = await service.analyzePage(settings, {
-      goal: { id: 'g', text: 'backend', createdAt: 0, updatedAt: 0 },
+      goal: 'learn backend english',
       pageText: '   ',
       pageUrl: 'https://example.com',
     });

@@ -97,7 +97,7 @@ forces a change to one feature to touch every folder; feature grouping keeps a c
 | Capture | `src/features/capture/` | `SaveForm` — the popup's save UI |
 | Library | `src/features/library/` | `LibraryList`, `LibraryToolbar`, `EntryCard`, `ExplanationView` |
 | Settings | `src/features/settings/` | `ProviderSettings`, `AppearanceSettings`, `DataSettings`, `backup.ts` |
-| Goal Mode | `src/features/goal/` | `GoalModeScreen`, `GoalVocabularyService`, `goal-repository`, `chunk`, `validate`, `rank`, `cache` |
+| Radar | `src/features/radar/` | `RadarPanel`, `RadarVocabularyService`, `chunk`, `validate`, `rank`, `cache` (goal text lives in Settings, not Dexie) |
 
 Anything used by more than one feature moves to `src/shared/`. **`src/shared` must never import from
 `src/features`** — that would create a cycle and make `shared` un-reusable. See
@@ -146,25 +146,29 @@ content script loads (document_idle)
   → MutationObserver keeps dynamic content highlighted
 ```
 
-**Finding goal vocabulary (Vocabulary Goal Mode)**
+**Finding goal vocabulary (Vocabulary Radar)**
 
-```
-user opens the popup "Goal" tab, sets a goal (or picks the active one)
-  → clicks "Find vocabulary for my goal"
-  → popup → sendMessage('analyze-goal-page', { goalId, pageUrl })
-  → worker → GoalVocabularyService.analyzePage()
-      • reads clean page text from the active tab   [extract-page-text → content script → extractArticle()]
+```text
+user sets a learning goal in Settings → "Vocabulary Radar"
+  → opens the popup, clicks "Find for my Radar"   (or Radar auto-finds on page load)
+  → popup → sendMessage('radar:scan')
+  → background → radarScan() → sendToTab(activeTab, 'radar:scan')
+  → content script → runRadarScanHere()
+      • reads clean page text locally   [extractArticle()]
+      • sendMessage('radar:analyze', { goal, pageUrl, pageText })
+  → worker → RadarVocabularyService.analyzePage()
       • chunks text on paragraph/sentence boundaries  [chunk.ts]
-      • per chunk: provider.complete(goal system prompt, user prompt)   [shared AI pipeline, BYOK]
+      • per chunk: provider.complete(radar system prompt, user prompt)   [shared AI pipeline, BYOK]
       • validates + coerces candidates (present in text, score 0–100)   [validate.ts]
       • merges / dedupes / ranks by score, keeps Top N (≥70)            [rank.ts]
-      • caches by normalised URL + goal id + content hash              [cache.ts]
-  → ranked candidates returned to the popup
-  → each candidate offers Explain / Save / Ignore (reuses existing flows)
+      • caches by normalised URL + goal text + content hash             [cache.ts]
+  → ranked candidates returned to the page → highlighted inline (avs-radar-highlight)
+  → also returned to the popup for Explain / Save / Ignore (reuses existing flows)
 ```
 
-The natural-language goal text is the source of truth; any AI-extracted `domains`/`topics`/`situations`
-are optional hints. Scanning is manual only — nothing is analyzed automatically on page load.
+The natural-language goal text lives in Settings (`settings.radar.goal`) and is the source of truth.
+Auto-find is on when `radar.autoScan` is enabled (or when Bilingual mode is enabled) and a goal is set.
+Unlike the original manual-only design, Radar auto-scans the current page on load when enabled.
 
 ---
 
@@ -283,8 +287,8 @@ declared together, so a handler cannot return the wrong type:
 | `vocabulary-changed` | broadcast | `void` |
 | `settings-changed` | broadcast | `void` |
 | `show-toast` | worker → content | `void` |
-| `analyze-goal-page` | UI → worker | `AnalyzePageResult` (ranked candidates, chunk progress, partial flag) |
-| `extract-page-text` | worker → content | `string` (cleaned article text via `extractArticle()`) |
+| `radar:scan` | popup → worker → content | `AnalyzePageResult` (ranked candidates, chunk progress, partial flag) — worker forwards to the page's own `radar:scan` handler, which extracts text locally |
+| `radar:analyze` | content → worker | `AnalyzePageResult` (goal text carried in the payload, so the worker never re-reads the page tab) |
 
 `dispatch()` in `src/shared/messaging/router.ts` is **total**: success, thrown errors, unknown message
 types and malformed payloads all become a `MessageResult`, never an unhandled rejection. Handlers are
