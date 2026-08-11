@@ -208,7 +208,7 @@ export async function translateUnit(
  */
 export async function analyzeGoalPage(
   deps: BackgroundDeps,
-  payload: { goalId: string; pageUrl: string },
+  payload: { goalId: string; pageUrl: string; pageText?: string },
 ): Promise<import('@/features/goal/goal-service').AnalyzePageResult> {
   const settings = await deps.settings.get();
   const goal = await deps.goals.get(payload.goalId);
@@ -216,8 +216,9 @@ export async function analyzeGoalPage(
     throw new AiError('config', 'No active vocabulary goal was found.');
   }
 
-  // Fetch clean page text from the active tab's content script.
-  const pageText = await readActivePageText();
+  // Use pre-extracted text when provided (content-script auto-scan), otherwise
+  // fetch clean page text from the active tab's content script.
+  const pageText = payload.pageText ?? (await readActivePageText());
   if (!pageText || !pageText.trim()) {
     return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
   }

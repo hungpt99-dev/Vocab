@@ -8,6 +8,7 @@ import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
+import { Switch } from '@/shared/ui/Switch';
 import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, PencilIcon, TrashIcon, CheckCheckIcon, RotateCwIcon } from '@/shared/ui/Icons';
 import { tints } from '@/shared/styles/tokens';
 
@@ -28,6 +29,22 @@ export function GoalModeScreen() {
   const [scan, setScan] = useState<ScanState>({ status: 'idle' });
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [currentHost, setCurrentHost] = useState('');
+
+  useEffect(() => {
+    void chrome.tabs
+      .query({ active: true, currentWindow: true })
+      .then((tabs) => {
+        const url = tabs[0]?.url;
+        if (!url) return;
+        try {
+          setCurrentHost(new URL(url).hostname.replace(/^www\./i, '').toLowerCase());
+        } catch {
+          /* ignore unparsable urls */
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   const activeGoal = useMemo(
     () => goals.find((g) => g.id === settings.activeGoalId) ?? null,
@@ -257,7 +274,52 @@ export function GoalModeScreen() {
         )}
       </div>
 
-      {/* Privacy note */}
+      {/* Auto-scan toggle — mirrors the Auto-site pattern; reuses the domain list. */}
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
+              <TargetIcon size={14} className="text-brand-600" aria-hidden="true" />
+              Auto-find on pages
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {settings.goalMode?.domains?.length
+                ? `On ${settings.goalMode.domains.length} site${settings.goalMode.domains.length === 1 ? '' : 's'}`
+                : 'On every readable page'}
+            </p>
+          </div>
+          <Switch
+            checked={Boolean(settings.goalMode?.autoScan)}
+            disabled={!settings.activeGoalId}
+            loading={false}
+            onChange={(next) => void update({ goalMode: { ...settings.goalMode, autoScan: next } })}
+            label="Auto-find vocabulary for your goal"
+          />
+        </div>
+
+        {settings.goalMode?.autoScan && settings.activeGoalId && currentHost && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              Current site: {currentHost}
+            </span>
+            <button
+              type="button"
+              className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-900/50"
+              onClick={() => {
+                const current = settings.goalMode?.domains ?? [];
+                if (current.includes(currentHost)) return;
+                void update({ goalMode: { ...settings.goalMode, domains: [...current, currentHost] } });
+              }}
+            >
+              {settings.goalMode?.domains?.includes(currentHost) ? 'Site included' : 'Only on this site'}
+            </button>
+          </div>
+        )}
+        {!settings.activeGoalId && (
+          <p className="mt-2 text-[11px] text-slate-400">Set a goal first to enable auto-find.</p>
+        )}
+      </div>
+
       {showPrivacy && activeGoal && (
         <p className="rounded-md bg-slate-100 px-3 py-2 text-[11px] leading-snug text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           To find vocabulary relevant to your goal, selected page content is sent to your

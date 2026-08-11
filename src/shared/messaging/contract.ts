@@ -79,7 +79,9 @@ export type Message =
         goalId: string;
         /** Normalised page URL, used for caching. */
         pageUrl: string;
-        signal?: string;
+        /** Optional pre-extracted page text (content script auto-scan path). When
+         * omitted, the worker fetches text from the active tab's content script. */
+        pageText?: string;
       };
     }
   | { type: 'extract-page-text' };

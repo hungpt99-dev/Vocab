@@ -58,6 +58,23 @@ export function injectStyles(doc: Document = document): void {
       cursor: help;
       box-decoration-break: clone;
     }
+    .avs-goal-highlight {
+      color: inherit;
+      border-radius: ${radius.sm};
+      padding: 0 1px;
+      cursor: pointer;
+      box-decoration-break: clone;
+      border-bottom: 2px solid rgba(245, 158, 11, 0.7);
+      background-color: rgba(245, 158, 11, 0.14);
+    }
+    .avs-goal-highlight.avs-goal-high {
+      border-bottom-color: rgba(239, 68, 68, 0.8);
+      background-color: rgba(239, 68, 68, 0.16);
+    }
+    .avs-goal-highlight:focus-visible {
+      outline: 2px solid var(--avs-overlay-focus-ring, #6366f1);
+      outline-offset: 1px;
+    }
     .${HIGHLIGHT_CLASS}:focus-visible {
       outline: 2px solid ${color.focusRing};
       outline-offset: 1px;

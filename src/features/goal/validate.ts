@@ -3,19 +3,36 @@ import { extractJsonObject } from '@/ai/parse';
 import { AiError } from '@/ai/types';
 import { collapseWhitespace } from '@/shared/lib/text';
 
+/** Strip wrapping quotes and surrounding punctuation a model may add. */
+function stripQuotes(value: string): string {
+  return value
+    .trim()
+    .replace(/^[""''`“”‘’]+/, '')
+    .replace(/[""''`“”‘’]+$/, '')
+    .trim();
+}
+
 /** Build a case-insensitive "appears in text" tester that tolerates light
- * whitespace/normalisation differences. Returns true when `needle` is present
- * as a substring of `haystack` (also tested ignoring case and collapsing runs
- * of whitespace, since models sometimes alter spacing). */
+ * whitespace/normalisation differences and wrapping quotes/punctuation. Returns
+ * true when `needle` is present as a substring of `haystack` (also tested
+ * ignoring case and collapsing runs of whitespace, since models sometimes alter
+ * spacing or wrap phrases in quotes). */
 export function makeTextContains(haystack: string): (needle: string) => boolean {
   const base = haystack.toLowerCase();
   const collapsed = collapseWhitespace(haystack).toLowerCase();
   return (needle: string): boolean => {
-    const n = needle.trim();
+    const n = stripQuotes(needle);
     if (!n) return false;
-    if (base.includes(n.toLowerCase())) return true;
+    const nl = n.toLowerCase();
+    if (base.includes(nl)) return true;
     const nc = collapseWhitespace(n).toLowerCase();
-    return collapsed.includes(nc);
+    if (collapsed.includes(nc)) return true;
+    // Last resort: drop a leading article/determiner ("a/the") some models add.
+    const deArticle = nl.replace(/^(a|an|the)\s+/, '');
+    if (deArticle !== nl && (base.includes(deArticle) || collapsed.includes(collapseWhitespace(deArticle)))) {
+      return true;
+    }
+    return false;
   };
 }
 
@@ -47,7 +64,7 @@ export function validateCandidate(
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
 
-  const text = asString(obj.text);
+  const text = stripQuotes(asString(obj.text));
   if (!text) return null;
   if (!contains(text)) return null;
 

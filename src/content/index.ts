@@ -27,6 +27,11 @@ import { extractArticle } from './reading/extract';
 // (and in the entry's tests) without the old circular dependency.
 import { matchesDomain } from './domain';
 export { matchesDomain };
+import {
+  highlightGoalRoot,
+  removeGoalHighlights,
+  type GoalMatchEntry,
+} from './highlighter';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -253,7 +258,10 @@ function showInlineExplain(state: ToolbarState, kind: ExplainKind): void {
  */
 function watchSettings(): void {
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes[SETTINGS_KEY]) void refresh();
+    if (areaName === 'local' && changes[SETTINGS_KEY]) {
+      void refresh();
+      void runGoalAutoScan();
+    }
   });
 }
 
@@ -294,6 +302,63 @@ async function refresh(): Promise<void> {
 
   scan(document.body);
   startObserving();
+
+  // Vocabulary Goal Mode auto-scan (VOC-133): if enabled for this domain,
+  // analyse the page automatically and highlight goal-relevant words inline.
+  void runGoalAutoScan();
+}
+
+/**
+ * Automatically analyse the current page for goal-relevant vocabulary and
+ * highlight the candidates inline — only when the user enabled Goal Mode
+ * auto-scan for this domain (reusing the per-site domain pattern). Safe no-op
+ * otherwise; the manual popup scan remains available in all cases.
+ */
+async function runGoalAutoScan(): Promise<void> {
+  let settings: import('@/shared/types/settings').Settings;
+  try {
+    settings = await settingsRepository.get();
+  } catch {
+    return;
+  }
+  const goalMode = settings.goalMode;
+  if (!goalMode?.autoScan) {
+    removeGoalHighlights();
+    return;
+  }
+  if (!settings.activeGoalId) {
+    removeGoalHighlights();
+    return;
+  }
+  // Respect the per-domain allow-list, mirroring bilingualDomains behaviour.
+  const host = location.hostname.replace(/^www\./i, '').toLowerCase();
+  if (goalMode.domains && goalMode.domains.length > 0 && !matchesDomain(host, goalMode.domains)) {
+    removeGoalHighlights();
+    return;
+  }
+
+  const blocks = extractArticle();
+  const pageText = blocks.map((block) => block.text).join('\n\n');
+  if (!pageText.trim()) return;
+
+  try {
+    const result = await sendMessage({
+      type: 'analyze-goal-page',
+      payload: { goalId: settings.activeGoalId, pageUrl: location.href, pageText },
+    });
+    removeGoalHighlights();
+    if (result && result.candidates.length > 0) {
+      const entries: GoalMatchEntry[] = result.candidates.map((c) => ({
+        key: c.key,
+        text: c.text,
+        tier: c.tier,
+      }));
+      highlightGoalRoot(document.body, entries);
+    }
+  } catch {
+    // Auto-scan failures are non-fatal: the page stays readable; the manual
+    // popup scan can surface the real error if the user retries.
+  }
 }
 
 function syncBilingual(enabled: boolean, domains: readonly string[]): void {

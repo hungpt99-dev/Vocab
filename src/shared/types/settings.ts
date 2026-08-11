@@ -85,6 +85,18 @@ export interface Settings {
   readingExperience: ReadingExperience;
   /** Id of the active Vocabulary Goal (VOC-132), or undefined when none is set. */
   activeGoalId?: string;
+  /**
+   * Vocabulary Goal Mode automation (VOC-133).
+   * - `autoScan`: when true, the active page is analysed automatically (no
+   *   manual button) and goal-relevant words are highlighted inline.
+   * - `domains`: if non-empty, auto-scan only runs on these hostnames (reusing
+   *   the same per-site pattern as `bilingualDomains`). When empty, auto-scan
+   *   applies to every page the extension can read. Manual scan always works.
+   */
+  goalMode: {
+    autoScan: boolean;
+    domains: string[];
+  };
 }
 
 export type SettingsPatch = Partial<Settings>;

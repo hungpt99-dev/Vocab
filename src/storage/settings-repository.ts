@@ -54,6 +54,10 @@ export const DEFAULT_SETTINGS: Settings = {
     spacing: readingTokens.spacing,
   },
   activeGoalId: undefined,
+  goalMode: {
+    autoScan: false,
+    domains: [],
+  },
 };
 
 /** Common UI languages for the bilingual target-language picker. */

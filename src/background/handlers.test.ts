@@ -498,6 +498,33 @@ describe('analyzeGoalPage', () => {
     ).rejects.toThrow();
   });
 
+  it('uses pre-extracted pageText from the content script (auto-scan path)', async () => {
+    const goal = await deps.goals.create({ text: 'reading' });
+    deps.goalService = {
+      analyzePage: vi.fn(async () => ({
+        candidates: [
+          { key: 'gracefully degrade', text: 'gracefully degrade', type: 'phrase', score: 96, reason: 'r', context: 'x', tier: 'high' },
+        ],
+        chunksAnalyzed: 1,
+        chunksTotal: 1,
+        partial: false,
+      })),
+    } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+
+    const result = await analyzeGoalPage(deps, {
+      goalId: goal.id,
+      pageUrl: 'https://example.com',
+      pageText: 'The system can gracefully degrade under heavy load.',
+    });
+    expect(result.candidates).toHaveLength(1);
+    // Should NOT query the tab for text when pageText is supplied.
+    expect(chromeMock().tabs.sendMessage).not.toHaveBeenCalled();
+    expect(deps.goalService.analyzePage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ pageText: 'The system can gracefully degrade under heavy load.' }),
+    );
+  });
+
   it('returns empty result when the page has no readable content', async () => {
     const goal = await deps.goals.create({ text: 'reading' });
     deps.goalService = { analyzePage: vi.fn() } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;

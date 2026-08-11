@@ -1,5 +1,6 @@
 import type { HighlightEntry } from './matcher';
 import { VocabularyMatcher } from './matcher';
+import { escapeRegExp } from '@/shared/lib/text';
 
 export const HIGHLIGHT_CLASS = 'avs-highlight';
 export const HIGHLIGHT_ATTR = 'data-avs-id';
@@ -93,6 +94,111 @@ export function highlightRoot(root: Node, matcher: VocabularyMatcher): number {
 /** Remove every highlight span, restoring the original text. */
 export function removeHighlights(root: ParentNode = document): void {
   for (const mark of root.querySelectorAll(`.${HIGHLIGHT_CLASS}`)) {
+    const parent = mark.parentNode;
+    if (!parent) continue;
+    parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+    parent.normalize();
+  }
+}
+
+/*
+ * Vocabulary Goal Mode highlighting (VOC-133).
+ *
+ * Goal candidates are transient suggestions, not saved words, so they get their
+ * own class and a lightweight matcher. They reuse the same text-node walker and
+ * wrapping logic as saved-word highlights but must not be picked up by the
+ * saved-word hover card or removeHighlights().
+ */
+
+export const GOAL_HIGHLIGHT_CLASS = 'avs-goal-highlight';
+export const GOAL_HIGHLIGHT_ATTR = 'data-avs-goal-key';
+
+export interface GoalMatchEntry {
+  /** Normalised key used to build the matcher pattern. */
+  key: string;
+  /** Display text (the surface form on the page). */
+  text: string;
+  /** Relevance tier for styling. */
+  tier: 'high' | 'relevant';
+}
+
+/** Build a boundary-aware regex from goal keys, longest first. */
+export function buildGoalMatcher(entries: readonly GoalMatchEntry[]): RegExp | null {
+  const keys = [...new Set(entries.map((e) => e.key))].sort((a, b) => b.length - a.length);
+  if (keys.length === 0) return null;
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}])(${keys.map(escapeRegExp).join('|')})(?![\\p{L}\\p{N}])`,
+    'giu',
+  );
+}
+
+function createGoalHighlight(text: string, entry: GoalMatchEntry): HTMLElement {
+  const mark = document.createElement('mark');
+  mark.className = `${GOAL_HIGHLIGHT_CLASS} avs-goal-${entry.tier}`;
+  mark.textContent = text;
+  mark.tabIndex = 0;
+  mark.setAttribute(GOAL_HIGHLIGHT_ATTR, entry.key);
+  mark.setAttribute('role', 'button');
+  mark.setAttribute('aria-label', `Goal vocabulary: ${entry.text}`);
+  return mark;
+}
+
+/** Highlight goal candidates inside a root, returning the count created. */
+export function highlightGoalRoot(root: Node, entries: readonly GoalMatchEntry[]): number {
+  const pattern = buildGoalMatcher(entries);
+  if (!pattern) return 0;
+  if (root.nodeType === Node.ELEMENT_NODE) {
+    const element = root as Element;
+    if (SKIPPED_TAGS.has(element.tagName)) return 0;
+  }
+
+  const byKey = new Map(entries.map((e) => [e.key, e]));
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      isHighlightableTextNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT,
+  });
+  const targets: Text[] = [];
+  let current = walker.nextNode();
+  while (current) {
+    targets.push(current as Text);
+    current = walker.nextNode();
+  }
+
+  let count = 0;
+  for (const node of targets) {
+    const text = node.nodeValue ?? '';
+    pattern.lastIndex = 0;
+    const matches: Array<{ start: number; end: number; entry: GoalMatchEntry }> = [];
+    for (const found of text.matchAll(pattern)) {
+      const value = found[0];
+      const index = found.index;
+      if (index === undefined) continue;
+      const entry = byKey.get(value.toLowerCase().replace(/\s+/g, ' '));
+      if (entry) matches.push({ start: index, end: index + value.length, entry });
+    }
+    if (matches.length === 0) continue;
+
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    for (const match of matches) {
+      if (match.start < cursor) continue;
+      if (match.start > cursor) {
+        fragment.append(document.createTextNode(text.slice(cursor, match.start)));
+      }
+      fragment.append(createGoalHighlight(text.slice(match.start, match.end), match.entry));
+      cursor = match.end;
+    }
+    if (cursor < text.length) fragment.append(document.createTextNode(text.slice(cursor)));
+    node.parentNode?.replaceChild(fragment, node);
+    count += matches.length;
+  }
+  return count;
+}
+
+/** Remove goal highlights only, restoring the original text. */
+export function removeGoalHighlights(root: ParentNode = document): void {
+  for (const mark of root.querySelectorAll(`.${GOAL_HIGHLIGHT_CLASS}`)) {
     const parent = mark.parentNode;
     if (!parent) continue;
     parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);

@@ -88,6 +88,7 @@ export class GoalVocabularyService {
     const collected: GoalCandidate[] = [];
     let analyzed = 0;
     let failed = false;
+    let firstError: unknown = undefined;
 
     for (let i = 0; i < chunks.length; i++) {
       signal?.throwIfAborted();
@@ -95,10 +96,17 @@ export class GoalVocabularyService {
         const chunkCandidates = await this.analyzeChunk(settings, goal, chunks[i]!, signal);
         collected.push(...chunkCandidates);
       } catch (error) {
-        // One chunk failing should not sink the whole page (partial failure).
         const code = error instanceof AiError ? error.code : 'unknown';
         if (code === 'aborted') throw error;
+        // Hard, non-transient AI errors (bad key, bad response, no provider)
+        // must surface to the user rather than be disguised as "no vocabulary".
+        if (code === 'missing_api_key' || code === 'unauthorized' || code === 'bad_response' || code === 'config' || code === 'unknown_provider') {
+          throw error;
+        }
+        // Transient failures (rate limit, network) are tolerated per-chunk so a
+        // single flaky request doesn't sink the whole page.
         failed = true;
+        firstError ??= error;
       }
       analyzed = i + 1;
       onProgress?.(analyzed, chunks.length);
@@ -134,6 +142,9 @@ export class GoalVocabularyService {
         ),
       signal,
     );
+    if (!value || !value.trim()) {
+      throw new AiError('bad_response', 'The AI returned an empty response.');
+    }
     return parseGoalAnalysis(value, chunk);
   }
 

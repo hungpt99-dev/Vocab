@@ -55,6 +55,23 @@ describe('parseGoalAnalysis', () => {
     expect(result[1]!.score).toBe(0);
   });
 
+  it('tolerates wrapping quotes and leading articles on candidate text', () => {
+    const page = 'The system can gracefully degrade under heavy load.';
+    const json = JSON.stringify({
+      candidates: [
+        { text: '"gracefully degrade"', type: 'phrase', score: 96, reason: 'resilience' },
+        { text: 'the heavy load', type: 'phrase', score: 80, reason: 'context' },
+      ],
+    });
+    const result = parseGoalAnalysis(json, page);
+    // Both candidates are accepted (quotes stripped for matching; a leading
+    // article is tolerated when matching but kept in the stored text).
+    expect(result).toHaveLength(2);
+    const byText = new Map(result.map((c) => [c.text, c]));
+    expect(byText.has('gracefully degrade')).toBe(true);
+    expect(byText.has('the heavy load')).toBe(true);
+  });
+
   it('drops candidates whose text is not in the source', () => {
     const json = JSON.stringify({
       candidates: [{ text: 'nonexistent phrase here', type: 'phrase', score: 80, reason: 'x' }],
