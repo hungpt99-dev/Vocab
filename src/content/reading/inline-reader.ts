@@ -15,7 +15,7 @@ import type { WordAlignResult, BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
-import { matchesDomain } from '../index';
+import { matchesDomain } from '../domain';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the

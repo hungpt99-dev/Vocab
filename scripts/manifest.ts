@@ -8,7 +8,7 @@ export function buildManifest(): Record<string, unknown> {
     description:
       'Save words while you browse, highlight them everywhere, and explain them with your own AI key. Local-first.',
     minimum_chrome_version: '110',
-    permissions: ['storage', 'contextMenus', 'activeTab', 'scripting', 'unlimitedStorage'],
+    permissions: ['storage', 'contextMenus', 'activeTab', 'unlimitedStorage'],
     host_permissions: ['<all_urls>'],
     background: { service_worker: 'background.js', type: 'module' },
     icons: {

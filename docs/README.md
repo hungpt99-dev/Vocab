@@ -16,7 +16,8 @@ For the product pitch, installation and quick start, see the [root README](../RE
 | **An AI coding agent** | [AI agent rules](AI_AGENT_RULES.md) → [AI workflow](AI_WORKFLOW.md) → [Architecture](ARCHITECTURE.md) |
 | **Reviewing a change** | [Contributing](CONTRIBUTING.md) → [Coding standards](CODING_STANDARDS.md) → [Decision log](DECISION_LOG.md) |
 | **Shipping a release** | [Release process](RELEASE_PROCESS.md) → [Deployment](DEPLOYMENT.md) → [Changelog](CHANGELOG.md) |
-| **Assessing privacy** | [Security](SECURITY.md) → [Storage](STORAGE.md) |
+| **Assessing privacy** | [Privacy](PRIVACY.md) → [Security](SECURITY.md) → [Storage](STORAGE.md) |
+| **Writing the store listing** | [Store listing](STORE_LISTING.md) → [Privacy](PRIVACY.md) → [Deployment](DEPLOYMENT.md) |
 
 ---
 
@@ -47,6 +48,7 @@ For the product pitch, installation and quick start, see the [root README](../RE
 | [AI_PROVIDER.md](AI_PROVIDER.md) | Provider abstraction, request flow, timeouts, error codes, tolerant parsing, adding a provider |
 | [STORAGE.md](STORAGE.md) | Dexie schema, indexes, normalised keys, migrations, export/import format |
 | [SECURITY.md](SECURITY.md) | Permission model and justifications, API key handling, privacy posture, threat model |
+| [PRIVACY.md](PRIVACY.md) | The complete data-use disclosure: what is stored, what is sent where, store-form answers |
 | [API_GUIDELINES.md](API_GUIDELINES.md) | The internal typed message contract and conventions for outbound provider calls |
 
 ### Standards
@@ -64,6 +66,7 @@ For the product pitch, installation and quick start, see the [root README](../RE
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Setup, every command, the two-config build, debugging each surface, troubleshooting |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branch naming, commit conventions, PR rules, review checklist, Definition of Done |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Producing a loadable artifact, Chrome Web Store submission, permission justifications |
+| [STORE_LISTING.md](STORE_LISTING.md) | Paste-ready store copy: name, descriptions, keywords, captions, promotional images |
 | [RELEASE_PROCESS.md](RELEASE_PROCESS.md) | SemVer policy, release checklist, tagging, verification, hotfixes |
 | [CHANGELOG.md](CHANGELOG.md) | Keep a Changelog history |
 

@@ -22,6 +22,11 @@ import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
 import { extractArticle } from './reading/extract';
+// The inline reader imports from './domain' directly to keep the module graph
+// acyclic; this import+re-export keeps `matchesDomain` available at the entry
+// (and in the entry's tests) without the old circular dependency.
+import { matchesDomain } from './domain';
+export { matchesDomain };
 
 const RESCAN_DELAY_MS = 400;
 
@@ -261,8 +266,9 @@ async function refresh(): Promise<void> {
     // The service worker is asleep or the extension was reloaded.
     return;
   }
-  // No data (e.g. the service worker vanished between dispatch and resolution):
-  // skip this refresh rather than crash the page.
+  // No data (e.g. the service worker vanished between dispatch and resolution,
+  // or a test harness without a mocked worker): skip this refresh rather than
+  // crash the page.
   if (!data) return;
 
   // Keep a settings snapshot for AI-key gating in the toolbar/assist menu.
@@ -288,25 +294,6 @@ async function refresh(): Promise<void> {
 
   scan(document.body);
   startObserving();
-}
-
-/**
- * Whether `hostname` matches any entry in `domains`. Each domain is matched as a
- * bare hostname or as a subdomain of it, with a leading `www.` ignored on both
- * sides so `example.com` and `www.example.com` are equivalent.
- */
-export function matchesDomain(hostname: string, domains: readonly string[]): boolean {
-  const host = hostname.replace(/^www\./i, '').toLowerCase();
-  return domains.some((raw) => {
-    // A stored rule may be a bare hostname or a full URL the user pasted; normalise it.
-    const domain = raw
-      .trim()
-      .replace(/^https?:\/\//i, '')
-      .replace(/\/.*$/, '')
-      .replace(/^www\./i, '')
-      .toLowerCase();
-    return domain !== '' && (host === domain || host.endsWith(`.${domain}`));
-  });
 }
 
 function syncBilingual(enabled: boolean, domains: readonly string[]): void {

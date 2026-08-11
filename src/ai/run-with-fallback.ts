@@ -26,7 +26,7 @@ export async function runActiveWithFallback<T>(
 ): Promise<T> {
   let primaryError: unknown;
 
-  const useKeyless = async (): Promise<T> => {
+  const runKeyless = async (): Promise<T> => {
     if (!keyless) throw primaryError;
     const { googleTranslate } = await import('./google-translate');
     if (keyless.kind === 'translate' && keyless.paragraphs) {
@@ -50,6 +50,6 @@ export async function runActiveWithFallback<T>(
         // fall through to keyless
       }
     }
-    return useKeyless();
+    return runKeyless();
   }
 }

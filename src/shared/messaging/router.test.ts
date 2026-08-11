@@ -24,8 +24,16 @@ describe('registerMessageHandlers', () => {
       throw new Error('The message channel closed before a response was received');
     });
 
+    type Listener = (
+      message: unknown,
+      sender: unknown,
+      sendResponse: (response: unknown) => void,
+    ) => void;
+
     registerMessageHandlers(handlers as never);
-    const listeners = (chrome.runtime.onMessage.addListener as unknown as { mock: { calls: Array<[Function]> } }).mock.calls;
+    const listeners = (chrome.runtime.onMessage.addListener as unknown as {
+      mock: { calls: Array<[Listener]> };
+    }).mock.calls;
     const listener = listeners[0]![0];
 
     // A late/closed channel must NOT surface as an unhandled error.
@@ -45,7 +53,9 @@ describe('registerMessageHandlers', () => {
     };
     const sendResponse = vi.fn();
     registerMessageHandlers(handlers as never);
-    const listeners = (chrome.runtime.onMessage.addListener as unknown as { mock: { calls: Array<[Function]> } }).mock.calls;
+    const listeners = (chrome.runtime.onMessage.addListener as unknown as {
+      mock: { calls: Array<[(message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => void]> };
+    }).mock.calls;
     const listener = listeners[0]![0];
 
     listener({ type: 'boom' }, fakeSender(), sendResponse);

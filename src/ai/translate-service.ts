@@ -165,7 +165,16 @@ export class TranslateService {
         language,
       ));
     if (!cached) this.writeAlignCache(GOOGLE_CACHE_PROVIDER, chunk, language, results);
-    return results;
+    // The cache is keyed by text but stores the FIRST requester's block ids.
+    // A second tab reading the same article gets a cache hit with foreign ids,
+    // and its reader can never match them — every injection silently dropped.
+    // Re-key the results to the caller's ids on every return (VOC-124).
+    return chunk.map((paragraph, index) => {
+      const hit = results[index];
+      return hit
+        ? { ...hit, id: paragraph.id, pairs: [...hit.pairs] }
+        : { id: paragraph.id, text: paragraph.text, pairs: [], translation: '' };
+    });
   }
 
   private cacheKey(

@@ -10,8 +10,10 @@ Related: [Storage](STORAGE.md), [AI providers](AI_PROVIDER.md),
 ## Summary
 
 The attack surface is small by construction. There is no backend, no account system, no telemetry and
-no third-party script. The extension stores data locally and makes exactly one kind of outbound
-request: an AI call the user triggered, sent directly to the provider they configured.
+no third-party script. The extension stores data locally and makes exactly two kinds of outbound
+request: a translation the user's reading features make to Google's keyless Translate endpoint, and
+an AI call the user triggered, sent directly to the provider they configured. Both are documented in
+[Data flows](#data-flows).
 
 The main residual risk is that the user's API key is stored in browser-local storage, where anything
 with access to the browser profile can read it. This is inherent to bring-your-own-key extensions and
@@ -28,7 +30,6 @@ Declared in `scripts/manifest.ts`. Each permission is requested for one reason:
 | `storage` | Persist settings in `chrome.storage.local` and receive change events | No settings; no live updates to open tabs |
 | `contextMenus` | The "Save … to vocabulary" right-click entry | Context-menu capture |
 | `activeTab` | Read the selection from the tab the user acted on | Capture from menu and shortcut |
-| `scripting` | Interact with the page for selection and highlighting | Highlighting and selection reading |
 | `unlimitedStorage` | Avoid a quota ceiling on a growing vocabulary | Large libraries could hit the default quota |
 | `host_permissions: <all_urls>` | Highlighting must work on any page the user reads | Highlighting would be limited to an allow-list |
 
@@ -71,15 +72,25 @@ Every outbound byte, exhaustively:
 
 | Flow | Trigger | Destination | Contains |
 | --- | --- | --- | --- |
+| Bilingual reading | Reader is open on a page (per settings or command) | `translate.googleapis.com` | Article sentences, paragraphs and individual words from the *current page*, plus the target language |
+| Quick translation | Selection card open, or popup translation on save/open | `translate.googleapis.com` | The selected or saved word (and its sentence, for context) |
 | AI explanation | User clicks *AI explain*, or auto-explain is enabled | The provider base URL in settings | The word and its sentence context |
-| Connection test | User clicks *Test connection* | Same | A minimal probe request |
+| AI translation fallback | No configured provider has a working key | `translate.googleapis.com` | The same word/sentence the AI call would have sent |
+| Connection test | User clicks *Test connection* | The provider base URL in settings | A minimal probe request |
 
-There is no other network activity. No analytics, no crash reporting, no update pings beyond Chrome's
-own extension updates, no fonts or scripts loaded from a CDN.
+Bilingual reading and quick translation do not use the user's AI key — they are
+served by Google's public, keyless Translate endpoint (the same one the Google
+Translate widget uses). This is what makes the reading features work out of the
+box. Details of what is sent, and how to turn the flow off, are in
+[Privacy](PRIVACY.md#what-is-sent-where).
 
-**What never leaves the browser:** the vocabulary library, notes, tags, browsing history, page
-content, URLs of pages visited, and the API key itself (it is sent *to* the provider as a credential,
-never to anyone else).
+There is no other network activity. No analytics, no crash reporting, no update
+pings beyond Chrome's own extension updates, no fonts or scripts loaded from a
+CDN.
+
+**What never leaves the browser:** the vocabulary library, notes, tags, browsing
+history, URLs of pages visited, and the API key itself (it is sent *to* the
+provider as a credential, never to anyone else).
 
 ---
 
@@ -119,6 +130,7 @@ catastrophic backtracking.
 | User exfiltrates their own data | n/a | Not a threat — the export feature exists for this | — |
 | Man-in-the-middle on a provider call | Very low | HTTPS to hosted providers | Local providers over plain HTTP on `localhost` are not exposed to a network MITM |
 | Page content sent to a provider without consent | Low | Only the selected word and its sentence are sent, and only on an explicit action | Auto-explain sends on save; it is off by default |
+| Page content sent to Google Translate while reading | Medium (feature is enabled by default) | Bilingual reading sends *current page* sentences/words to Google's keyless endpoint — disclosed, off-by-command or by setting, and never stored | A user who needs zero outbound traffic must turn the reader off |
 
 ---
 

@@ -1,5 +1,4 @@
 import { chromium } from '@playwright/test';
-import { createServer } from 'node:http';
 
 const EXT = new URL('../dist', import.meta.url).pathname;
 const TARGET_PAGE = process.env.TARGET_URL || 'https://docs.nestjs.com';

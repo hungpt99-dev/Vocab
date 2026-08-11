@@ -43,4 +43,11 @@ export default tseslint.config(
       'no-empty-pattern': 'off',
     },
   },
+  {
+    // Manual selftest scripts: Node scripts that embed browser-context closures
+    // (`document`, `URL`, `chrome` inside page.evaluate), so both global sets
+    // are legitimately in scope.
+    files: ['e2e/selftest-*.mjs', 'scripts/*.mjs'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node, ...globals.webextensions } },
+  },
 );

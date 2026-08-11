@@ -156,7 +156,7 @@ test('saves a word straight from the page with the floating toolbar', async ({
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
 
-  const saveButton = page.locator('.avs-toolbar [data-action="save"]');
+  const saveButton = page.locator('#avs-selection-card [data-action="save"]');
   await expect(saveButton).toBeVisible();
   await saveButton.click();
 
@@ -265,7 +265,7 @@ test('on-page explain hands the word to the popup (no dummy toast) with no provi
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
 
-  const explainBtn = page.locator('.avs-toolbar [data-action="explain"]');
+  const explainBtn = page.locator('#avs-selection-card [data-action="generate"]');
   await expect(explainBtn).toBeVisible({ timeout: 10_000 });
   await explainBtn.click();
 

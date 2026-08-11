@@ -91,6 +91,25 @@ describe('TranslateService (bilingual = keyless Google)', () => {
     expect(google.align).toHaveBeenCalledTimes(0);
   });
 
+  it('re-keys cached align results to the caller ids (two tabs, same article)', async () => {
+    await noKeySettings();
+    const service = new TranslateService();
+    // Tab 1 reads the article; its (random) block ids end up in the cache.
+    await service.alignWords([{ id: 'tab1-block', text: 'Hello world' }], 'Vietnamese');
+    google.align.mockClear();
+    // Tab 2 reads the same article: text matches the cache, ids differ. The
+    // cached results must be re-keyed to tab 2's ids or its reader injects
+    // nothing (every lookup misses) — the real bug behind "second tab blank".
+    const result = await service.alignWords([{ id: 'tab2-block', text: 'Hello world' }], 'Vietnamese');
+    expect(google.align).toHaveBeenCalledTimes(0);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('tab2-block');
+    expect(result[0]?.pairs).toEqual([
+      { source: 'Hello', target: '[vi]Hello' },
+      { source: 'world', target: '[vi]world' },
+    ]);
+  });
+
   it('chunks long articles across multiple Google calls in order', async () => {
     await noKeySettings();
     const paragraphs = Array.from({ length: 20 }, (_, index) => ({ id: `p${index}`, text: `Para ${index}` }));

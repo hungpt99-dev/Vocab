@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && xvfb-run -a playwright test",
-    "package": "npm run build && cd dist && zip -r ../ai-vocabulary-saver.zip . -x '*.map'"
+    "package": "npm run build && node scripts/package.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",

@@ -110,6 +110,8 @@ test('options page persists settings and toggles highlighting', async ({ page, e
   await page.getByLabel('API key').fill('sk-test-key');
   await page.getByRole('button', { name: 'Save' }).click();
 
+  // Highlighting controls live on the Appearance tab.
+  await page.getByRole('button', { name: 'Appearance' }).click();
   await page.getByLabel('Highlight colour').fill('#ff8800');
   await page.getByLabel(/Highlight saved words/).uncheck();
 
@@ -122,6 +124,7 @@ test('options page persists settings and toggles highlighting', async ({ page, e
   await expect(page.getByLabel('API key')).toHaveValue('sk-test-key');
   await page.getByRole('button', { name: 'Cancel' }).click();
 
+  await page.getByRole('button', { name: 'Appearance' }).click();
   await expect(page.getByLabel('Highlight colour')).toHaveValue('#ff8800');
   await expect(page.getByLabel(/Highlight saved words/)).not.toBeChecked();
 });
@@ -137,6 +140,7 @@ test('disabling highlighting removes highlights from pages', async ({ page, cont
 
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await options.getByRole('button', { name: 'Appearance' }).click();
   await options.getByLabel(/Highlight saved words/).uncheck();
   await options.close();
 
@@ -148,6 +152,7 @@ test('exports the vocabulary as a JSON backup', async ({ page, extensionId }) =>
   await saveWord(page, 'serendipity');
 
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await page.getByRole('button', { name: 'Your data' }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON' }).click();
 
@@ -160,7 +165,9 @@ test('bilingual settings: language picker, toggle and editable prompt persist', 
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
   await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
 
-  // Target language picker (Bilingual mode section) — a dropdown <select>.
+  // Target language picker, toggle and prompt live on the Bilingual reading tab.
+  await page.getByRole('button', { name: 'Bilingual reading' }).click();
+  // Target language picker — a dropdown <select>.
   await page.getByLabel('Target language').selectOption('Vietnamese');
   // Bilingual toggle.
   await page.getByLabel(/Bilingual mode/).uncheck();
@@ -172,6 +179,7 @@ test('bilingual settings: language picker, toggle and editable prompt persist', 
   await page.reload();
   await expect(page.getByRole('heading', { name: /Settings/ })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Bilingual reading' }).click();
   await expect(page.getByLabel('Target language')).toHaveValue('Vietnamese');
   await expect(page.getByLabel(/Bilingual mode/)).not.toBeChecked();
   await expect(page.getByLabel('Explain prompt')).toHaveValue(

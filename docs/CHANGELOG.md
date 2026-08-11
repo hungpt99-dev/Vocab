@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Chrome Web Store release assets: `docs/STORE_LISTING.md` (paste-ready listing
+  copy), `docs/PRIVACY.md` (complete data-use disclosure + store-form answers),
+  and `store-assets/` (1280×800 screenshots plus a 1400×560 banner and 440×280
+  tile, generated from the real build by `scripts/store-screenshots.mjs`).
+- Cross-platform packaging script `scripts/package.mjs` (PowerShell
+  `Compress-Archive` on Windows, `zip` elsewhere); `npm run package` no longer
+  requires the `zip` binary and always recreates the archive from scratch.
 - Smart AI assistance on a selected/translated sentence: the selection toolbar's "More" menu exposes
   Explain sentence, Explain grammar, Explain vocabulary, Simplify, Summarize and Save difficult words.
   Each analysis routes through the provider-agnostic `ExplainService` (with a dedicated prompt per
@@ -46,6 +53,10 @@ All notable changes to this project are documented here. The format is based on
 - Content script styling now reads from the shared token module instead of hardcoded hex values; no visible change to end users.
 
 ### Fixed
+- Bilingual reading on a second tab showing the same article as the first
+  stayed blank: the align cache was keyed by text but returned the first
+  requester's block ids, so every lookup missed. Cached results are now
+  re-keyed to the caller's ids (VOC-124, `translate-service.ts`).
 - AI calls now retry transient failures and are rate-limited; previously a transient 429/5xx failed immediately.
 - Content script emitted as ESM (silent highlighting failure) — now built as a standalone IIFE.
 - Settings checkbox reverted mid-interaction — now applied optimistically.

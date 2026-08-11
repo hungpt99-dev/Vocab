@@ -25,7 +25,7 @@ test('floating toolbar buttons actually work (save + explain feedback)', async (
   await page.dispatchEvent('#w', 'mouseup').catch(() => {});
   await page.waitForTimeout(500);
 
-  const toolbar = page.locator('#avs-toolbar');
+  const toolbar = page.locator('#avs-selection-card');
   await expect(toolbar).toBeVisible();
   await expect(toolbar.locator('[data-role="word"]')).toHaveText('serendipity');
 
@@ -41,7 +41,8 @@ test('floating toolbar buttons actually work (save + explain feedback)', async (
   await page.dispatchEvent('#w', 'mouseup').catch(() => {});
   await page.waitForTimeout(500);
   await expect(toolbar).toBeVisible();
-  await toolbar.locator('[data-action="explain"]').click();
+  // "Generate with AI" is the card action that surfaces the inline explain.
+  await toolbar.locator('[data-action="generate"]').click();
   await page.waitForTimeout(500);
   // Without an API key the inline popover should surface a clear message (not a blank popup).
   // Either the explain dialog opened, or a toast explaining the missing key appeared.

@@ -82,17 +82,23 @@ test('every keyboard-focused popup control shows a visible focus ring', async ({
 test('options page exposes labelled sections and controls', async ({ page, extensionId }) => {
   await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
 
-  // Landmark regions carry accessible names.
+  // The default tab renders a landmark region with an accessible name.
   await expect(page.getByRole('region', { name: 'AI providers' })).toBeVisible();
+
+  // Each sidebar tab exposes its own labelled section when activated.
+  await page.getByRole('button', { name: 'Appearance' }).click();
   await expect(page.getByRole('region', { name: 'Highlighting' })).toBeVisible();
+  await page.getByRole('button', { name: 'Your data' }).click();
   await expect(page.getByRole('region', { name: 'Your data' })).toBeVisible();
 
   // The Popup section exposes its controls with labels.
+  await page.getByRole('button', { name: 'Popup' }).click();
   await expect(page.getByRole('heading', { name: 'Popup' })).toBeVisible();
   await expect(page.getByLabel(/auto-translate the highlighted word/i)).toBeVisible();
   await expect(page.getByLabel(/default tab on open/i)).toBeVisible();
 
   // The API key is masked. Open the default provider's editor to reveal it.
+  await page.getByRole('button', { name: 'AI providers' }).click();
   await page.getByRole('button', { name: /^Edit/ }).first().click();
   await expect(page.getByLabel('API key')).toHaveAttribute('type', 'password');
   await page.getByRole('button', { name: 'Cancel' }).click();

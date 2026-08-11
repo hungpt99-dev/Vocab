@@ -72,6 +72,9 @@ async function isEnabled(): Promise<boolean> {
 function emit(where: 'content' | 'sw', args: unknown[]): void {
   // Fire-and-forget: never block the pipeline on logging.
   void isEnabled().then((on) => {
+    // Deliberate: this IS the opt-in debug logger; logging only happens when the
+    // user explicitly enables it via chrome.storage.local.
+    // eslint-disable-next-line no-console
     if (on) console.log(`[avs:bilingual][${where}]`, ...args);
   });
 }
