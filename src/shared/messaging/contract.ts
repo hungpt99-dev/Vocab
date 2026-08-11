@@ -72,7 +72,17 @@ export type Message =
   | { type: 'open-options' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
-  | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } };
+  | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } }
+  | {
+      type: 'analyze-goal-page';
+      payload: {
+        goalId: string;
+        /** Normalised page URL, used for caching. */
+        pageUrl: string;
+        signal?: string;
+      };
+    }
+  | { type: 'extract-page-text' };
 
 export type MessageType = Message['type'];
 
@@ -114,6 +124,8 @@ export interface ResponseMap {
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;
+  'analyze-goal-page': import('@/features/goal/goal-service').AnalyzePageResult;
+  'extract-page-text': string;
 }
 
 export type MessageResult<T extends MessageType> =

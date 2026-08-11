@@ -34,6 +34,7 @@ These are known gaps to be closed, not permanent decisions.
 | L7 | **Settings are not exported** | A backup file does not carry the API key or preferences | Intentional for key safety; preferences export may be added separately |
 | L8 | **No i18n** | UI is English-only | Locale scaffolding if contributors need it |
 | L9 | **No automated store submission** | Releases are manual | The [release process](RELEASE_PROCESS.md) documents the manual steps |
+| L10 | **Vocabulary Goal Mode MVP scope** | One active goal at a time (model supports more); manual scan only (no auto-analysis on load); AI-extracted `domains`/`topics` are optional hints, not required; in-flight cancellation across the message channel is not wired (the service accepts an `AbortSignal` for future/tests) | Multi-goal management UI, live cancel message, optional goal-metadata enrichment as fast-follows |
 
 ---
 

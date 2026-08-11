@@ -12,7 +12,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, GithubIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, UsersIcon, WandIcon } from '@/shared/ui/Icons';
+import { BookIcon, GithubIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, UsersIcon, WandIcon, TargetIcon } from '@/shared/ui/Icons';
 import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
@@ -29,6 +29,7 @@ import { ReviewScreen } from '@/features/review/ReviewScreen';
 import { QuizScreen } from '@/features/quiz/QuizScreen';
 import { ProgressScreen } from '@/features/progress/ProgressScreen';
 import { ExplanationView } from '@/features/library/ExplanationView';
+import { GoalModeScreen } from '@/features/goal/GoalModeScreen';
 import type { Explanation } from '@/shared/types/vocabulary';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
@@ -58,7 +59,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const [onboarded, setOnboarded] = useState(true);
   const { settings } = useSettings();
   const { available: aiAvailable } = useAiAvailable();
-  const [tab, setTab] = useState<'library' | 'review' | 'quiz' | 'progress'>(settings.popupDefaultTab);
+  const [tab, setTab] = useState<'library' | 'review' | 'quiz' | 'progress' | 'goal'>(settings.popupDefaultTab);
   const [dueCount, setDueCount] = useState(0);
   const [alreadySaved, setAlreadySaved] = useState(false);
 
@@ -457,9 +458,23 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         >
           Progress
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('goal')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium ${
+            tab === 'goal'
+              ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-200'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          <TargetIcon size={14} aria-hidden="true" />
+          Goal
+        </button>
       </div>
 
-      {tab === 'progress' ? (
+      {tab === 'goal' ? (
+        <GoalModeScreen />
+      ) : tab === 'progress' ? (
         <ProgressScreen />
       ) : tab === 'quiz' ? (
         <QuizScreen />

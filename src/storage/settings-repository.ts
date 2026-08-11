@@ -53,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fontSize: readingTokens.fontSize,
     spacing: readingTokens.spacing,
   },
+  activeGoalId: undefined,
 };
 
 /** Common UI languages for the bilingual target-language picker. */

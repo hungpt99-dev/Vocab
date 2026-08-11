@@ -8,6 +8,7 @@ import {
   saveSelection,
   splitVocabularyTerm,
   translateUnit,
+  analyzeGoalPage,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -15,6 +16,8 @@ import { TranslateService } from '@/ai/translate-service';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
+import { GoalRepository } from '@/storage/goal-repository';
+import { goalVocabularyService } from '@/features/goal/goal-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -58,6 +61,8 @@ beforeEach(async () => {
     translate: {
       translate: vi.fn(async () => []),
     } as unknown as TranslateService,
+    goals: new GoalRepository(db),
+    goalService: goalVocabularyService,
   };
 });
 
@@ -462,4 +467,47 @@ describe('translateUnit default language', () => {
     expect(translate.translate).toHaveBeenCalledWith([{ id: 'unit', text: 'hello' }], 'English');
   });
 });
+
+describe('analyzeGoalPage', () => {
+  it('returns candidates from the goal service for a page with readable content', async () => {
+    const goal = await deps.goals.create({ text: 'backend engineering' });
+    deps.goalService = {
+      analyzePage: vi.fn(async () => ({
+        candidates: [
+          { key: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'API', context: 'x', tier: 'high' },
+        ],
+        chunksAnalyzed: 1,
+        chunksTotal: 1,
+        partial: false,
+      })),
+    } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+
+    chromeMock().tabs.query.mockResolvedValue([{ id: 1, url: 'https://example.com/article' }]);
+    chromeMock().tabs.sendMessage.mockResolvedValue('The API should be idempotent.');
+
+    const result = await analyzeGoalPage(deps, { goalId: goal.id, pageUrl: 'https://example.com/article' });
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]!.text).toBe('idempotent');
+    expect(deps.goalService.analyzePage).toHaveBeenCalled();
+  });
+
+  it('throws a config error when the goal does not exist', async () => {
+    deps.goalService = { analyzePage: vi.fn() } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+    await expect(
+      analyzeGoalPage(deps, { goalId: 'missing', pageUrl: 'https://example.com' }),
+    ).rejects.toThrow();
+  });
+
+  it('returns empty result when the page has no readable content', async () => {
+    const goal = await deps.goals.create({ text: 'reading' });
+    deps.goalService = { analyzePage: vi.fn() } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+    chromeMock().tabs.query.mockResolvedValue([{ id: 1, url: 'https://example.com' }]);
+    chromeMock().tabs.sendMessage.mockResolvedValue('');
+
+    const result = await analyzeGoalPage(deps, { goalId: goal.id, pageUrl: 'https://example.com' });
+    expect(result.candidates).toEqual([]);
+    expect(deps.goalService.analyzePage).not.toHaveBeenCalled();
+  });
+});
+
 

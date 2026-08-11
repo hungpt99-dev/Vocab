@@ -21,6 +21,7 @@ import {
 import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
+import { extractArticle } from './reading/extract';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -58,6 +59,12 @@ registerMessageHandlers({
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
+  'extract-page-text': () => {
+    // Reuse the existing article extractor: skips nav/footer/script/ads and
+    // prefers <article>/<main>. Join blocks with blank lines for the AI.
+    const blocks = extractArticle();
+    return blocks.map((block) => block.text).join('\n\n');
+  },
 });
 
 void bootstrap();
@@ -247,13 +254,16 @@ function watchSettings(): void {
 
 /** Pull the latest vocabulary + settings and re-apply highlighting. */
 async function refresh(): Promise<void> {
-  let data: HighlightData;
+  let data: HighlightData | undefined;
   try {
     data = await sendMessage({ type: 'get-highlight-data' });
   } catch {
     // The service worker is asleep or the extension was reloaded.
     return;
   }
+  // No data (e.g. the service worker vanished between dispatch and resolution):
+  // skip this refresh rather than crash the page.
+  if (!data) return;
 
   // Keep a settings snapshot for AI-key gating in the toolbar/assist menu.
   try {

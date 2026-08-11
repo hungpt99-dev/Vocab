@@ -27,9 +27,9 @@ export class GeminiProvider implements AiProvider {
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
     const content = await this.complete(
-      config,
       buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
+      config,
       'application/json',
     );
     return toExplanation(content, {
@@ -121,10 +121,10 @@ export class GeminiProvider implements AiProvider {
   }
 
   /** Post one generateContent call with a system instruction and read the text. */
-  private async complete(
-    config: ProviderConfig,
+  async complete(
     system: string,
     user: string,
+    config: ProviderConfig,
     responseMimeType?: string,
   ): Promise<string> {
     if (!config.apiKey) {
