@@ -75,11 +75,14 @@ export type Message =
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } }
   | {
       type: 'radar:scan';
+      /** Optional one-off goal override (e.g. a quick-search query). When absent,
+       * the content script uses the user's saved Radar goal from Settings. */
+      payload?: { goal?: string };
     }
   | {
       type: 'radar:analyze';
       payload: {
-        /** The user's free-text learning goal. */
+        /** The user's free-text learning goal (the source of truth for what to find). */
         goal: string;
         /** Normalised page URL, used for caching. */
         pageUrl: string;

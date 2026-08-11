@@ -9,6 +9,7 @@ import {
   splitVocabularyTerm,
   translateUnit,
   radarAnalyze,
+  radarScan,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -501,6 +502,31 @@ describe('radarAnalyze', () => {
     const result = await radarAnalyze(deps, { goal: 'reading', pageUrl: 'https://example.com', pageText: '   ' });
     expect(result.candidates).toEqual([]);
     expect(deps.radarService.analyzePage).not.toHaveBeenCalled();
+  });
+});
+
+describe('radarScan', () => {
+  it('forwards the scan to the active page tab and returns its result', async () => {
+    chromeMock().tabs.query.mockResolvedValue([{ id: 7, url: 'https://example.com/article' }]);
+    const pageResult = {
+      candidates: [],
+      chunksAnalyzed: 1,
+      chunksTotal: 1,
+      partial: false,
+    };
+    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: pageResult });
+
+    const result = await radarScan();
+    expect(result).toBe(pageResult);
+    // The worker asks the PAGE to scan itself (it has the real DOM + tab), so
+    // the goal override (carried in the radar:scan payload by the popup) is
+    // forwarded, not re-resolved from the popup window.
+    expect(chromeMock().tabs.sendMessage).toHaveBeenCalledWith(7, { type: 'radar:scan' });
+  });
+
+  it('throws when there is no active page tab', async () => {
+    chromeMock().tabs.query.mockResolvedValue([]);
+    await expect(radarScan()).rejects.toThrow();
   });
 });
 

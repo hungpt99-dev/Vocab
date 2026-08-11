@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnalyzePageResult } from './radar-service';
 import type { RankedCandidate } from './types';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
@@ -6,8 +6,9 @@ import { useSettings } from '@/shared/hooks/useSettings';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { Button } from '@/shared/ui/Button';
-import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon } from '@/shared/ui/Icons';
+import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, XIcon } from '@/shared/ui/Icons';
 import { tints } from '@/shared/styles/tokens';
 
 type ScanState =
@@ -17,6 +18,11 @@ type ScanState =
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
+/** Minimum query length before we trigger a search (avoids noise on single chars). */
+const MIN_QUERY_LENGTH = 2;
+/** Debounce before firing a search while the user types. */
+const SEARCH_DEBOUNCE_MS = 350;
+
 export function RadarPanel() {
   const { settings, update } = useSettings();
   const { available: aiAvailable } = useAiAvailable();
@@ -24,6 +30,13 @@ export function RadarPanel() {
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [currentHost, setCurrentHost] = useState('');
+
+  // Quick Search bar state. Reuses the exact Radar scan pipeline — the query is
+  // passed as a one-off goal override, so nothing about the search/AI/result
+  // logic is duplicated.
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   const goal = settings.radar?.goal ?? '';
   const autoScan = Boolean(settings.radar?.autoScan);
@@ -43,33 +56,78 @@ export function RadarPanel() {
       .catch(() => undefined);
   }, []);
 
-  const runScan = useCallback(async () => {
-    if (!goal.trim() || !aiAvailable) return;
-    if (!showPrivacy) setShowPrivacy(true);
-    setScan({ status: 'scanning', done: 0, total: 0 });
-    try {
-      // Ask the PAGE to scan itself — it already has the article text and the
-      // correct tab context. This fixes the old bug where the background tried
-      // to re-query the active tab while the popup was focused (and resolved to
-      // the popup window, returning no page text).
-      const result = await sendMessage({ type: 'radar:scan' });
-      if (!result || result.candidates.length === 0) {
-        setScan({ status: 'empty' });
-      } else {
-        setScan({ status: 'done', result });
-        const keys = new Set<string>();
-        await Promise.all(
-          result.candidates.map(async (c) => {
-            const entry = await vocabularyRepository.findByWord(c.text);
-            if (entry) keys.add(c.key);
-          }),
-        );
-        setSavedKeys(keys);
+  /**
+   * Run a Radar scan against the current page, optionally with a one-off goal
+   * override (the Quick Search query). This is the single entry point for both
+   * the "Find for my Radar" button and the search bar — existing loading,
+   * result, error and empty states are preserved untouched.
+   */
+  const runScan = useCallback(
+    async (goalOverride?: string) => {
+      const effectiveGoal = goalOverride?.trim() || goal.trim();
+      if (!effectiveGoal || !aiAvailable) return;
+      if (!showPrivacy) setShowPrivacy(true);
+      setScan({ status: 'scanning', done: 0, total: 0 });
+      try {
+        // Ask the PAGE to scan itself — it already has the article text and the
+        // correct tab context. This fixes the old bug where the background tried
+        // to re-query the active tab while the popup was focused (and resolved to
+        // the popup window, returning no page text).
+        const result = await sendMessage({
+          type: 'radar:scan',
+          payload: goalOverride?.trim() ? { goal: goalOverride.trim() } : undefined,
+        });
+        if (!result || result.candidates.length === 0) {
+          setScan({ status: 'empty' });
+        } else {
+          setScan({ status: 'done', result });
+          const keys = new Set<string>();
+          await Promise.all(
+            result.candidates.map(async (c) => {
+              const entry = await vocabularyRepository.findByWord(c.text);
+              if (entry) keys.add(c.key);
+            }),
+          );
+          setSavedKeys(keys);
+        }
+      } catch (cause) {
+        setScan({ status: 'error', message: aiErrorMessage(cause) });
       }
-    } catch (cause) {
-      setScan({ status: 'error', message: aiErrorMessage(cause) });
-    }
-  }, [goal, aiAvailable, showPrivacy]);
+    },
+    [goal, aiAvailable, showPrivacy],
+  );
+
+  // Quick Search: debounced live scan using the typed query as the goal.
+  useEffect(() => {
+    if (debouncedQuery.trim().length < MIN_QUERY_LENGTH) return;
+    void runScan(debouncedQuery);
+  }, [debouncedQuery, runScan]);
+
+  // Ctrl/Cmd + F focuses the Radar search bar without hijacking the browser's
+  // normal find (we don't preventDefault, so the page's own find still works
+  // when Radar is not the intended target). Only acts when Radar is usable.
+  const onTriggerShortcut = useCallback(() => {
+    if (!goal.trim() || !aiAvailable) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [goal, aiAvailable]);
+
+  // Global Ctrl/Cmd + F handler. When Radar is usable, intercept the shortcut
+  // and focus the Radar search bar (the browser's built-in find is suppressed).
+  // When Radar is not usable (no goal / no AI), we do nothing so the browser's
+  // normal find still works.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && (event.key === 'f' || event.key === 'F')) {
+        const usable = goal.trim().length > 0 && aiAvailable;
+        if (!usable) return;
+        event.preventDefault();
+        onTriggerShortcut();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [goal, aiAvailable, onTriggerShortcut]);
 
   const ignoreCandidate = useCallback((key: string) => {
     setScan((prev) =>
@@ -112,12 +170,53 @@ export function RadarPanel() {
     [settings.targetLanguage],
   );
 
+  const showResults = scan.status !== 'idle' && !debouncedQuery.trim();
+
   return (
     <div className="flex flex-col gap-3 p-4">
       <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <TargetIcon size={14} className="text-brand-600" aria-hidden="true" />
         Vocabulary Radar finds words on this page that match your learning goal (set in Settings).
       </p>
+
+      {/* Quick Search bar — a keyboard-first entry point into the existing Radar
+          scan. Typing reuses the exact same pipeline; Esc clears/closes. */}
+      <div className="relative">
+        <SearchIcon
+          size={15}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          aria-hidden="true"
+        />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setQuery('');
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder="Search vocabulary…  (Ctrl/Cmd + F)"
+          aria-label="Search vocabulary with Vocab Radar"
+          title="Type to search with Vocab Radar. Press Ctrl/Cmd + F to focus."
+          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+          >
+            <XIcon size={13} aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       {!goal.trim() && (
         <p className={`rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300`} role="alert">
@@ -195,23 +294,44 @@ export function RadarPanel() {
         )}
       </div>
 
-      {showPrivacy && goal.trim() && (
+      {showPrivacy && goal.trim() && !debouncedQuery.trim() && (
         <p className="rounded-md bg-slate-100 px-3 py-2 text-[11px] leading-snug text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           To find vocabulary relevant to your goal, selected page content is sent to your configured AI provider.
         </p>
       )}
 
-      {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
-      {scan.status === 'empty' && <EmptyResult />}
-      {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan()} />}
-      {scan.status === 'done' && (
-        <Results
-          result={scan.result}
-          savedKeys={savedKeys}
-          onExplain={explainCandidate}
-          onSave={saveCandidate}
-          onIgnore={ignoreCandidate}
-        />
+      {debouncedQuery.trim().length >= MIN_QUERY_LENGTH && (
+        <>
+          {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
+          {scan.status === 'empty' && <EmptyResult />}
+          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan(debouncedQuery)} />}
+          {scan.status === 'done' && (
+            <Results
+              result={scan.result}
+              savedKeys={savedKeys}
+              onExplain={explainCandidate}
+              onSave={saveCandidate}
+              onIgnore={ignoreCandidate}
+            />
+          )}
+        </>
+      )}
+
+      {showResults && (
+        <>
+          {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
+          {scan.status === 'empty' && <EmptyResult />}
+          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan()} />}
+          {scan.status === 'done' && (
+            <Results
+              result={scan.result}
+              savedKeys={savedKeys}
+              onExplain={explainCandidate}
+              onSave={saveCandidate}
+              onIgnore={ignoreCandidate}
+            />
+          )}
+        </>
       )}
     </div>
   );
