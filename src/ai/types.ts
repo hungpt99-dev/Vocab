@@ -104,6 +104,12 @@ export interface AiProvider {
   translate(request: TranslateRequest, config: ProviderConfig): Promise<TranslateResult>;
   /** Word-by-word aligned translation: returns ordered source→target glosses. */
   align(request: TranslateRequest, config: ProviderConfig): Promise<WordAlignResult[]>;
+  /**
+   * Generic chat completion: run `system` + `user` turns and return the raw text.
+   * Used by features (e.g. Vocabulary Goal Mode) that need a custom prompt while
+   * still going through the provider's transport, auth and error handling.
+   */
+  complete(system: string, user: string, config: ProviderConfig): Promise<string>;
 }
 
 /** Provider-level translation response: one translation per input paragraph. */
@@ -120,7 +126,8 @@ export type AiErrorCode =
   | 'aborted'
   | 'bad_response'
   | 'unknown_provider'
-  | 'server_error';
+  | 'server_error'
+  | 'config';
 
 /** Normalised error surface so the UI never has to branch per provider. */
 export class AiError extends Error {

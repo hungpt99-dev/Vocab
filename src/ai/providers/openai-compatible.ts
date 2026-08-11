@@ -53,14 +53,14 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
-    const { content, model } = await this.complete(
-      config,
+    const content = await this.complete(
       buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
+      config,
     );
     return toExplanation(content, {
       provider: this.id,
-      model,
+      model: config.model || this.defaultModel,
       kind: request.kind,
       text: request.word,
     });
@@ -152,11 +152,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   /** Post one chat-completions call with a system + user turn and extract the text. */
-  private async complete(
-    config: ProviderConfig,
+  async complete(
     system: string,
     user: string,
-  ): Promise<{ content: string; model: string }> {
+    config: ProviderConfig,
+  ): Promise<string> {
     if (this.requiresApiKey && !config.apiKey) {
       throw new AiError('missing_api_key', `An API key is required for ${this.label}.`);
     }
@@ -188,7 +188,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', `${this.label} returned an empty response.`);
     }
-    return { content, model: data.model ?? model };
+    return content;
   }
 }
 

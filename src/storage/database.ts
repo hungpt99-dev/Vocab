@@ -17,9 +17,20 @@ export interface ReviewRecord {
   updatedAt: number;
 }
 
+export interface GoalRecord {
+  id: string;
+  text: string;
+  domains?: string[];
+  topics?: string[];
+  situations?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type VocabularyDatabase = Dexie & {
   vocabulary: EntityTable<VocabularyEntry, 'id'>;
   review: EntityTable<ReviewRecord, 'id'>;
+  goals: EntityTable<GoalRecord, 'id'>;
 };
 
 /**
@@ -35,6 +46,10 @@ export function createDatabase(name: string = DB_NAME): VocabularyDatabase {
   // VOC-109: review scheduling table for the spaced-repetition queue.
   db.version(2).stores({
     review: 'id, wordKey, dueAt, updatedAt',
+  });
+  // VOC-132: Vocabulary Goal Mode goals.
+  db.version(3).stores({
+    goals: 'id, updatedAt, createdAt',
   });
   return db;
 }

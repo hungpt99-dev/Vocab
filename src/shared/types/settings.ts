@@ -83,6 +83,8 @@ export interface Settings {
   explainPromptTemplate: string;
   /** Reading overlay presentation, applied live to open pages. */
   readingExperience: ReadingExperience;
+  /** Id of the active Vocabulary Goal (VOC-132), or undefined when none is set. */
+  activeGoalId?: string;
 }
 
 export type SettingsPatch = Partial<Settings>;

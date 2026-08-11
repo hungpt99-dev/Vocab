@@ -3,6 +3,7 @@ import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { DifficultWordsPayload, HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
+import { AiError } from '@/ai/types';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
 import {
   TranslateService,
@@ -17,6 +18,8 @@ import {
   vocabularyRepository as defaultVocabularyRepository,
 } from '@/storage/vocabulary-repository';
 import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
+import { GoalRepository, goalRepository as defaultGoalRepository } from '@/storage/goal-repository';
+import { goalVocabularyService as defaultGoalService } from '@/features/goal/goal-service';
 
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
@@ -24,6 +27,8 @@ export interface BackgroundDeps {
   explain: ExplainService;
   translate: TranslateService;
   review: ReviewRepository;
+  goals: GoalRepository;
+  goalService: typeof defaultGoalService;
 }
 
 export const defaultDeps: BackgroundDeps = {
@@ -32,6 +37,8 @@ export const defaultDeps: BackgroundDeps = {
   explain: defaultExplainService,
   translate: defaultTranslationService,
   review: defaultReviewRepository,
+  goals: defaultGoalRepository,
+  goalService: defaultGoalService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -191,6 +198,50 @@ export async function translateUnit(
   return results[0]?.translation ?? '';
 }
 
+/**
+ * Vocabulary Goal Mode: analyse the active tab's page text against a goal and
+ * return ranked candidate vocabulary. The page text is fetched from the page's
+ * content script (which reuses the existing article extractor), then the
+ * GoalVocabularyService chunks/validates/merges/ranks it via the shared AI
+ * pipeline. Respects cache + partial-failure semantics. The natural-language
+ * goal text is the source of truth; structured metadata is optional.
+ */
+export async function analyzeGoalPage(
+  deps: BackgroundDeps,
+  payload: { goalId: string; pageUrl: string },
+): Promise<import('@/features/goal/goal-service').AnalyzePageResult> {
+  const settings = await deps.settings.get();
+  const goal = await deps.goals.get(payload.goalId);
+  if (!goal) {
+    throw new AiError('config', 'No active vocabulary goal was found.');
+  }
+
+  // Fetch clean page text from the active tab's content script.
+  const pageText = await readActivePageText();
+  if (!pageText || !pageText.trim()) {
+    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
+  }
+
+  return deps.goalService.analyzePage(settings, {
+    goal,
+    pageText,
+    pageUrl: payload.pageUrl,
+  });
+}
+
+/** Ask the active tab's content script for its cleaned article text. */
+async function readActivePageText(): Promise<string> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return '';
+  try {
+    const text = await chrome.tabs.sendMessage(tab.id, { type: 'extract-page-text' });
+    return typeof text === 'string' ? text : '';
+  } catch {
+    // Content script not ready / not on a normal page (e.g. chrome://).
+    return '';
+  }
+}
+
 /** Build the handler map used by the service worker's message router. */
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
   return {
@@ -255,5 +306,6 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
+    'analyze-goal-page': (message) => analyzeGoalPage(deps, message.payload),
   };
 }

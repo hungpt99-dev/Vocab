@@ -27,14 +27,14 @@ export class AnthropicProvider implements AiProvider {
   readonly requiresApiKey = true;
 
   async explain(request: ExplainRequest, config: ProviderConfig): Promise<Explanation> {
-    const { content, model } = await this.complete(
-      config,
+    const content = await this.complete(
       buildExplainSystemPrompt(request.kind, request.promptTemplate),
       buildExplainWordUserPrompt(request),
+      config,
     );
     return toExplanation(content, {
       provider: this.id,
-      model,
+      model: config.model || this.defaultModel,
       kind: request.kind,
       text: request.word,
     });
@@ -128,11 +128,11 @@ export class AnthropicProvider implements AiProvider {
   }
 
   /** Post one Messages API call with a system prompt and read the text. */
-  private async complete(
-    config: ProviderConfig,
+  async complete(
     system: string,
     user: string,
-  ): Promise<{ content: string; model: string }> {
+    config: ProviderConfig,
+  ): Promise<string> {
     if (!config.apiKey) {
       throw new AiError('missing_api_key', 'An API key is required for Anthropic.');
     }
@@ -166,6 +166,6 @@ export class AnthropicProvider implements AiProvider {
     if (!content) {
       throw new AiError('bad_response', 'Anthropic returned an empty response.');
     }
-    return { content, model: data.model ?? model };
+    return content;
   }
 }
