@@ -6,7 +6,6 @@ import { useSettings } from '@/shared/hooks/useSettings';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
-import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { Button } from '@/shared/ui/Button';
 import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, XIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { tints } from '@/shared/styles/tokens';
@@ -18,10 +17,8 @@ type ScanState =
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
-/** Minimum query length before we trigger a search (avoids noise on single chars). */
+/** Minimum query length before the Search button/Enter is enabled (avoids noise on single chars). */
 const MIN_QUERY_LENGTH = 2;
-/** Debounce before firing a search while the user types. */
-const SEARCH_DEBOUNCE_MS = 350;
 
 export function RadarPanel() {
   const { settings } = useSettings();
@@ -35,7 +32,6 @@ export function RadarPanel() {
   // logic is duplicated.
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   const goal = settings.radar?.goal ?? '';
 
@@ -80,15 +76,14 @@ export function RadarPanel() {
     [goal, aiAvailable, showPrivacy],
   );
 
-  // Quick Search: debounced live scan using the typed query as the goal.
-  useEffect(() => {
-    if (debouncedQuery.trim().length < MIN_QUERY_LENGTH) return;
-    void runScan(debouncedQuery);
-  }, [debouncedQuery, runScan]);
+  // Quick Search is triggered explicitly (Enter or the search button), NOT on
+  // every keystroke — running a live AI scan per character is slow and wasteful.
+  const runQuickSearch = useCallback(() => {
+    const q = query.trim();
+    if (q.length < MIN_QUERY_LENGTH) return;
+    void runScan(q);
+  }, [query, runScan]);
 
-  // Ctrl/Cmd + F focuses the Radar search bar without hijacking the browser's
-  // normal find (we don't preventDefault, so the page's own find still works
-  // when Radar is not the intended target). Only acts when Radar is usable.
   const onTriggerShortcut = useCallback(() => {
     if (!goal.trim() || !aiAvailable) return;
     inputRef.current?.focus();
@@ -153,7 +148,7 @@ export function RadarPanel() {
     [settings.targetLanguage],
   );
 
-  const showResults = scan.status !== 'idle' && !debouncedQuery.trim();
+  const showResults = scan.status !== 'idle' && !query.trim();
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -162,8 +157,9 @@ export function RadarPanel() {
         Vocabulary Radar finds words on this page that match your learning goal (set in Settings).
       </p>
 
-      {/* Quick Search bar — a keyboard-first entry point into the existing Radar
-          scan. Typing reuses the exact same pipeline; Esc clears/closes. */}
+      {/* Quick Search bar — an explicit entry point into the existing Radar scan.
+          Type, then press Enter or the search button; it does NOT auto-search on
+          every keystroke. Esc clears the query. */}
       <div className="relative">
         <SearchIcon
           size={15}
@@ -179,11 +175,14 @@ export function RadarPanel() {
             if (event.key === 'Escape') {
               setQuery('');
               inputRef.current?.blur();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              runQuickSearch();
             }
           }}
           placeholder="Search vocabulary…  (Ctrl/Cmd + F)"
           aria-label="Search vocabulary with Vocab Radar"
-          title="Type to search with Vocab Radar. Press Ctrl/Cmd + F to focus."
+          title="Type a query, then press Enter or the search button to scan with Vocab Radar. Press Ctrl/Cmd + F to focus."
           className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
         {query && (
@@ -232,6 +231,18 @@ export function RadarPanel() {
             {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
           </Button>
 
+          {query.trim().length >= MIN_QUERY_LENGTH && (
+            <Button
+              variant="secondary"
+              disabled={!aiAvailable || scan.status === 'scanning'}
+              onClick={runQuickSearch}
+              title="Search this page with your query as the Radar goal"
+            >
+              <SearchIcon size={14} className="mr-1.5" aria-hidden="true" />
+              Search
+            </Button>
+          )}
+
           {!aiAvailable && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               AI actions need an API key — open settings.
@@ -240,17 +251,17 @@ export function RadarPanel() {
         </div>
       )}
 
-      {showPrivacy && goal.trim() && !debouncedQuery.trim() && (
+      {showPrivacy && goal.trim() && !query.trim() && (
         <p className="rounded-md bg-slate-100 px-3 py-2 text-[11px] leading-snug text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           To find vocabulary relevant to your goal, selected page content is sent to your configured AI provider.
         </p>
       )}
 
-      {debouncedQuery.trim().length >= MIN_QUERY_LENGTH && (
+      {query.trim().length >= MIN_QUERY_LENGTH && (
         <>
           {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
           {scan.status === 'empty' && <EmptyResult />}
-          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan(debouncedQuery)} />}
+          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={runQuickSearch} />}
           {scan.status === 'done' && (
             <Results
               result={scan.result}
