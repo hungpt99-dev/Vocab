@@ -3,7 +3,13 @@ import { SETTINGS_KEY, settingsRepository } from '@/storage/settings-repository'
 import { sendMessage } from '@/shared/messaging/client';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
+import { isRadarEnabled } from '@/shared/types/settings';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
+import {
+  highlightRadarRoot,
+  removeRadarHighlights,
+  type RadarMatchEntry,
+} from './highlighter';
 import { HoverCard } from './hover-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
@@ -27,11 +33,6 @@ import { extractArticle } from './reading/extract';
 // (and in the entry's tests) without the old circular dependency.
 import { matchesDomain } from './domain';
 export { matchesDomain };
-import {
-  highlightGoalRoot,
-  removeGoalHighlights,
-  type GoalMatchEntry,
-} from './highlighter';
 
 const RESCAN_DELAY_MS = 400;
 
@@ -69,12 +70,7 @@ registerMessageHandlers({
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
-  'extract-page-text': () => {
-    // Reuse the existing article extractor: skips nav/footer/script/ads and
-    // prefers <article>/<main>. Join blocks with blank lines for the AI.
-    const blocks = extractArticle();
-    return blocks.map((block) => block.text).join('\n\n');
-  },
+  'radar:scan': () => runRadarScanHere(),
 });
 
 void bootstrap();
@@ -260,7 +256,7 @@ function watchSettings(): void {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes[SETTINGS_KEY]) {
       void refresh();
-      void runGoalAutoScan();
+      void runRadarAutoScan();
     }
   });
 }
@@ -303,58 +299,72 @@ async function refresh(): Promise<void> {
   scan(document.body);
   startObserving();
 
-  // Vocabulary Goal Mode auto-scan (VOC-133): if enabled for this domain,
-  // analyse the page automatically and highlight goal-relevant words inline.
-  void runGoalAutoScan();
+  // Vocabulary Radar auto-scan (VOC-134): if enabled for this domain, analyse
+  // the page automatically and highlight radar-relevant words inline.
+  void runRadarAutoScan();
 }
 
 /**
- * Automatically analyse the current page for goal-relevant vocabulary and
- * highlight the candidates inline — only when the user enabled Goal Mode
- * auto-scan for this domain (reusing the per-site domain pattern). Safe no-op
- * otherwise; the manual popup scan remains available in all cases.
+ * Run a Radar scan for the *current page* (invoked from the popup via the
+ * background, or directly). Extracts the article text, asks the background to
+ * analyse it against the user's Radar goal, then highlights the results inline.
+ * The page does the extraction itself so it always reads its own content —
+ * this is what fixes the old bug where the background resolved the popup's tab.
  */
-async function runGoalAutoScan(): Promise<void> {
+async function runRadarScanHere(): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
+  const settings = await settingsRepository.get();
+  const goal = settings.radar?.goal?.trim() ?? '';
+  if (!goal) {
+    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
+  }
+  const blocks = extractArticle();
+  const pageText = blocks.map((block) => block.text).join('\n\n');
+  if (!pageText.trim()) {
+    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
+  }
+
+  const result = await sendMessage({
+    type: 'radar:analyze',
+    payload: { goal, pageUrl: location.href, pageText },
+  });
+  removeRadarHighlights();
+  if (result && result.candidates.length > 0) {
+    const entries: RadarMatchEntry[] = result.candidates.map((c) => ({
+      key: c.key,
+      text: c.text,
+      tier: c.tier,
+    }));
+    highlightRadarRoot(document.body, entries);
+  }
+  return result ?? { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
+}
+
+/**
+ * Automatically analyse the current page for radar-relevant vocabulary and
+ * highlight the candidates inline — only when Radar is enabled for this domain
+ * (reusing the per-site domain pattern from Bilingual). Safe no-op otherwise;
+ * the manual popup scan remains available in all cases.
+ */
+async function runRadarAutoScan(): Promise<void> {
   let settings: import('@/shared/types/settings').Settings;
   try {
     settings = await settingsRepository.get();
   } catch {
     return;
   }
-  const goalMode = settings.goalMode;
-  if (!goalMode?.autoScan) {
-    removeGoalHighlights();
-    return;
-  }
-  if (!settings.activeGoalId) {
-    removeGoalHighlights();
+  if (!isRadarEnabled(settings)) {
+    removeRadarHighlights();
     return;
   }
   // Respect the per-domain allow-list, mirroring bilingualDomains behaviour.
   const host = location.hostname.replace(/^www\./i, '').toLowerCase();
-  if (goalMode.domains && goalMode.domains.length > 0 && !matchesDomain(host, goalMode.domains)) {
-    removeGoalHighlights();
+  if (settings.radar.domains.length > 0 && !matchesDomain(host, settings.radar.domains)) {
+    removeRadarHighlights();
     return;
   }
 
-  const blocks = extractArticle();
-  const pageText = blocks.map((block) => block.text).join('\n\n');
-  if (!pageText.trim()) return;
-
   try {
-    const result = await sendMessage({
-      type: 'analyze-goal-page',
-      payload: { goalId: settings.activeGoalId, pageUrl: location.href, pageText },
-    });
-    removeGoalHighlights();
-    if (result && result.candidates.length > 0) {
-      const entries: GoalMatchEntry[] = result.candidates.map((c) => ({
-        key: c.key,
-        text: c.text,
-        tier: c.tier,
-      }));
-      highlightGoalRoot(document.body, entries);
-    }
+    await runRadarScanHere();
   } catch {
     // Auto-scan failures are non-fatal: the page stays readable; the manual
     // popup scan can surface the real error if the user retries.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGoalAnalysis, makeTextContains } from './validate';
+import { parseRadarAnalysis, makeTextContains } from './validate';
 
 const PAGE = 'The API should be idempotent. The system can gracefully degrade under heavy load. We must consider the trade-off between consistency and latency.';
 
@@ -12,7 +12,7 @@ describe('makeTextContains', () => {
   });
 });
 
-describe('parseGoalAnalysis', () => {
+describe('parseRadarAnalysis', () => {
   it('parses valid candidates and keeps only those present in the text', () => {
     const json = JSON.stringify({
       candidates: [
@@ -21,7 +21,7 @@ describe('parseGoalAnalysis', () => {
         { text: 'blockchain', type: 'word', score: 90, reason: 'Not on page' },
       ],
     });
-    const candidates = parseGoalAnalysis(json, PAGE);
+    const candidates = parseRadarAnalysis(json, PAGE);
     const texts = candidates.map((c) => c.text);
     expect(texts).toContain('idempotent');
     expect(texts).toContain('gracefully degrade');
@@ -29,16 +29,16 @@ describe('parseGoalAnalysis', () => {
   });
 
   it('throws on invalid JSON', () => {
-    expect(() => parseGoalAnalysis('not json{', PAGE)).toThrow();
+    expect(() => parseRadarAnalysis('not json{', PAGE)).toThrow();
   });
 
   it('throws when candidates array is missing', () => {
-    expect(() => parseGoalAnalysis(JSON.stringify({ foo: 1 }), PAGE)).toThrow();
+    expect(() => parseRadarAnalysis(JSON.stringify({ foo: 1 }), PAGE)).toThrow();
   });
 
   it('rejects candidates with missing text', () => {
     const json = JSON.stringify({ candidates: [{ score: 90, reason: 'x' }] });
-    expect(parseGoalAnalysis(json, PAGE)).toEqual([]);
+    expect(parseRadarAnalysis(json, PAGE)).toEqual([]);
   });
 
   it('rejects candidates with out-of-range scores', () => {
@@ -48,7 +48,7 @@ describe('parseGoalAnalysis', () => {
         { text: 'idempotent', type: 'word', score: -5, reason: 'too low' },
       ],
     });
-    const result = parseGoalAnalysis(json, PAGE);
+    const result = parseRadarAnalysis(json, PAGE);
     // Out-of-range scores are clamped into 0..100, so they survive validation.
     expect(result).toHaveLength(2);
     expect(result[0]!.score).toBe(100);
@@ -63,7 +63,7 @@ describe('parseGoalAnalysis', () => {
         { text: 'the heavy load', type: 'phrase', score: 80, reason: 'context' },
       ],
     });
-    const result = parseGoalAnalysis(json, page);
+    const result = parseRadarAnalysis(json, page);
     // Both candidates are accepted (quotes stripped for matching; a leading
     // article is tolerated when matching but kept in the stored text).
     expect(result).toHaveLength(2);
@@ -76,14 +76,14 @@ describe('parseGoalAnalysis', () => {
     const json = JSON.stringify({
       candidates: [{ text: 'nonexistent phrase here', type: 'phrase', score: 80, reason: 'x' }],
     });
-    expect(parseGoalAnalysis(json, PAGE)).toEqual([]);
+    expect(parseRadarAnalysis(json, PAGE)).toEqual([]);
   });
 
   it('defaults type to word and coerces non-string reason/context', () => {
     const json = JSON.stringify({
       candidates: [{ text: 'idempotent', score: 88 }],
     });
-    const result = parseGoalAnalysis(json, PAGE);
+    const result = parseRadarAnalysis(json, PAGE);
     const c = result[0]!;
     expect(c.type).toBe('word');
     expect(c.reason).toBe('');

@@ -102,18 +102,18 @@ export function removeHighlights(root: ParentNode = document): void {
 }
 
 /*
- * Vocabulary Goal Mode highlighting (VOC-133).
+ * Vocabulary Radar highlighting (VOC-133/134).
  *
- * Goal candidates are transient suggestions, not saved words, so they get their
+ * Radar candidates are transient suggestions, not saved words, so they get their
  * own class and a lightweight matcher. They reuse the same text-node walker and
  * wrapping logic as saved-word highlights but must not be picked up by the
  * saved-word hover card or removeHighlights().
  */
 
-export const GOAL_HIGHLIGHT_CLASS = 'avs-goal-highlight';
-export const GOAL_HIGHLIGHT_ATTR = 'data-avs-goal-key';
+export const RADAR_HIGHLIGHT_CLASS = 'avs-radar-highlight';
+export const RADAR_HIGHLIGHT_ATTR = 'data-avs-radar-key';
 
-export interface GoalMatchEntry {
+export interface RadarMatchEntry {
   /** Normalised key used to build the matcher pattern. */
   key: string;
   /** Display text (the surface form on the page). */
@@ -122,8 +122,8 @@ export interface GoalMatchEntry {
   tier: 'high' | 'relevant';
 }
 
-/** Build a boundary-aware regex from goal keys, longest first. */
-export function buildGoalMatcher(entries: readonly GoalMatchEntry[]): RegExp | null {
+/** Build a boundary-aware regex from radar keys, longest first. */
+export function buildRadarMatcher(entries: readonly RadarMatchEntry[]): RegExp | null {
   const keys = [...new Set(entries.map((e) => e.key))].sort((a, b) => b.length - a.length);
   if (keys.length === 0) return null;
   return new RegExp(
@@ -132,20 +132,20 @@ export function buildGoalMatcher(entries: readonly GoalMatchEntry[]): RegExp | n
   );
 }
 
-function createGoalHighlight(text: string, entry: GoalMatchEntry): HTMLElement {
+function createRadarHighlight(text: string, entry: RadarMatchEntry): HTMLElement {
   const mark = document.createElement('mark');
-  mark.className = `${GOAL_HIGHLIGHT_CLASS} avs-goal-${entry.tier}`;
+  mark.className = `${RADAR_HIGHLIGHT_CLASS} avs-radar-${entry.tier}`;
   mark.textContent = text;
   mark.tabIndex = 0;
-  mark.setAttribute(GOAL_HIGHLIGHT_ATTR, entry.key);
+  mark.setAttribute(RADAR_HIGHLIGHT_ATTR, entry.key);
   mark.setAttribute('role', 'button');
-  mark.setAttribute('aria-label', `Goal vocabulary: ${entry.text}`);
+  mark.setAttribute('aria-label', `Radar vocabulary: ${entry.text}`);
   return mark;
 }
 
-/** Highlight goal candidates inside a root, returning the count created. */
-export function highlightGoalRoot(root: Node, entries: readonly GoalMatchEntry[]): number {
-  const pattern = buildGoalMatcher(entries);
+/** Highlight radar candidates inside a root, returning the count created. */
+export function highlightRadarRoot(root: Node, entries: readonly RadarMatchEntry[]): number {
+  const pattern = buildRadarMatcher(entries);
   if (!pattern) return 0;
   if (root.nodeType === Node.ELEMENT_NODE) {
     const element = root as Element;
@@ -169,12 +169,12 @@ export function highlightGoalRoot(root: Node, entries: readonly GoalMatchEntry[]
   for (const node of targets) {
     const text = node.nodeValue ?? '';
     pattern.lastIndex = 0;
-    const matches: Array<{ start: number; end: number; entry: GoalMatchEntry }> = [];
+    const matches: Array<{ start: number; end: number; entry: RadarMatchEntry }> = [];
     for (const found of text.matchAll(pattern)) {
       const value = found[0];
       const index = found.index;
       if (index === undefined) continue;
-      const entry = byKey.get(value.toLowerCase().replace(/\s+/g, ' '));
+      const entry = byKey.get(value.toLowerCase().replace(/\\s+/g, ' '));
       if (entry) matches.push({ start: index, end: index + value.length, entry });
     }
     if (matches.length === 0) continue;
@@ -186,7 +186,7 @@ export function highlightGoalRoot(root: Node, entries: readonly GoalMatchEntry[]
       if (match.start > cursor) {
         fragment.append(document.createTextNode(text.slice(cursor, match.start)));
       }
-      fragment.append(createGoalHighlight(text.slice(match.start, match.end), match.entry));
+      fragment.append(createRadarHighlight(text.slice(match.start, match.end), match.entry));
       cursor = match.end;
     }
     if (cursor < text.length) fragment.append(document.createTextNode(text.slice(cursor)));
@@ -196,9 +196,9 @@ export function highlightGoalRoot(root: Node, entries: readonly GoalMatchEntry[]
   return count;
 }
 
-/** Remove goal highlights only, restoring the original text. */
-export function removeGoalHighlights(root: ParentNode = document): void {
-  for (const mark of root.querySelectorAll(`.${GOAL_HIGHLIGHT_CLASS}`)) {
+/** Remove radar highlights only, restoring the original text. */
+export function removeRadarHighlights(root: ParentNode = document): void {
+  for (const mark of root.querySelectorAll(`.${RADAR_HIGHLIGHT_CLASS}`)) {
     const parent = mark.parentNode;
     if (!parent) continue;
     parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);

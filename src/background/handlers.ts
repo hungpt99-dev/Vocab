@@ -18,8 +18,7 @@ import {
   vocabularyRepository as defaultVocabularyRepository,
 } from '@/storage/vocabulary-repository';
 import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
-import { GoalRepository, goalRepository as defaultGoalRepository } from '@/storage/goal-repository';
-import { goalVocabularyService as defaultGoalService } from '@/features/goal/goal-service';
+import { radarVocabularyService as defaultRadarService } from '@/features/radar/radar-service';
 
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
@@ -27,8 +26,7 @@ export interface BackgroundDeps {
   explain: ExplainService;
   translate: TranslateService;
   review: ReviewRepository;
-  goals: GoalRepository;
-  goalService: typeof defaultGoalService;
+  radarService: typeof defaultRadarService;
 }
 
 export const defaultDeps: BackgroundDeps = {
@@ -37,8 +35,7 @@ export const defaultDeps: BackgroundDeps = {
   explain: defaultExplainService,
   translate: defaultTranslationService,
   review: defaultReviewRepository,
-  goals: defaultGoalRepository,
-  goalService: defaultGoalService,
+  radarService: defaultRadarService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -199,47 +196,51 @@ export async function translateUnit(
 }
 
 /**
- * Vocabulary Goal Mode: analyse the active tab's page text against a goal and
- * return ranked candidate vocabulary. The page text is fetched from the page's
- * content script (which reuses the existing article extractor), then the
- * GoalVocabularyService chunks/validates/merges/ranks it via the shared AI
- * pipeline. Respects cache + partial-failure semantics. The natural-language
- * goal text is the source of truth; structured metadata is optional.
+ * Vocabulary Radar: analyse the active page against the user's Radar goal and
+ * return ranked candidate vocabulary. Two entry points:
+ *  - `radarScan` is called by the popup; it asks the PAGE (which has the
+ *    article text and the correct tab context) to analyse itself. This avoids
+ *    the old bug where the worker re-queried the active tab while the popup was
+ *    focused and resolved to the popup window (no page text → empty results).
+ *  - `radarAnalyze` is the page-side worker; it runs the shared AI pipeline
+ *    (chunks/validates/merges/ranks) and respects cache + partial failures.
+ * The natural-language goal text (from Settings) is the source of truth.
  */
-export async function analyzeGoalPage(
+export async function radarAnalyze(
   deps: BackgroundDeps,
-  payload: { goalId: string; pageUrl: string; pageText?: string },
-): Promise<import('@/features/goal/goal-service').AnalyzePageResult> {
+  payload: { goal: string; pageUrl: string; pageText: string },
+): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
   const settings = await deps.settings.get();
-  const goal = await deps.goals.get(payload.goalId);
+  const goal = payload.goal.trim();
   if (!goal) {
-    throw new AiError('config', 'No active vocabulary goal was found.');
+    throw new AiError('config', 'Set a Radar goal in Settings first.');
   }
-
-  // Use pre-extracted text when provided (content-script auto-scan), otherwise
-  // fetch clean page text from the active tab's content script.
-  const pageText = payload.pageText ?? (await readActivePageText());
+  const pageText = payload.pageText;
   if (!pageText || !pageText.trim()) {
     return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
   }
-
-  return deps.goalService.analyzePage(settings, {
+  return deps.radarService.analyzePage(settings, {
     goal,
     pageText,
     pageUrl: payload.pageUrl,
   });
 }
 
-/** Ask the active tab's content script for its cleaned article text. */
-async function readActivePageText(): Promise<string> {
+/**
+ * Popup entry point. Ask the active tab's content script to scan itself
+ * (`radar:scan` → `radar:analyze` with the page's own extracted text). Returns
+ * the ranked candidates so the popup can show them without a tab round-trip.
+ */
+export async function radarScan(): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return '';
+  if (!tab?.id) {
+    throw new AiError('config', 'No active page to scan.');
+  }
   try {
-    const text = await chrome.tabs.sendMessage(tab.id, { type: 'extract-page-text' });
-    return typeof text === 'string' ? text : '';
+    const result = await sendToTab(tab.id, { type: 'radar:scan' });
+    return result as import('@/features/radar/radar-service').AnalyzePageResult;
   } catch {
-    // Content script not ready / not on a normal page (e.g. chrome://).
-    return '';
+    throw new AiError('config', 'Could not read the page content (try reloading the page).');
   }
 }
 
@@ -307,6 +308,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
-    'analyze-goal-page': (message) => analyzeGoalPage(deps, message.payload),
+    'radar:scan': () => radarScan(),
+    'radar:analyze': (message) => radarAnalyze(deps, message.payload),
   };
 }

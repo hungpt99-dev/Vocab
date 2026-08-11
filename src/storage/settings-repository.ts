@@ -53,8 +53,8 @@ export const DEFAULT_SETTINGS: Settings = {
     fontSize: readingTokens.fontSize,
     spacing: readingTokens.spacing,
   },
-  activeGoalId: undefined,
-  goalMode: {
+  radar: {
+    goal: '',
     autoScan: false,
     domains: [],
   },
@@ -83,6 +83,25 @@ export const LANGUAGES: readonly string[] = [
   'Ukrainian',
   'Czech',
 ];
+
+/** Promote the VOC-133 `goalMode` fields into the VOC-134 `radar` shape.
+ * The old goal *text* lived in IndexedDB (a separate "Goal" tab); Radar now
+ * keeps the goal text in Settings, so we intentionally do not port it — the
+ * user re-enters it. We do preserve their auto-scan + domain preferences. */
+function migrateRadar(value: Partial<Settings>): Partial<Settings> {
+  const legacy = value as Partial<Settings> & { goalMode?: { autoScan?: boolean; domains?: string[] } };
+  if (legacy.goalMode && !('radar' in value)) {
+    return {
+      ...value,
+      radar: {
+        goal: '',
+        autoScan: Boolean(legacy.goalMode.autoScan),
+        domains: Array.isArray(legacy.goalMode.domains) ? legacy.goalMode.domains : [],
+      },
+    };
+  }
+  return value;
+}
 
 /** Promote the old single-provider fields into the new providers array. */
 function migrateLegacy(value: Partial<Settings> & Partial<LegacySettings>): Partial<Settings> {
@@ -114,7 +133,7 @@ export class SettingsRepository {
   async get(): Promise<Settings> {
     const stored = await chrome.storage.local.get(SETTINGS_KEY);
     const value = (stored[SETTINGS_KEY] as (Partial<Settings> & Partial<LegacySettings>) | undefined) ?? {};
-    const merged = migrateLegacy(value);
+    const merged = migrateRadar(migrateLegacy(value));
     return { ...DEFAULT_SETTINGS, ...merged };
   }
 

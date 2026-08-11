@@ -74,17 +74,19 @@ export type Message =
   | { type: 'settings-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } }
   | {
-      type: 'analyze-goal-page';
+      type: 'radar:scan';
+    }
+  | {
+      type: 'radar:analyze';
       payload: {
-        goalId: string;
+        /** The user's free-text learning goal. */
+        goal: string;
         /** Normalised page URL, used for caching. */
         pageUrl: string;
-        /** Optional pre-extracted page text (content script auto-scan path). When
-         * omitted, the worker fetches text from the active tab's content script. */
-        pageText?: string;
+        /** Pre-extracted page text (content script path). */
+        pageText: string;
       };
-    }
-  | { type: 'extract-page-text' };
+    };
 
 export type MessageType = Message['type'];
 
@@ -126,8 +128,8 @@ export interface ResponseMap {
   'vocabulary-changed': void;
   'settings-changed': void;
   'show-toast': void;
-  'analyze-goal-page': import('@/features/goal/goal-service').AnalyzePageResult;
-  'extract-page-text': string;
+  'radar:scan': import('@/features/radar/radar-service').AnalyzePageResult;
+  'radar:analyze': import('@/features/radar/radar-service').AnalyzePageResult;
 }
 
 export type MessageResult<T extends MessageType> =

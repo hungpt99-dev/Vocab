@@ -83,20 +83,30 @@ export interface Settings {
   explainPromptTemplate: string;
   /** Reading overlay presentation, applied live to open pages. */
   readingExperience: ReadingExperience;
-  /** Id of the active Vocabulary Goal (VOC-132), or undefined when none is set. */
-  activeGoalId?: string;
-  /**
-   * Vocabulary Goal Mode automation (VOC-133).
-   * - `autoScan`: when true, the active page is analysed automatically (no
-   *   manual button) and goal-relevant words are highlighted inline.
-   * - `domains`: if non-empty, auto-scan only runs on these hostnames (reusing
-   *   the same per-site pattern as `bilingualDomains`). When empty, auto-scan
-   *   applies to every page the extension can read. Manual scan always works.
-   */
-  goalMode: {
+  /** Vocabulary Radar: a natural-language goal used to surface vocabulary that
+   * is relevant to what you want to learn. Lived as a separate "Goal" tab
+   * (VOC-132), but per user request it now lives in Settings and shares the
+   * per-domain auto behaviour with Bilingual mode (VOC-134). */
+  radar: {
+    /** The free-text learning goal (the source of truth for what to find). */
+    goal: string;
+    /** Auto-scan + highlight relevant words on pages where Radar is active. */
     autoScan: boolean;
+    /** Hostnames where auto-scan runs. Empty = every readable page. */
     domains: string[];
   };
+}
+
+/**
+ * True when Radar should actively find vocabulary: a goal must be set, and either
+ * the explicit Radar auto-find switch is on OR Bilingual mode is enabled (per the
+ * user's request, enabling Bilingual also enables Radar). Mirrors how Bilingual
+ * mode is evaluated so the two can be toggled together.
+ */
+export function isRadarEnabled(settings: Settings): boolean {
+  const hasGoal = Boolean(settings.radar?.goal.trim());
+  if (!hasGoal) return false;
+  return Boolean(settings.radar?.autoScan || settings.bilingualMode);
 }
 
 export type SettingsPatch = Partial<Settings>;

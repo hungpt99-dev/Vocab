@@ -8,7 +8,7 @@ import {
   saveSelection,
   splitVocabularyTerm,
   translateUnit,
-  analyzeGoalPage,
+  radarAnalyze,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -16,8 +16,7 @@ import { TranslateService } from '@/ai/translate-service';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
-import { GoalRepository } from '@/storage/goal-repository';
-import { goalVocabularyService } from '@/features/goal/goal-service';
+import { radarVocabularyService } from '@/features/radar/radar-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -61,8 +60,7 @@ beforeEach(async () => {
     translate: {
       translate: vi.fn(async () => []),
     } as unknown as TranslateService,
-    goals: new GoalRepository(db),
-    goalService: goalVocabularyService,
+    radarService: radarVocabularyService,
   };
 });
 
@@ -468,72 +466,41 @@ describe('translateUnit default language', () => {
   });
 });
 
-describe('analyzeGoalPage', () => {
-  it('returns candidates from the goal service for a page with readable content', async () => {
-    const goal = await deps.goals.create({ text: 'backend engineering' });
-    deps.goalService = {
+describe('radarAnalyze', () => {
+  it('returns candidates from the radar service for a page with readable content', async () => {
+    deps.radarService = {
       analyzePage: vi.fn(async () => ({
         candidates: [
-          { key: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'API', context: 'x', tier: 'high' },
+          { key: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'x', context: 'x', tier: 'high' },
         ],
         chunksAnalyzed: 1,
         chunksTotal: 1,
         partial: false,
       })),
-    } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+    } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
 
-    chromeMock().tabs.query.mockResolvedValue([{ id: 1, url: 'https://example.com/article' }]);
-    chromeMock().tabs.sendMessage.mockResolvedValue('The API should be idempotent.');
-
-    const result = await analyzeGoalPage(deps, { goalId: goal.id, pageUrl: 'https://example.com/article' });
+    const result = await radarAnalyze(deps, {
+      goal: 'backend engineering',
+      pageUrl: 'https://example.com/article',
+      pageText: 'The API should be idempotent.',
+    });
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]!.text).toBe('idempotent');
-    expect(deps.goalService.analyzePage).toHaveBeenCalled();
+    expect(deps.radarService.analyzePage).toHaveBeenCalled();
   });
 
-  it('throws a config error when the goal does not exist', async () => {
-    deps.goalService = { analyzePage: vi.fn() } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
+  it('throws a config error when the goal text is empty', async () => {
+    deps.radarService = { analyzePage: vi.fn() } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
     await expect(
-      analyzeGoalPage(deps, { goalId: 'missing', pageUrl: 'https://example.com' }),
+      radarAnalyze(deps, { goal: '   ', pageUrl: 'https://example.com', pageText: 'text' }),
     ).rejects.toThrow();
   });
 
-  it('uses pre-extracted pageText from the content script (auto-scan path)', async () => {
-    const goal = await deps.goals.create({ text: 'reading' });
-    deps.goalService = {
-      analyzePage: vi.fn(async () => ({
-        candidates: [
-          { key: 'gracefully degrade', text: 'gracefully degrade', type: 'phrase', score: 96, reason: 'r', context: 'x', tier: 'high' },
-        ],
-        chunksAnalyzed: 1,
-        chunksTotal: 1,
-        partial: false,
-      })),
-    } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
-
-    const result = await analyzeGoalPage(deps, {
-      goalId: goal.id,
-      pageUrl: 'https://example.com',
-      pageText: 'The system can gracefully degrade under heavy load.',
-    });
-    expect(result.candidates).toHaveLength(1);
-    // Should NOT query the tab for text when pageText is supplied.
-    expect(chromeMock().tabs.sendMessage).not.toHaveBeenCalled();
-    expect(deps.goalService.analyzePage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ pageText: 'The system can gracefully degrade under heavy load.' }),
-    );
-  });
-
   it('returns empty result when the page has no readable content', async () => {
-    const goal = await deps.goals.create({ text: 'reading' });
-    deps.goalService = { analyzePage: vi.fn() } as unknown as import('@/features/goal/goal-service').GoalVocabularyService;
-    chromeMock().tabs.query.mockResolvedValue([{ id: 1, url: 'https://example.com' }]);
-    chromeMock().tabs.sendMessage.mockResolvedValue('');
-
-    const result = await analyzeGoalPage(deps, { goalId: goal.id, pageUrl: 'https://example.com' });
+    deps.radarService = { analyzePage: vi.fn() } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
+    const result = await radarAnalyze(deps, { goal: 'reading', pageUrl: 'https://example.com', pageText: '   ' });
     expect(result.candidates).toEqual([]);
-    expect(deps.goalService.analyzePage).not.toHaveBeenCalled();
+    expect(deps.radarService.analyzePage).not.toHaveBeenCalled();
   });
 });
 
