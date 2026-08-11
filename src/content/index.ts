@@ -70,7 +70,7 @@ registerMessageHandlers({
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
-  'radar:scan': () => runRadarScanHere(),
+  'radar:scan': (message) => runRadarScanHere(message.payload?.goal),
 });
 
 void bootstrap();
@@ -308,12 +308,17 @@ async function refresh(): Promise<void> {
  * Run a Radar scan for the *current page* (invoked from the popup via the
  * background, or directly). Extracts the article text, asks the background to
  * analyse it against the user's Radar goal, then highlights the results inline.
- * The page does the extraction itself so it always reads its own content —
- * this is what fixes the old bug where the background resolved the popup's tab.
+ * The page does the extraction itself so it always reads its own content — this
+ * is what fixes the old bug where the background resolved the popup's tab.
+ *
+ * `goalOverride` lets a caller (e.g. Radar Quick Search) reuse this exact
+ * pipeline with an ad-hoc goal without changing the saved Settings goal.
  */
-async function runRadarScanHere(): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
+async function runRadarScanHere(
+  goalOverride?: string,
+): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
   const settings = await settingsRepository.get();
-  const goal = settings.radar?.goal?.trim() ?? '';
+  const goal = goalOverride?.trim() || settings.radar?.goal?.trim() || '';
   if (!goal) {
     return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
   }
