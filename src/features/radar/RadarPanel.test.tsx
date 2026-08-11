@@ -71,15 +71,18 @@ describe('RadarPanel — Quick Search', () => {
     expect(input).not.toHaveFocus();
   });
 
-  it('runs the existing radar scan with the typed query as the goal override', async () => {
+  it('runs the existing radar scan only when the Search button/Enter is used, not on every keystroke', async () => {
     await act(async () => {
       render(<RadarPanel />);
     });
     const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
 
-    await userEvent.type(input, 'serendipity');
+    // Typing alone must NOT trigger a scan (no auto-search while typing).
+    await userEvent.type(input, 'serendip');
+    expect(chromeMock().runtime.sendMessage).not.toHaveBeenCalled();
 
-    // Debounce (350ms) + async scan must complete; loading then results.
+    // Pressing Enter runs the scan with the typed query as the goal override.
+    fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(
       () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
       { timeout: 2000 },
@@ -88,7 +91,24 @@ describe('RadarPanel — Quick Search', () => {
     const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
     const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
     expect(scanCall).toBeDefined();
-    expect(scanCall![0].payload).toEqual({ goal: 'serendipity' });
+    expect(scanCall![0].payload).toEqual({ goal: 'serendip' });
+  });
+
+  it('also triggers the scan via the Search button', async () => {
+    await act(async () => {
+      render(<RadarPanel />);
+    });
+    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    await userEvent.type(input, 'idempotent');
+
+    await userEvent.click(screen.getByRole('button', { name: /^Search$/i }));
+    await waitFor(
+      () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
+    const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
+    expect(scanCall![0].payload).toEqual({ goal: 'idempotent' });
   });
 
   it('clears the search query with Esc without destroying Radar state', async () => {
@@ -98,6 +118,7 @@ describe('RadarPanel — Quick Search', () => {
     const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
 
     await userEvent.type(input, 'serendipity');
+    fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(), {
       timeout: 2000,
     });

@@ -23,6 +23,9 @@ export interface AnalyzePageParams {
   limit?: number;
   /** Chunking options. */
   chunkOptions?: ChunkOptions;
+  /** How many page chunks to analyze concurrently. Defaults to 4. Bounded so we
+   * don't open an unbounded number of simultaneous AI calls on long pages. */
+  concurrency?: number;
   /** Abort signal so the user can cancel an in-flight analysis. */
   signal?: AbortSignal;
   /** Progress callback: (completedChunks, totalChunks). */
@@ -90,10 +93,17 @@ export class RadarVocabularyService {
     let analyzed = 0;
     let failed = false;
 
-    for (let i = 0; i < chunks.length; i++) {
-      signal?.throwIfAborted();
+    // Analyze chunks with bounded concurrency. The old code awaited each chunk
+    // in a serial loop, so a long article (N chunks) paid N sequential round
+    // trips to the AI provider — that's the main source of Radar's slowness on
+    // real pages. Running a few chunks at once keeps correctness/ranking
+    // identical (candidates are merged after all chunks return) while cutting
+    // wall-clock time roughly by the concurrency factor. Re-runs are still
+    // instant thanks to the cache.
+    const concurrency = Math.max(1, params.concurrency ?? 4);
+    await this.runBounded(chunks, concurrency, signal, async (chunk, index) => {
       try {
-        const chunkCandidates = await this.analyzeChunk(settings, goal, chunks[i]!, signal);
+        const chunkCandidates = await this.analyzeChunk(settings, goal, chunk, signal);
         collected.push(...chunkCandidates);
       } catch (error) {
         const code = error instanceof AiError ? error.code : 'unknown';
@@ -113,9 +123,9 @@ export class RadarVocabularyService {
         // single flaky request doesn't sink the whole page.
         failed = true;
       }
-      analyzed = i + 1;
+      analyzed = index + 1;
       onProgress?.(analyzed, chunks.length);
-    }
+    });
 
     const ranked = mergeAndRank(collected, limit);
     if (!failed && analyzed === chunks.length) {
@@ -128,6 +138,31 @@ export class RadarVocabularyService {
       chunksTotal: chunks.length,
       partial: failed && ranked.length > 0,
     };
+  }
+
+  /**
+   * Run an async task over `items` with at most `limit` tasks in flight at
+   * once, preserving per-item index. Rejects on the first thrown error (which
+   * callers use to surface hard AI failures); transient per-chunk errors are
+   * expected to be swallowed inside `task` itself. Aborts promptly if the
+   * signal fires.
+   */
+  private async runBounded<T>(
+    items: T[],
+    limit: number,
+    signal: AbortSignal | undefined,
+    task: (item: T, index: number) => Promise<void>,
+  ): Promise<void> {
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (cursor < items.length) {
+        signal?.throwIfAborted();
+        const index = cursor;
+        cursor += 1;
+        await task(items[index]!, index);
+      }
+    });
+    await Promise.all(workers);
   }
 
   /** Analyze a single chunk: run the AI and validate/coerce candidates. */
