@@ -185,6 +185,12 @@ export class SelectionCard {
     if (this.pendingKind !== null) return;
     this.pendingKind = kind;
     const token = this.analysisToken;
+    // Which action button is the loading one: xray keeps its own button, every
+    // other kind is the "Generate with AI" button. We surface a button-level
+    // loading state (disabled + aria-busy + spinner ring) so the click has
+    // immediate, unmistakable feedback — mirroring the popup explain buttons.
+    const loadingAction: CardActionId = kind === 'xray' ? 'xray' : 'generate';
+    this.setActionLoading(loadingAction, true);
     // Re-show the card: clicking the button collapses the page selection, which
     // hides it, but the user explicitly asked for this analysis.
     card.hidden = false;
@@ -252,8 +258,18 @@ export class SelectionCard {
     } finally {
       // Release the in-flight guard whether we succeeded, failed, or went stale.
       if (this.pendingKind === kind) this.pendingKind = null;
+      this.setActionLoading(loadingAction, false);
     }
     this.reposition();
+  }
+
+  /** Toggle the loading visual (disabled + aria-busy + spinner ring) on an action button. */
+  private setActionLoading(action: CardActionId, loading: boolean): void {
+    const button = this.buttons.find((b) => b.dataset.action === action);
+    if (!button) return;
+    button.classList.toggle('avs-selection-card-btn--loading', loading);
+    button.toggleAttribute('disabled', loading);
+    button.setAttribute('aria-busy', loading ? 'true' : 'false');
   }
 
   /**

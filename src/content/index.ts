@@ -198,10 +198,11 @@ async function handleToolbarAction(
     // One AI button generates the full enrichment (meaning, translation, examples,
     // synonyms, related words) inline in the card. The reader's highlighted-word
     // click still dispatches 'explain' for the same full card, and 'simplify'
-    // requests the simplified variant. See VOC-119.
+    // requests the simplified variant. See VOC-119. Keep the card open (like
+    // xray) so the inline "Asking the AI…" status renders in place instead of
+    // flickering through a hide/re-show — the button also shows a loading state.
     case 'generate':
     case 'explain': {
-      toolbar.hide();
       if (state) showInlineExplain(state, 'word');
       return;
     }

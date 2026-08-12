@@ -171,6 +171,25 @@ export function injectStyles(doc: Document = document): void {
     .avs-selection-card-btn:hover { background: var(--avs-overlay-surface-alt); }
     .avs-selection-card-btn:active { background: var(--avs-overlay-surface-active); }
     .avs-selection-card-btn:focus-visible { outline: 2px solid ${color.focusRing}; outline-offset: 1px; }
+    .avs-selection-card-btn--loading {
+      position: relative;
+      opacity: 0.85;
+      cursor: progress;
+      outline: 2px solid var(--avs-brand);
+      outline-offset: 1px;
+    }
+    .avs-selection-card-btn--loading svg { visibility: hidden; }
+    .avs-selection-card-btn--loading::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--avs-overlay-muted, rgba(100, 116, 139, 0.4));
+      border-top-color: var(--avs-brand);
+      border-radius: 50%;
+      animation: avs-spin 0.7s linear infinite;
+    }
+    @keyframes avs-spin { to { transform: rotate(360deg); } }
     .avs-selection-card-body {
       display: flex;
       flex-direction: column;
