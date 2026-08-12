@@ -70,6 +70,7 @@ registerMessageHandlers({
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
+  'bilingual:reconcile': () => void reconcileBilingual(),
   'radar:scan': (message) => runRadarScanHere(message.payload?.goal),
 });
 
@@ -376,9 +377,51 @@ async function runRadarAutoScan(): Promise<void> {
   }
 }
 
+/**
+ * Tracks whether bilingual is effectively on for THIS tab. The decision of
+ * whether to actually translate is delegated to the service worker, which is
+ * the only place that knows which tab is currently active.
+ */
+let bilingualActiveHere = false;
+
+/**
+ * Open or close the inline reader based on whether THIS tab is the active tab.
+ *
+ * Content scripts run in EVERY open tab, so a global bilingual setting would
+ * otherwise turn translation on in all of them at once (the bug where enabling
+ * bilingual hit every open tab). We ask the service worker "am I the active
+ * tab?" — it answers via chrome.tabs.query({active:true}) — and only the
+ * single active tab ever translates. The service worker also broadcasts
+ * `bilingual:reconcile` to every tab on tab-switch, so exactly one tab
+ * translates at a time and the previous one closes.
+ */
+async function reconcileBilingual(): Promise<void> {
+  if (!bilingualActiveHere || localBilingualOff) {
+    document.body.classList.remove('avs-bilingual-on');
+    if (reader.isOpen) reader.close();
+    return;
+  }
+  document.body.classList.add('avs-bilingual-on');
+  let isActive = false;
+  try {
+    isActive = await sendMessage({ type: 'am-i-active-tab' });
+  } catch {
+    // Worker unreachable: stay closed rather than guessing and translating
+    // every tab.
+    if (reader.isOpen) reader.close();
+    return;
+  }
+  if (isActive) {
+    void reader.open();
+  } else if (reader.isOpen) {
+    reader.close();
+  }
+}
+
 function syncBilingual(enabled: boolean, domains: readonly string[]): void {
   // Auto-enable for configured domains even when the global switch is off.
   const active = enabled || matchesDomain(location.hostname, domains);
+  bilingualActiveHere = active;
   if (!active) {
     // Bilingual is off for this page: any local opt-out is moot.
     localBilingualOff = false;
@@ -393,9 +436,8 @@ function syncBilingual(enabled: boolean, domains: readonly string[]): void {
     return;
   }
   document.body.classList.add('avs-bilingual-on');
-  // The reader renders its own inline control (show/hide, layout, close), so no
-  // separate floating bar is needed — that kept colliding with the popup.
-  void reader.open();
+  // Open ONLY in the active tab; the worker decides which tab that is.
+  void reconcileBilingual();
 }
 
 function scan(root: Node | null): void {

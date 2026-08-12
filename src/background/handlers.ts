@@ -174,6 +174,21 @@ export async function saveDifficultWords(
   return entries;
 }
 
+/**
+ * Whether the tab that sent a message is the currently active tab in its
+ * window. Used to ensure bilingual (inline) translation runs in exactly one
+ * tab — the one the user is looking at — rather than every open tab.
+ */
+export async function isActiveTab(senderTabId: number | undefined): Promise<boolean> {
+  if (typeof senderTabId !== 'number') return false;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab?.id === senderTabId;
+  } catch {
+    return false;
+  }
+}
+
 /** Translate a single page unit (paragraph, heading, list item…) via the AI layer. */
 export async function translateUnit(
   deps: BackgroundDeps,
@@ -306,6 +321,8 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     'open-options': () => {
       void chrome.runtime.openOptionsPage();
     },
+    'am-i-active-tab': (_message, sender) => isActiveTab(sender.tab?.id),
+    'bilingual:reconcile': () => undefined,
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
     'radar:scan': () => radarScan(),

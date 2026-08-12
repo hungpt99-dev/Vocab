@@ -32,6 +32,23 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
+/**
+ * When the user switches tabs, tell every tab to re-check whether it is the
+ * active one. Each tab asks the worker "am I the active tab?" and opens or
+ * closes its inline translation accordingly — so exactly one tab translates at
+ * a time (the one being viewed), fixing the "bilingual translates all tabs"
+ * bug. Best-effort: a tab that has navigated away simply ignores the message.
+ */
+chrome.tabs.onActivated.addListener(() => {
+  void chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (typeof tab.id === 'number') {
+        sendToTab(tab.id, { type: 'bilingual:reconcile' }).catch(() => undefined);
+      }
+    }
+  });
+});
+
 /** Ask the active tab's content script to open or close bilingual reading. */
 async function toggleBilingualReading(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
