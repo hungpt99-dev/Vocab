@@ -35,6 +35,29 @@ import type { Explanation } from '@/shared/types/vocabulary';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
 
+// Durable in-flight state for the popup's AI explain/enrich actions. The popup
+// can close and reopen mid-call (it remounts on blur), which wipes volatile React
+// state and makes the loading spinner vanish. We mirror the explain session in
+// storage so a reloaded popup resumes the spinner and keeps the result — same
+// durable pattern as `avs:pending-explain`.
+const ENRICH_SESSION_KEY = 'avs:enrich-session';
+interface EnrichSession {
+  word: string;
+  kind: ExplainKind | null;
+  enriching: boolean;
+  explanation: Explanation | null;
+}
+const readEnrichSession = (): Promise<EnrichSession | null> =>
+  new Promise((resolve) => {
+    chrome.storage.local.get(ENRICH_SESSION_KEY, (v) =>
+      resolve((v[ENRICH_SESSION_KEY] as EnrichSession | undefined) ?? null),
+    );
+  });
+const writeEnrichSession = (s: EnrichSession | null): void => {
+  if (s) chrome.storage.local.set({ [ENRICH_SESSION_KEY]: s });
+  else chrome.storage.local.remove(ENRICH_SESSION_KEY);
+};
+
 /** Contextual AI actions shown under the enrich panel — part of the learning
  * flow, not a separate chat. Each maps to an ExplainKind already supported by
  * the explain service. */
@@ -156,6 +179,37 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
 
   const enrichWord = selection?.word ?? word;
 
+  // Resume a popup that was reopened mid-explain: restore the loading spinner and
+  // any finished result from the durable enrich session so a reload doesn't wipe
+  // the in-flight state (the AI call keeps running in the background worker).
+  useEffect(() => {
+    let cancelled = false;
+    void readEnrichSession().then((s) => {
+      if (cancelled || !s || s.word !== enrichWord) return;
+      if (s.enriching) setEnriching(true);
+      if (s.kind) setExplainKind(s.kind);
+      if (s.explanation) setEnrich({ word: s.word, explanation: s.explanation });
+    });
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string): void => {
+      if (area !== 'local' || !('avs:enrich-session' in changes)) return;
+      const s = changes['avs:enrich-session'].newValue as EnrichSession | undefined;
+      if (!s || s.word !== enrichWord) {
+        setEnriching(false);
+        setExplainKind(null);
+        if (!s) setEnrich((prev) => (prev && prev.word === enrichWord ? prev : null));
+        return;
+      }
+      setEnriching(s.enriching);
+      setExplainKind(s.kind);
+      setEnrich(s.explanation ? { word: s.word, explanation: s.explanation } : null);
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => {
+      cancelled = true;
+      chrome.storage.onChanged.removeListener(onChanged);
+    };
+  }, [enrichWord]);
+
   const handleQuickAdd = useCallback(
     async (related: string) => {
       const word = related.trim();
@@ -179,6 +233,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
       const target = enrichWord;
       if (!target) return;
       setExplainKind(kind);
+      writeEnrichSession({ word: target, kind, enriching: false, explanation: null });
       try {
         const explanation = await sendMessage({
           type: 'explain',
@@ -191,8 +246,10 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
           },
         });
         setEnrich({ word: target, explanation });
+        writeEnrichSession({ word: target, kind: null, enriching: false, explanation });
       } catch (cause) {
         notify(aiErrorMessage(cause), 'error');
+        writeEnrichSession(null);
       } finally {
         setExplainKind(null);
       }
@@ -248,14 +305,17 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
     const target = enrichWord;
     if (!target) return;
     setEnriching(true);
+    writeEnrichSession({ word: target, kind: null, enriching: true, explanation: null });
     try {
       const explanation = await sendMessage({
         type: 'explain',
         payload: { word: target, context: selection?.sentence, pageTitle: selection?.sourceTitle },
       });
       setEnrich({ word: target, explanation });
+      writeEnrichSession({ word: target, kind: null, enriching: false, explanation });
     } catch (cause) {
       notify(aiErrorMessage(cause), 'error');
+      writeEnrichSession(null);
     } finally {
       setEnriching(false);
     }
