@@ -233,7 +233,10 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
       const target = enrichWord;
       if (!target) return;
       setExplainKind(kind);
-      writeEnrichSession({ word: target, kind, enriching: false, explanation: null });
+      // Persist the loading flag BEFORE the AI round-trip so a popup reload
+      // (close/reopen on blur) that lands during the call reads a committed
+      // session and shows the spinner — not an empty one.
+      await writeEnrichSession({ word: target, kind, enriching: false, explanation: null });
       try {
         const explanation = await sendMessage({
           type: 'explain',
@@ -246,10 +249,10 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
           },
         });
         setEnrich({ word: target, explanation });
-        writeEnrichSession({ word: target, kind: null, enriching: false, explanation });
+        await writeEnrichSession({ word: target, kind: null, enriching: false, explanation });
       } catch (cause) {
         notify(aiErrorMessage(cause), 'error');
-        writeEnrichSession(null);
+        await writeEnrichSession(null);
       } finally {
         setExplainKind(null);
       }
@@ -305,7 +308,8 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
     const target = enrichWord;
     if (!target) return;
     setEnriching(true);
-    writeEnrichSession({ word: target, kind: null, enriching: true, explanation: null });
+    // Persist the loading flag BEFORE the AI round-trip (see handleExplainKind).
+    await writeEnrichSession({ word: target, kind: null, enriching: true, explanation: null });
     try {
       const explanation = await sendMessage({
         type: 'explain',
