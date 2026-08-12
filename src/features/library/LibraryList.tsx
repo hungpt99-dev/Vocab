@@ -140,7 +140,7 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
   };
 
   return (
-    <div ref={wrapperRef} className="avs-scroll h-full overflow-y-auto">
+    <div ref={wrapperRef} className="avs-scroll flex-1 min-h-0 overflow-y-auto">
       <VariableSizeList<RowData>
         ref={listRef}
         height={viewportHeight}

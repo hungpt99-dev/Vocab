@@ -389,7 +389,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <SaveForm
         selection={selection}
         saving={saving}
@@ -412,7 +412,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
       />
 
       {enrichWord && (
-        <div className="border-b border-slate-200 p-3 dark:border-slate-700">
+        <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
               {enrichWord}
@@ -547,7 +547,9 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
         <ReviewScreen />
       ) : (
         <>
-          <LibraryToolbar filters={filters} tags={tags} count={entries.length} onChange={setFilters} />
+          <div className="shrink-0">
+            <LibraryToolbar filters={filters} tags={tags} count={entries.length} onChange={setFilters} />
+          </div>
 
           {loading ? (
             <SkeletonList rows={4} />
@@ -591,7 +593,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
           )}
         </>
       )}
-    </>
+    </div>
   );
 }
 
