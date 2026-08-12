@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { VariableSizeList, type ListChildComponentProps } from 'react-window';
 import type { VocabularyEntry, VocabularyPatch } from '@/shared/types/vocabulary';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -45,6 +45,22 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
   const sizeMap = useRef<Map<number, number>>(new Map());
   // Track ResizeObservers per row node so they can be disconnected on unmount.
   const rowObservers = useRef(new WeakMap<HTMLElement, ResizeObserver>());
+  // The popup lays this list out inside a `flex-1` area whose height varies
+  // (popup size, StatsRow, search form). Pinning the react-window viewport to a
+  // fixed 320px caused a nested-scroll mismatch: the inner list overflowed the
+  // outer flex area so the last items were clipped/unreachable. Instead we
+  // measure the wrapper and let the viewport fill the available space exactly.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [viewportHeight, setViewportHeight] = useState(VIEWPORT_HEIGHT);
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const measure = () => setViewportHeight(el.clientHeight || VIEWPORT_HEIGHT);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const itemSize = useCallback(
     (index: number): number => sizeMap.current.get(index) ?? MIN_ROW_HEIGHT,
@@ -124,10 +140,10 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
   };
 
   return (
-    <div className="avs-scroll max-h-80 overflow-y-auto">
+    <div ref={wrapperRef} className="avs-scroll h-full overflow-y-auto">
       <VariableSizeList<RowData>
         ref={listRef}
-        height={VIEWPORT_HEIGHT}
+        height={viewportHeight}
         width="100%"
         itemCount={entries.length}
         itemSize={itemSize}
