@@ -17,6 +17,7 @@ import { Switch } from '@/shared/ui/Switch';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
+import { Spinner } from '@/shared/ui/Spinner';
 import { StatsRow } from '@/shared/ui/StatsRow';
 import { OnboardingCoachmark } from '@/shared/ui/OnboardingCoachmark';
 import { tints } from '@/shared/styles/tokens';
@@ -373,7 +374,7 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
                 onClick={() => void handleExplainKind(action.kind)}
                 title={aiAvailable ? action.label : 'AI actions need an API key in settings'}
               >
-                {explainKind === action.kind ? '…' : action.label}
+                {explainKind === action.kind ? <Spinner label="Loading…" /> : action.label}
               </Button>
             ))}
           </div>
