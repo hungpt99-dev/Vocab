@@ -96,6 +96,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
       wordKey: entry.wordKey,
       note: entry.note,
       createdAt: entry.createdAt,
+      sourceLanguage: entry.sourceLanguage,
       meaning: entry.explanation?.meaning ?? '',
       pronunciation: entry.explanation?.pronunciation ?? '',
       explanation: entry.explanation ?? null,

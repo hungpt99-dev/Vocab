@@ -99,6 +99,13 @@ export function injectStyles(doc: Document = document): void {
     }
     .avs-card[hidden] { display: none; }
     .avs-card-word { font-weight: 600; margin-bottom: ${spacing.xs}; }
+    .avs-card-word-row { display: flex; align-items: center; gap: ${spacing.xs}; margin-bottom: ${spacing.xs}; }
+    .avs-card-word-row .avs-card-word { margin-bottom: 0; flex: 1 1 auto; }
+    .avs-card-speaker { flex: 0 0 auto; pointer-events: auto; }
+    .avs-card-speaker-btn { color: var(--avs-overlay-text); background: transparent; border: 0; border-radius: ${radius.sm}; padding: ${spacing.xs}; cursor: pointer; line-height: 0; }
+    .avs-card-speaker-btn:hover { background: ${color.overlaySurface}; }
+    .avs-card-speaker-btn:focus-visible { outline: 2px solid ${color.brand}; outline-offset: 1px; }
+    .avs-card-speaker-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
     .avs-card-row { margin-top: ${spacing.xs}; }
     .avs-card-label {
       color: var(--avs-overlay-muted);

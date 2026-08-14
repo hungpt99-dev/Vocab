@@ -8,6 +8,7 @@ const entry: HighlightEntry = {
   wordKey: 'serendipity',
   note: 'from an article',
   createdAt: Date.UTC(2026, 0, 15),
+  sourceLanguage: 'English',
   meaning: 'A fortunate accident.',
   pronunciation: '',
   explanation: null,
@@ -256,6 +257,37 @@ describe('HoverCard', () => {
       card.destroy();
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('renders a pronunciation speaker button for the word', async () => {
+    const { act } = await import('react-dom/test-utils');
+    // jsdom has no SpeechSynthesis; stub it so PronunciationButton is enabled.
+    (window as unknown as { speechSynthesis: unknown }).speechSynthesis = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: () => [],
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = class {
+      text = '';
+      lang = '';
+      voice: unknown = null;
+    };
+    document.body.innerHTML = '<mark id="m">serendipity</mark>';
+    const anchor = document.getElementById('m') as HTMLElement;
+    const card = new HoverCard();
+    try {
+      await act(async () => {
+        card.show(anchor, entry);
+      });
+      const speaker = document.querySelector<HTMLButtonElement>('[aria-label="Listen to pronunciation of serendipity"]');
+      expect(speaker).not.toBeNull();
+      expect(speaker?.disabled).toBe(false);
+    } finally {
+      delete (window as unknown as { speechSynthesis?: unknown }).speechSynthesis;
+      card.destroy();
     }
   });
 });

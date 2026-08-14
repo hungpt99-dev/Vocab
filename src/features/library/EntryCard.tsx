@@ -10,6 +10,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { PlusIcon } from '@/shared/ui/Icons';
 import { Dialog } from '@/shared/ui/Dialog';
 import { StarIcon, StarOutlineIcon, PencilIcon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@/shared/ui/Icons';
+import { PronunciationButton } from '@/features/pronunciation/PronunciationButton';
 import { ExplanationView } from './ExplanationView';
 
 export interface EntryCardProps {
@@ -80,9 +81,12 @@ export function EntryCard({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {entry.word}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {entry.word}
+                </p>
+                <PronunciationButton word={entry.word} language={entry.sourceLanguage} />
+              </div>
               <EntryTranslation text={entry.word} />
               {entry.phrase && entry.phrase.trim() && <EntryTranslation text={entry.phrase} />}
               {entry.sentence && (

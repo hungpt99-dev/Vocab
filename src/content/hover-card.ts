@@ -1,4 +1,7 @@
 import type { HighlightEntry } from './matcher';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { PronunciationButton } from '@/features/pronunciation/PronunciationButton';
 
 const CARD_ID = 'avs-hover-card';
 const OFFSET = 10;
@@ -49,6 +52,7 @@ export class HoverCard {
   private element: HTMLElement | null = null;
   private explaining = false;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
+  private speakerRoot: Root | null = null;
 
   private ensureElement(): HTMLElement {
     if (this.element?.isConnected) return this.element;
@@ -129,13 +133,36 @@ export class HoverCard {
 
   destroy(): void {
     this.cancelHide();
+    this.disposeSpeaker();
     this.element?.remove();
     this.element = null;
   }
 
   private render(entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     if (!this.element) return;
+    this.disposeSpeaker();
     this.element.replaceChildren(...renderContent(entry, this.explaining, options));
+
+    // Mount the reusable PronunciationButton (same component/icon/font as the
+    // React UIs) into a host so the on-page card can speak the word too.
+    const host = this.element.querySelector<HTMLElement>('.avs-card-speaker');
+    if (host && entry.word) {
+      this.speakerRoot = createRoot(host);
+      this.speakerRoot.render(
+        createElement(PronunciationButton, {
+          word: entry.word,
+          language: entry.sourceLanguage ?? '',
+          className: 'avs-card-speaker-btn',
+        }),
+      );
+    }
+  }
+
+  private disposeSpeaker(): void {
+    if (this.speakerRoot) {
+      this.speakerRoot.unmount();
+      this.speakerRoot = null;
+    }
   }
 }
 
@@ -143,10 +170,23 @@ function renderContent(entry: HighlightEntry, explaining: boolean, options: Hove
   const nodes: HTMLElement[] = [];
 
   if (options.showOriginal) {
+    const wordRow = document.createElement('div');
+    wordRow.className = 'avs-card-word-row';
+
     const word = document.createElement('div');
     word.className = 'avs-card-word';
     word.textContent = entry.word;
-    nodes.push(word);
+    wordRow.append(word);
+
+    // Host for the React PronunciationButton (speaker). The button disables
+    // itself when speech is unsupported or the language is unknown, so it is
+    // safe to always mount.
+    const speaker = document.createElement('div');
+    speaker.className = 'avs-card-speaker';
+    speaker.setAttribute('role', 'presentation');
+    wordRow.append(speaker);
+
+    nodes.push(wordRow);
   }
 
   const explanation = entry.explanation;
