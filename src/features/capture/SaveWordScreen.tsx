@@ -7,14 +7,12 @@ import { useVocabulary } from '@/shared/hooks/useVocabulary';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { takePendingExplain } from '@/content/pending-explain';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
-import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { ArrowLeftIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import { aiErrorMessage } from '@/ai/types';
 import { SaveForm } from './SaveForm';
-import { WordCard } from './WordCard';
 
 // Durable in-flight state for the popup's AI enrich action. The popup can close
 // and reopen mid-call (it remounts on blur), which wipes volatile React state
@@ -67,9 +65,7 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
   // form. Either way it can be enriched inline before saving.
   const [word, setWord] = useState('');
   const { notify } = useToast();
-  const { settings } = useSettings();
   const { available: aiAvailable } = useAiAvailable();
-  const [alreadySaved, setAlreadySaved] = useState(false);
 
   // Pull the library so we can push explain results onto existing entries while
   // on the save page (same behaviour the dashboard had when the form was inline).
@@ -80,22 +76,6 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
     sortBy: 'createdAt',
     sortDirection: 'desc',
   });
-
-  // Track whether the current word is already in the library (drives the Save button).
-  useEffect(() => {
-    const w = selection?.word.trim();
-    if (!w) {
-      setAlreadySaved(false);
-      return;
-    }
-    let cancelled = false;
-    void vocabularyRepository.findByWord(w).then((entry) => {
-      if (!cancelled) setAlreadySaved(Boolean(entry));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [selection]);
 
   useEffect(() => {
     const readSelection = (): void => {
@@ -271,23 +251,12 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
           onWordChange={setWord}
           onSave={handleSave}
         />
-        <WordCard
-          selection={selection}
-          alreadySaved={alreadySaved}
-          saving={saving}
-          showTranslation={settings.popupShowTranslation}
-          showSimplify={false}
-          onSave={() => void handleSave({ word: enrichWord, note: '', tags: [] })}
-          aiUnavailableHint={
-            aiAvailable ? undefined : 'AI actions need an API key — open settings.'
-          }
-        />
 
-        {/* A single AI enrich action for the word being saved. */}
-        <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
+        {/* Single AI action: enrich the word before saving. */}
+        <div className="shrink-0 border-t border-slate-200 p-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {enrichWord || 'AI enrichment'}
+              AI enrichment
             </p>
             <Button
               size="sm"
@@ -306,11 +275,6 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
               {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
             </Button>
           </div>
-          {selection?.word === enrichWord && selection.sentence && (
-            <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
-              “{selection.sentence}”
-            </p>
-          )}
           {enrich?.word === enrichWord && (
             <div className="mt-2">
               <ExplanationView explanation={enrich.explanation} />
