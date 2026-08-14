@@ -1,6 +1,6 @@
 # Roadmap
 
-Tracked in Linear (project **AI Vocabulary Saver**, team VOC). This document is the human-readable
+Tracked in Linear (project **vocab**, team VOC). This document is the human-readable
 summary; the issue tracker is authoritative.
 
 ---

@@ -1,7 +1,7 @@
 # Development
 
 This document covers local setup and the day-to-day commands for working on AI
-Vocabulary Saver. For the module layout and build rationale, see
+vocab. For the module layout and build rationale, see
 [Architecture](ARCHITECTURE.md); for the test strategy see [Testing](TESTING.md).
 
 ## Prerequisites
@@ -53,7 +53,7 @@ Every script below is defined in `package.json`. Run them with `npm run <script>
 | `test:watch` | `vitest` | Runs the unit suite in watch mode. | TDD loop while editing. |
 | `test:coverage` | `vitest run --coverage` | Runs unit tests with the v8 coverage reporter (text + html). | Check coverage of changed code. |
 | `test:e2e` | `npm run build && xvfb-run -a playwright test` | Builds, then runs the Playwright suite against the real unpacked extension. | Validate end-to-end behaviour (14 tests across 3 specs). |
-| `package` | `npm run build && cd dist && zip -r ../ai-vocabulary-saver.zip . -x '*.map'` | Builds, then zips `dist/` (excluding source maps) into `ai-vocabulary-saver.zip`. | Produce a distributable artifact. |
+| `package` | `npm run build && cd dist && zip -r ../vocab.zip . -x '*.map'` | Builds, then zips `dist/` (excluding source maps) into `vocab.zip`. | Produce a distributable artifact. |
 
 ## The two-config build
 
@@ -82,7 +82,7 @@ app output.
 
 1. Keep `npm run dev` running in a terminal.
 2. After a change, open `chrome://extensions`.
-3. Click the reload icon (⟳) on the **AI Vocabulary Saver** card.
+3. Click the reload icon (⟳) on the **vocab** card.
 
 Reload behaviour by surface:
 
@@ -103,7 +103,7 @@ extension card (**Details → Extension options**) and use its DevTools. Both ar
 standard web pages, so React DevTools, the console and the network panel all work.
 
 **Service worker (MV3 background)**
-Open `chrome://extensions`, find **AI Vocabulary Saver**, and click the
+Open `chrome://extensions`, find **vocab**, and click the
 **Inspect views: service worker** (or **View views**) link. This opens a DevTools
 window scoped to the worker. Note that MV3 service workers are event-based and may
 be terminated when idle; logs from a terminated worker persist in this inspect
@@ -136,4 +136,4 @@ single inlined IIFE, there are no separate module files to step through.
 | Lint reports warnings | Run `npm run lint:fix`, then resolve anything remaining by hand — the gate is zero-warning. |
 | Stray `.js` files appear next to `.ts` sources | These are `tsc` artefacts. They are gitignored (`src/**/*.js`, `scripts/**/*.js`, `*.tsbuildinfo`) and must not be committed; the build is Vite-based, not `tsc` emit. |
 | Playwright reports a missing browser | Run `npx playwright install --with-deps chromium`. |
-| `npm run package` leaves old entries in the zip | The script uses `zip -r`, which merges into an existing archive. Delete `ai-vocabulary-saver.zip` first if you need a clean artifact. |
+| `npm run package` leaves old entries in the zip | The script uses `zip -r`, which merges into an existing archive. Delete `vocab.zip` first if you need a clean artifact. |

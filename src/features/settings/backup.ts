@@ -6,7 +6,7 @@ export const BACKUP_SCHEMA_VERSION = 1;
 export interface VocabularyBackup {
   schemaVersion: number;
   exportedAt: string;
-  app: 'ai-vocabulary-saver';
+  app: 'vocab';
   entries: VocabularyEntry[];
 }
 
@@ -17,7 +17,7 @@ export async function createBackup(
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    app: 'ai-vocabulary-saver',
+    app: 'vocab',
     entries: await repo.exportAll(),
   };
 }
@@ -42,7 +42,7 @@ export function parseBackup(raw: unknown): VocabularyBackup {
   return {
     schemaVersion: backup.schemaVersion,
     exportedAt: typeof backup.exportedAt === 'string' ? backup.exportedAt : '',
-    app: 'ai-vocabulary-saver',
+    app: 'vocab',
     entries: backup.entries,
   };
 }
@@ -69,5 +69,5 @@ export async function restoreBackup(
 
 /** Suggested filename for a downloaded backup. */
 export function backupFilename(date: Date = new Date()): string {
-  return `ai-vocabulary-${date.toISOString().slice(0, 10)}.json`;
+  return `vocab-${date.toISOString().slice(0, 10)}.json`;
 }

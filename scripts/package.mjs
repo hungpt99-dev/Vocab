@@ -1,5 +1,5 @@
 /**
- * Cross-platform extension packaging: builds `ai-vocabulary-saver.zip` from
+ * Cross-platform extension packaging: builds `vocab.zip` from
  * the current `dist/` with the archive root as the extension root
  * (manifest.json at the top level, as the Chrome Web Store requires).
  *
@@ -14,7 +14,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const zipPath = resolve(root, 'ai-vocabulary-saver.zip');
+const zipPath = resolve(root, 'vocab.zip');
 const dist = resolve(root, 'dist');
 const where = platform();
 
@@ -31,7 +31,7 @@ if (where === 'win32') {
     [
       '-NoProfile',
       '-Command',
-      'Push-Location dist; Compress-Archive -Path (Get-ChildItem . | ForEach-Object FullName) -DestinationPath ..\\ai-vocabulary-saver.zip -Force; Pop-Location',
+      'Push-Location dist; Compress-Archive -Path (Get-ChildItem . | ForEach-Object FullName) -DestinationPath ..\\vocab.zip -Force; Pop-Location',
     ],
     { cwd: root, stdio: 'inherit' },
   );

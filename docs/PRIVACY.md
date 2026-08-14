@@ -32,7 +32,7 @@ Related: [Security](SECURITY.md#data-flows), [Storage](STORAGE.md),
 
 | Data | Where | Why |
 | --- | --- | --- |
-| Vocabulary entries (word, sentence, source URL/title, note, tags, favorite, explanation) | IndexedDB (`ai-vocabulary-saver`) | The library — nothing else can do the job offline and locally |
+| Vocabulary entries (word, sentence, source URL/title, note, tags, favorite, explanation) | IndexedDB (`vocab`) | The library — nothing else can do the job offline and locally |
 | Review schedule (ease, interval, due date) | IndexedDB, `review` table | Spaced-repetition queue |
 | Settings incl. your API key(s) | `chrome.storage.local` under `avs:settings` | BYO-key configuration |
 | Reading preferences | `chrome.storage.local` under `avs:reading` | Reader layout/font preferences |

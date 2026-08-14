@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
     target: 'chrome110',
     lib: {
       entry: resolve(__dirname, 'src/content/index.ts'),
-      name: 'AiVocabularySaverContent',
+      name: 'VocabContent',
       formats: ['iife'],
       fileName: () => 'content.js',
     },

@@ -8,7 +8,7 @@ For the record of decisions and their trade-offs, see the [Decision log](DECISIO
 
 ## Overall architecture
 
-AI Vocabulary Saver is a Chrome **Manifest V3** extension. It has no server component. Everything
+vocab is a Chrome **Manifest V3** extension. It has no server component. Everything
 runs inside the browser profile, and the only outbound traffic is the AI request the user triggers,
 sent directly from their browser to the provider they configured.
 

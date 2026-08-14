@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve AI Vocabulary Saver.
+Thanks for helping improve vocab.
 
 ## Getting started
 

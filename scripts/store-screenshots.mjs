@@ -196,7 +196,7 @@ async function seedVocabulary(page) {
   }));
   await page.evaluate((rows) => {
     const done = new Promise((resolve, reject) => {
-      const open = indexedDB.open('ai-vocabulary-saver');
+      const open = indexedDB.open('vocab');
       open.onerror = () => reject(open.error);
       open.onsuccess = () => {
         const db = open.result;
@@ -378,7 +378,7 @@ function bannerHtml(width) {
     <div class="orb orb-a"></div><div class="orb orb-b"></div>
     <div class="content">
       <div class="brand">
-        <div class="logo"><img src="${icon}" alt=""/><span>Vocab Saver</span></div>
+        <div class="logo"><img src="${icon}" alt=""/><span>vocab</span></div>
         <div class="tagline">Save words while you browse. Highlight them anywhere. Understand and remember every one.</div>
       </div>
       <div class="shots">

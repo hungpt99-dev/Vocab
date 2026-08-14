@@ -19,7 +19,7 @@ describe('createBackup', () => {
     const backup = await createBackup(repo);
 
     expect(backup.schemaVersion).toBe(1);
-    expect(backup.app).toBe('ai-vocabulary-saver');
+    expect(backup.app).toBe('vocab');
     expect(backup.entries).toHaveLength(1);
     expect(Date.parse(backup.exportedAt)).not.toBeNaN();
   });
@@ -66,7 +66,7 @@ describe('restoreBackup', () => {
 
   it('merges without deleting existing words', async () => {
     await repo.save({ word: 'existing' });
-    const backup = { schemaVersion: 1, exportedAt: '', app: 'ai-vocabulary-saver' as const, entries: [] };
+    const backup = { schemaVersion: 1, exportedAt: '', app: 'vocab' as const, entries: [] };
 
     await restoreBackup(backup, 'merge', repo);
     expect(await repo.count()).toBe(1);
@@ -75,6 +75,6 @@ describe('restoreBackup', () => {
 
 describe('backupFilename', () => {
   it('embeds the date', () => {
-    expect(backupFilename(new Date('2026-03-04T00:00:00Z'))).toBe('ai-vocabulary-2026-03-04.json');
+    expect(backupFilename(new Date('2026-03-04T00:00:00Z'))).toBe('vocab-2026-03-04.json');
   });
 });

@@ -42,7 +42,7 @@ function SettingsScreen() {
           </span>
           <div className="leading-tight">
             <h1 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">AI Vocabulary Saver</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">vocab</p>
           </div>
         </div>
         <nav className="flex flex-col gap-0.5" aria-label="Settings sections">

@@ -3,7 +3,7 @@
 ## Vision
 
 Reading is where most vocabulary is encountered and where most of it is lost. A reader meets an
-unfamiliar word, guesses from context, moves on, and forgets it. AI Vocabulary Saver aims to make
+unfamiliar word, guesses from context, moves on, and forgets it. vocab aims to make
 capturing a word cost roughly nothing — one keystroke, in place, without leaving the page — and then
 to keep that word visible in the reader's ordinary browsing until it becomes familiar.
 

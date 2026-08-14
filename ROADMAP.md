@@ -1,6 +1,6 @@
 # Roadmap
 
-Delivery is tracked in Linear under the **AI Vocabulary Saver** project (team `VOC`).
+Delivery is tracked in Linear under the **vocab** project (team `VOC`).
 
 ## Shipped — v0.1.0
 

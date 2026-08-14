@@ -25,7 +25,7 @@ await p.evaluate(async () => {
     ['to raise concerns', 'gây lo ngại', 'The report has raised concerns.', ['collocation'], false, 3],
     ['meticulous', 'tỉ mỉ', 'She kept meticulous records.', ['adjective'], false, 5],
   ];
-  const req = indexedDB.open('ai-vocabulary-saver');
+  const req = indexedDB.open('vocab');
   const db = await new Promise((res, rej) => {
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);

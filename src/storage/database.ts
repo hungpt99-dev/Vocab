@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
 
-export const DB_NAME = 'ai-vocabulary-saver';
+export const DB_NAME = 'vocab';
 export const DB_VERSION = 3;
 
 export interface ReviewRecord {

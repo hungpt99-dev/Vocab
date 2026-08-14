@@ -1,6 +1,6 @@
 # Release Process
 
-How a versioned release of AI Vocabulary Saver is cut and verified. This is the manual procedure today
+How a versioned release of vocab is cut and verified. This is the manual procedure today
 (see [Known limitations](KNOWN_LIMITATIONS.md) L9 — no automated store submission yet).
 
 Related: [Deployment](DEPLOYMENT.md), [CHANGELOG](CHANGELOG.md), the
@@ -79,7 +79,7 @@ git tag vX.Y.Z
 ```bash
 rm -rf dist
 npm run build
-npm run package        # produces ai-vocabulary-saver.zip
+npm run package        # produces vocab.zip
 ```
 
 ### 7. Verify the artifact
@@ -129,6 +129,6 @@ Every release records the gate results it was cut from:
 
 - CI run URL (the `quality` and `e2e` jobs).
 - The commit the tag points to.
-- The `ai-vocabulary-saver.zip` artifact hash.
+- The `vocab.zip` artifact hash.
 
 A release without these is not auditable and should not be shipped.

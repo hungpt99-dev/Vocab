@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 /** Open the extension popup as a normal page. */
 async function openPopup(page: Page, extensionId: string) {
   await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
-  await expect(page.getByRole('heading', { name: 'Vocab Saver' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'vocab' })).toBeVisible();
   return page;
 }
 
@@ -157,7 +157,7 @@ test('exports the vocabulary as a JSON backup', async ({ page, extensionId }) =>
   await page.getByRole('button', { name: 'Export JSON' }).click();
 
   const file = await download;
-  expect(file.suggestedFilename()).toMatch(/^ai-vocabulary-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(file.suggestedFilename()).toMatch(/^vocab-\d{4}-\d{2}-\d{2}\.json$/);
   await expect(page.getByText(/Exported 1 words?\./)).toBeVisible();
 });
 

@@ -327,7 +327,7 @@ export function App() {
               </span>
               <div className="min-w-0 leading-tight">
                 <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                  Vocab Saver
+                  vocab
                 </h1>
                 <p className="max-[380px]:hidden truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
                   Save&nbsp;•&nbsp;Learn&nbsp;•&nbsp;Remember

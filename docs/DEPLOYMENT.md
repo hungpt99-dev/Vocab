@@ -5,7 +5,7 @@ extension artifact. There is no backend, no server and no account system, so the
 is nothing to deploy to a host. The deliverable is either:
 
 - a local `dist/` folder that a user loads unpacked, or
-- a packaged `ai-vocabulary-saver.zip` that is uploaded to the Chrome Web Store or
+- a packaged `vocab.zip` that is uploaded to the Chrome Web Store or
   distributed directly.
 
 See [Architecture](ARCHITECTURE.md) for why the extension is local-first, and
@@ -37,14 +37,14 @@ npm run package
 ```
 
 This runs the production build and then packages `dist/` into
-`ai-vocabulary-saver.zip` at the repository root (via `scripts/package.mjs`:
+`vocab.zip` at the repository root (via `scripts/package.mjs`:
 PowerShell `Compress-Archive` on Windows, `zip` elsewhere). The archive is
 recreated from scratch on every run — stale entries are never merged in — and
 `manifest.json` sits at the archive root, as the Chrome Web Store requires.
 
 Verified output for v0.1.0:
 
-- `ai-vocabulary-saver.zip` is about **174 KB** (16 files: 11 JS/CSS/HTML
+- `vocab.zip` is about **174 KB** (16 files: 11 JS/CSS/HTML
   artifacts, `manifest.json` and 4 icons).
 - A clean `npm run build` produces **16 files** in `dist/`:
 
@@ -109,7 +109,7 @@ triggers.
 
 For environments that cannot use the public store:
 
-- **Direct zip** — share `ai-vocabulary-saver.zip`; recipients unzip and use
+- **Direct zip** — share `vocab.zip`; recipients unzip and use
   **Load unpacked** pointing at the extracted `dist/`.
 - **Chrome for Enterprise / group policy** — deploy the unpacked directory (or a
   signed `.crx` if you run your own update server) via the

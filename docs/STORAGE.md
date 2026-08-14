@@ -47,7 +47,7 @@ export async function createBackup(
 `src/storage/database.ts`:
 
 ```ts
-export const DB_NAME = 'ai-vocabulary-saver';
+export const DB_NAME = 'vocab';
 export const DB_VERSION = 1;
 
 db.version(DB_VERSION).stores({
@@ -135,12 +135,12 @@ export const BACKUP_SCHEMA_VERSION = 1;
 export interface VocabularyBackup {
   schemaVersion: number;
   exportedAt: string;              // ISO 8601
-  app: 'ai-vocabulary-saver';
+  app: 'vocab';
   entries: VocabularyEntry[];
 }
 ```
 
-Exported filenames follow `ai-vocabulary-YYYY-MM-DD.json`.
+Exported filenames follow `vocab-YYYY-MM-DD.json`.
 
 ### Validation
 

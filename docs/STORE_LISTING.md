@@ -13,8 +13,8 @@ Related: [Privacy](PRIVACY.md), [Security](SECURITY.md#data-flows).
 
 | Field | Value |
 | --- | --- |
-| Name | **AI Vocabulary Saver** |
-| Name (visible on store) | AI Vocabulary Saver |
+| Name | **vocab** |
+| Name (visible on store) | vocab |
 | Version | 0.1.0 (bump per `CHANGELOG.md`) |
 | Category | **Productivity** (allows "Language" tags afterwards; Education is a worse fit — reviewers flag learning extensions with external services) |
 
@@ -33,7 +33,7 @@ Related: [Privacy](PRIVACY.md), [Security](SECURITY.md#data-flows).
 ```
 Save words while you browse. Understand and remember them.
 
-AI Vocabulary Saver turns the words you meet while reading into a vocabulary
+vocab turns the words you meet while reading into a vocabulary
 you actually keep: one click saves any word with its sentence, it is
 highlighted everywhere it appears again, and an AI explanation builds the
 meaning, translation, examples and synonyms for you.
@@ -132,7 +132,7 @@ Google's keyless Translate endpoint for reading/translation features.**
 
 - [ ] `npm run test` passes (full unit suite).
 - [ ] `npx playwright test` passes (e2e against the built `dist/`).
-- [ ] `ai-vocabulary-saver.zip` built with `npm run package` and smoke-tested.
+- [ ] `vocab.zip` built with `npm run package` and smoke-tested.
 - [ ] Icons: `public/assets/icon128.png` is the final artwork; `icon16/32/48` in sync.
 - [ ] Screenshots visually inspected (dimensions verified by generator: 1280×800).
 - [ ] Bilingual screenshot shows a real translation (Google keyless) — no placeholder UI.
