@@ -62,7 +62,13 @@ export class InlineReader {
   async open(): Promise<boolean> {
     if (this.active) return true;
     const blocks = extractArticle();
-    if (blocks.length === 0) return false;
+    if (blocks.length === 0) {
+      // No translatable article text on this page. Previously this returned
+      // silently, so enabling bilingual looked like "nothing happens". Surface
+      // it so the cause is diagnosable.
+      console.warn('[bilingual] enabled but no translatable blocks found on this page');
+      return false;
+    }
 
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.alignment = prefs.alignment;

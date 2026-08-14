@@ -13,7 +13,13 @@ All notable changes to this project are documented here. The format is based on
   and the popup `WordCard` (next to the word). Language is taken from the entry's
   existing `sourceLanguage` metadata (reusing `toLocale()` from `language-codes.ts`
   to expand a name/code to a BCP-47 locale), never hardcoded to English.
-- **On-page hover card now has the speaker too:** the reading-overlay tooltip that
+- **Bilingual now surfaces silent failures** (VOC-143): previously, enabling
+  bilingual with no translatable blocks, or with the service worker
+  unreachable for the active-tab check, failed with *nothing* on screen (no
+  skeleton, no error). `reconcileBilingual` now **falls back to opening in the
+  current tab** when the worker can't be reached (the user explicitly enabled
+  it here), instead of silently staying closed, and emits a `console.warn`
+  (`[bilingual] ...`) at each silent-failure point so the cause is diagnosable.
   appears on a highlighted word on any webpage mounts the *same* `PronunciationButton`
   (reusing the shared `pronunciationService`), so pronunciation works wherever a
   saved word is shown — not just the library and popup. Required plumbing: added

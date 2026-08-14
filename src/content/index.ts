@@ -404,11 +404,19 @@ async function reconcileBilingual(): Promise<void> {
   }
   document.body.classList.add('avs-bilingual-on');
   let isActive = false;
+  let reachable = true;
   try {
     isActive = await sendMessage({ type: 'am-i-active-tab' });
   } catch {
-    // Worker unreachable: stay closed rather than guessing and translating
-    // every tab.
+    // Worker unreachable: previously we stayed closed, leaving the user with
+    // "nothing happens" and no way to tell why. The user explicitly enabled
+    // bilingual here, so fall back to opening in the current tab rather than
+    // silently doing nothing.
+    reachable = false;
+    isActive = true;
+    console.warn('[bilingual] am-i-active-tab worker unreachable; opening in current tab');
+  }
+  if (!reachable && !isActive) {
     if (reader.isOpen) reader.close();
     return;
   }
