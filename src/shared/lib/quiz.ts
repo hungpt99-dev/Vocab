@@ -29,8 +29,13 @@ function rng(seed: number): () => number {
 
 function answerFor(entry: VocabularyEntry): string | null {
   const ex = entry.explanation;
-  if (ex?.translation) return ex.translation;
+  // Prefer the AI-generated `meaning` (a real definition, consistent with the
+  // explain prompt's language) over the keyless `translation`. `translation` is a
+  // short gloss locked to whatever target language was active at enrich time, so
+  // mixing it across words produces answer options in inconsistent languages
+  // (e.g. Spanish + Vietnamese) that don't read as meanings of the quiz word.
   if (ex?.meaning) return ex.meaning;
+  if (ex?.translation) return ex.translation;
   return null;
 }
 

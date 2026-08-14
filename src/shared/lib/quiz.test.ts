@@ -55,6 +55,44 @@ describe('buildQuiz', () => {
     }
   });
 
+  it('uses the AI meaning (not the mixed-language translation) for options', () => {
+    // Simulate the real bug: words enriched under different target languages
+    // have translations in inconsistent languages, but `meaning` is a consistent
+    // definition. The quiz must build options from `meaning`, not the garbled mix.
+    const entries = [
+      entry('dodges', 'esquivas', 'to avoid by moving quickly'),
+      entry('ubiquitous', 'phổ biến', 'present everywhere at once'),
+      entry('ephemeral', 'phù du', 'lasting a very short time'),
+      entry('meticulous', 'tỉ mỉ', 'very careful and precise'),
+      entry('gregarious', 'hòa đồng', 'enjoying the company of others'),
+    ];
+    const questions = buildQuiz(entries, { seed: 3 });
+    expect(questions.length).toBeGreaterThan(0);
+    for (const q of questions) {
+      // No option should be a raw translation in another language.
+      expect(q.options).not.toContain('esquivas');
+      expect(q.options).not.toContain('phổ biến');
+      // The correct option must be the word's own meaning.
+      const expected = entries.find((e) => e.word === q.word)!.explanation!.meaning;
+      expect(q.options[q.answerIndex]).toBe(expected);
+    }
+  });
+
+  it('falls back to translation when meaning is missing', () => {
+    const entries = [
+      entry('apple', 'táo'),
+      entry('book', 'sách'),
+      entry('cat', 'mèo'),
+      entry('dog', 'chó'),
+    ];
+    const questions = buildQuiz(entries, { seed: 42 });
+    expect(questions.length).toBeGreaterThan(0);
+    for (const q of questions) {
+      const expected = entries.find((e) => e.word === q.word)!.explanation!.translation;
+      expect(q.options[q.answerIndex]).toBe(expected);
+    }
+  });
+
   it('is deterministic for a fixed seed', () => {
     const entries = [
       entry('apple', 'táo'),
