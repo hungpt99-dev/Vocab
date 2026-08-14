@@ -1,4 +1,4 @@
-import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload, Languages, KeyRound, Database, Palette, SlidersHorizontal, Wand2, ChevronDown, ChevronRight, Flame, CalendarDays, ArrowRight, RotateCw, Layers, HelpCircle, BookMarked, Globe, Github, Users, Target, CheckCheck, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Star, Pencil, Trash2, X, Search, Settings, Plus, Filter, AlertCircle, CheckCircle2, BookOpen, Sparkles, Download, Upload, Languages, KeyRound, Database, Palette, SlidersHorizontal, Wand2, ChevronDown, ChevronRight, Flame, CalendarDays, ArrowRight, ArrowLeft, RotateCw, Layers, HelpCircle, BookMarked, Globe, Github, Users, Target, CheckCheck, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 /**
@@ -48,6 +48,7 @@ export const ChevronRightIcon = build(ChevronRight);
 export const FlameIcon = build(Flame);
 export const CalendarDaysIcon = build(CalendarDays);
 export const ArrowRightIcon = build(ArrowRight);
+export const ArrowLeftIcon = build(ArrowLeft);
 export const RotateCwIcon = build(RotateCw);
 export const LayersIcon = build(Layers);
 export const HelpCircleIcon = build(HelpCircle);
