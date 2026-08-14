@@ -9,19 +9,18 @@ import { takePendingExplain } from '@/content/pending-explain';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { Spinner } from '@/shared/ui/Spinner';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
-import { ArrowLeftIcon, SparklesIcon, WandIcon } from '@/shared/ui/Icons';
+import { ArrowLeftIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import { aiErrorMessage } from '@/ai/types';
 import { SaveForm } from './SaveForm';
 import { WordCard } from './WordCard';
 
-// Durable in-flight state for the popup's AI explain/enrich actions. The popup
-// can close and reopen mid-call (it remounts on blur), which wipes volatile React
-// state and makes the loading spinner vanish. We mirror the explain session in
-// storage so a reloaded popup resumes the spinner and keeps the result — same
-// durable pattern as `avs:pending-explain`.
+// Durable in-flight state for the popup's AI enrich action. The popup can close
+// and reopen mid-call (it remounts on blur), which wipes volatile React state
+// and makes the loading spinner vanish. We mirror the enrich session in storage
+// so a reloaded popup resumes the spinner and keeps the result — same durable
+// pattern as `avs:pending-explain`.
 const ENRICH_SESSION_KEY = 'avs:enrich-session';
 interface EnrichSession {
   word: string;
@@ -39,15 +38,6 @@ const writeEnrichSession = (s: EnrichSession | null): void => {
   if (s) chrome.storage.local.set({ [ENRICH_SESSION_KEY]: s });
   else chrome.storage.local.remove(ENRICH_SESSION_KEY);
 };
-
-/** Contextual AI actions shown under the enrich panel — part of the learning
- * flow, not a separate chat. Each maps to an ExplainKind already supported by
- * the explain service. */
-const CONTEXT_ACTIONS: ReadonlyArray<{ kind: ExplainKind; label: string }> = [
-  { kind: 'sentence', label: 'Explain sentence' },
-  { kind: 'examples', label: 'Give examples' },
-  { kind: 'native', label: 'In my language' },
-];
 
 export interface SaveWordScreenProps {
   /** Called after a word is saved, so the dashboard can refresh its stats. */
@@ -81,9 +71,8 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
   const { available: aiAvailable } = useAiAvailable();
   const [alreadySaved, setAlreadySaved] = useState(false);
 
-  // Pull the library so we can push related-vocab results onto existing entries
-  // while on the save page (same behaviour the dashboard had when the form was
-  // inline). We only need `update` here, not the list.
+  // Pull the library so we can push explain results onto existing entries while
+  // on the save page (same behaviour the dashboard had when the form was inline).
   const { update } = useVocabulary({
     search: '',
     favoritesOnly: false,
@@ -156,7 +145,7 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
 
   const enrichWord = selection?.word ?? word;
 
-  // Resume a popup that was reopened mid-explain: restore the loading spinner and
+  // Resume a popup that was reopened mid-enrich: restore the loading spinner and
   // any finished result so a reload doesn't wipe the in-flight state (the AI call
   // keeps running in the background worker).
   useEffect(() => {
@@ -164,7 +153,6 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
     void readEnrichSession().then((s) => {
       if (cancelled || !s || s.word !== enrichWord) return;
       if (s.enriching) setEnriching(true);
-      if (s.kind) setExplainKind(s.kind);
       if (s.explanation) setEnrich({ word: s.word, explanation: s.explanation });
     });
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string): void => {
@@ -172,12 +160,10 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
       const s = changes['avs:enrich-session'].newValue as EnrichSession | undefined;
       if (!s || s.word !== enrichWord) {
         setEnriching(false);
-        setExplainKind(null);
         if (!s) setEnrich((prev) => (prev && prev.word === enrichWord ? prev : null));
         return;
       }
       setEnriching(s.enriching);
-      setExplainKind(s.kind);
       setEnrich(s.explanation ? { word: s.word, explanation: s.explanation } : null);
     };
     chrome.storage.onChanged.addListener(onChanged);
@@ -187,88 +173,12 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
     };
   }, [enrichWord]);
 
-  const [explainKind, setExplainKind] = useState<ExplainKind | null>(null);
-
-  const handleExplainKind = useCallback(
-    async (kind: ExplainKind) => {
-      const target = enrichWord;
-      if (!target) return;
-      setExplainKind(kind);
-      // Persist the loading flag BEFORE the AI round-trip so a popup reload
-      // (close/reopen on blur) that lands during the call reads a committed
-      // session and shows the spinner — not an empty one.
-      await writeEnrichSession({ word: target, kind, enriching: false, explanation: null });
-      try {
-        const explanation = await sendMessage({
-          type: 'explain',
-          payload: {
-            word: target,
-            context: selection?.sentence,
-            pageTitle: selection?.sourceTitle,
-            language: settings.targetLanguage || 'English',
-            kind,
-          },
-        });
-        setEnrich({ word: target, explanation });
-        await writeEnrichSession({ word: target, kind: null, enriching: false, explanation });
-      } catch (cause) {
-        notify(aiErrorMessage(cause), 'error');
-        await writeEnrichSession(null);
-      } finally {
-        setExplainKind(null);
-      }
-    },
-    [enrichWord, selection, settings.targetLanguage, notify],
-  );
-
-  const [generatingRelated, setGeneratingRelated] = useState(false);
-
-  const handleGenerateRelated = useCallback(async () => {
-    const target = enrichWord;
-    if (!target) return;
-    setGeneratingRelated(true);
-    try {
-      const explanation = await sendMessage({
-        type: 'explain',
-        payload: {
-          word: target,
-          context: selection?.sentence,
-          pageTitle: selection?.sourceTitle,
-          language: settings.targetLanguage || 'English',
-          kind: 'related',
-        },
-      });
-      // Persist the generated related vocabulary onto the entry's explanation.
-      const related = [
-        ...(explanation.relatedWords ?? []),
-        ...(explanation.relatedPhrases ?? []),
-      ].filter(Boolean);
-      const entry = await vocabularyRepository.findByWord(target);
-      if (entry) {
-        const merged = new Set([...(entry.explanation?.relatedWords ?? []), ...related]);
-        await update(entry.id, {
-          explanation: {
-            ...(entry.explanation ?? explanation),
-            relatedWords: [...merged],
-            relatedPhrases: explanation.relatedPhrases ?? entry.explanation?.relatedPhrases ?? [],
-          },
-        });
-      }
-      setEnrich({ word: target, explanation: { ...explanation, relatedWords: [...related] } });
-      await onSaved();
-      notify(`Added ${related.length} related term${related.length === 1 ? '' : 's'}.`, 'success');
-    } catch (cause) {
-      notify(aiErrorMessage(cause), 'error');
-    } finally {
-      setGeneratingRelated(false);
-    }
-  }, [enrichWord, selection, settings.targetLanguage, update, notify, onSaved]);
-
   const handleEnrich = useCallback(async () => {
     const target = enrichWord;
     if (!target) return;
     setEnriching(true);
-    // Persist the loading flag BEFORE the AI round-trip (see handleExplainKind).
+    // Persist the loading flag BEFORE the AI round-trip so a popup reload that
+    // lands during the call reads a committed session and shows the spinner.
     await writeEnrichSession({ word: target, kind: null, enriching: true, explanation: null });
     try {
       const explanation = await sendMessage({
@@ -366,15 +276,14 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
           alreadySaved={alreadySaved}
           saving={saving}
           showTranslation={settings.popupShowTranslation}
-          showSimplify={settings.popupShowSimplify}
+          showSimplify={false}
           onSave={() => void handleSave({ word: enrichWord, note: '', tags: [] })}
-          onSimplify={() => void handleExplainKind('simplify')}
-          simplifying={explainKind === 'simplify'}
           aiUnavailableHint={
             aiAvailable ? undefined : 'AI actions need an API key — open settings.'
           }
         />
 
+        {/* A single AI enrich action for the word being saved. */}
         <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -397,55 +306,17 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
               {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
             </Button>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {CONTEXT_ACTIONS.map((action) => (
-              <Button
-                key={action.kind}
-                size="sm"
-                variant="ghost"
-                disabled={!enrichWord || explainKind !== null || !aiAvailable}
-                onClick={() => void handleExplainKind(action.kind)}
-                title={
-                  !enrichWord
-                    ? 'Type or select a word first'
-                    : aiAvailable
-                      ? action.label
-                      : 'AI actions need an API key in settings'
-                }
-              >
-                {explainKind === action.kind ? <Spinner label="Loading…" /> : action.label}
-              </Button>
-            ))}
-          </div>
-          <div className="mt-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!enrichWord || generatingRelated || !aiAvailable}
-              onClick={() => void handleGenerateRelated()}
-              title={
-                !enrichWord
-                  ? 'Type or select a word first'
-                  : aiAvailable
-                    ? 'Use AI to suggest related vocabulary'
-                    : 'AI actions need an API key in settings'
-              }
-            >
-              <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
-              {generatingRelated ? 'Generating…' : 'Generate related vocabulary'}
-            </Button>
-          </div>
-            {selection?.word === enrichWord && selection.sentence && (
-              <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
-                “{selection.sentence}”
-              </p>
-            )}
-            {enrich?.word === enrichWord && (
-              <div className="mt-2">
-                <ExplanationView explanation={enrich.explanation} />
-              </div>
-            )}
-          </div>
+          {selection?.word === enrichWord && selection.sentence && (
+            <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
+              “{selection.sentence}”
+            </p>
+          )}
+          {enrich?.word === enrichWord && (
+            <div className="mt-2">
+              <ExplanationView explanation={enrich.explanation} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
