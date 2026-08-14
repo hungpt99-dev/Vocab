@@ -231,18 +231,6 @@ export function RadarPanel() {
             {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
           </Button>
 
-          {query.trim().length >= MIN_QUERY_LENGTH && (
-            <Button
-              variant="secondary"
-              disabled={!aiAvailable || scan.status === 'scanning'}
-              onClick={runQuickSearch}
-              title="Search this page with your query as the Radar goal"
-            >
-              <SearchIcon size={14} className="mr-1.5" aria-hidden="true" />
-              Search
-            </Button>
-          )}
-
           {!aiAvailable && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               AI actions need an API key — open settings.

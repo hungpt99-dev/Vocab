@@ -94,14 +94,18 @@ describe('RadarPanel — Quick Search', () => {
     expect(scanCall![0].payload).toEqual({ goal: 'serendip' });
   });
 
-  it('also triggers the scan via the Search button', async () => {
+  it('has a single search affordance — no floating Search button; Enter submits', async () => {
     await act(async () => {
       render(<RadarPanel />);
     });
     const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
     await userEvent.type(input, 'idempotent');
 
-    await userEvent.click(screen.getByRole('button', { name: /^Search$/i }));
+    // The redundant floating "Search" button was removed — the search bar is the
+    // only search affordance, and it submits via Enter.
+    expect(screen.queryByRole('button', { name: /^Search$/i })).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(
       () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
       { timeout: 2000 },
