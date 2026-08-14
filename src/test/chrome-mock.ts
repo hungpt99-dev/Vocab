@@ -36,6 +36,7 @@ export function createChromeMock() {
       query: vi.fn<(...args: any[]) => Promise<any>>(async () => [
         { id: 1, url: 'https://example.com', title: 'Example' },
       ]),
+      get: vi.fn(async (id: number) => ({ id, active: true, currentWindow: true })) as any,
       sendMessage: vi.fn<(...args: any[]) => Promise<any>>(async () => undefined),
       create: vi.fn<(...args: any[]) => Promise<any>>(async () => ({ id: 2 })),
     },

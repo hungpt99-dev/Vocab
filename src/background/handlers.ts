@@ -183,8 +183,14 @@ export async function saveDifficultWords(
 export async function isActiveTab(senderTabId: number | undefined): Promise<boolean> {
   if (typeof senderTabId !== 'number') return false;
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tab?.id === senderTabId;
+    // Check whether the sender's OWN tab is the active tab within its window.
+    // We intentionally do NOT use `chrome.tabs.query({ active: true, currentWindow: true })`:
+    // from a service worker `currentWindow` is meaningless, so that query returns the
+    // wrong tab and bilingual silently fails to open ("nothing happens"). Asking for the
+    // sender tab directly is also immune to the popup stealing focus when the user toggles
+    // bilingual from the toolbar popup — the page tab remains `active` in its own window.
+    const tab = await chrome.tabs.get(senderTabId);
+    return tab?.active === true;
   } catch {
     return false;
   }

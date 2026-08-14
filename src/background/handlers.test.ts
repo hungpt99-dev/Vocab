@@ -530,4 +530,29 @@ describe('radarScan', () => {
   });
 });
 
+describe('isActiveTab (VOC-143 bilingual gate)', () => {
+  it('returns true when the sender tab is active, even if tabs.query/currentWindow yields nothing', async () => {
+    // Reproduce the real-world failure: from a service worker,
+    // chrome.tabs.query({ active: true, currentWindow: true }) returns nothing
+    // (currentWindow is meaningless in the worker context), which previously made
+    // isActiveTab return false and silently closed the bilingual reader.
+    chromeMock().tabs.query.mockResolvedValue([]);
+    chromeMock().tabs.get.mockResolvedValue({ id: 42, active: true, currentWindow: true });
+
+    const { isActiveTab } = await import('./handlers');
+    expect(await isActiveTab(42)).toBe(true);
+  });
+
+  it('returns false when the sender tab exists but is not the active tab', async () => {
+    chromeMock().tabs.get.mockResolvedValue({ id: 42, active: false });
+    const { isActiveTab } = await import('./handlers');
+    expect(await isActiveTab(42)).toBe(false);
+  });
+
+  it('returns false when there is no sender tab id', async () => {
+    const { isActiveTab } = await import('./handlers');
+    expect(await isActiveTab(undefined)).toBe(false);
+  });
+});
+
 

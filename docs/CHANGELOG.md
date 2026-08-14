@@ -13,7 +13,14 @@ All notable changes to this project are documented here. The format is based on
   and the popup `WordCard` (next to the word). Language is taken from the entry's
   existing `sourceLanguage` metadata (reusing `toLocale()` from `language-codes.ts`
   to expand a name/code to a BCP-47 locale), never hardcoded to English.
-- **Bilingual now surfaces silent failures** (VOC-143): previously, enabling
+- **Bilingual active-tab gate fixed (VOC-143):** `isActiveTab` used
+  `chrome.tabs.query({ active: true, currentWindow: true })`, which returns
+  nothing from a service worker (no window context), so it reported the active
+  page tab as *not* active and `reconcileBilingual` silently closed the reader
+  — bilingual enabled but never translated (no skeleton, nothing happened).
+  It now queries the sender tab directly via `chrome.tabs.get(senderTabId)` and
+  checks `tab.active`, which is immune to the popup stealing focus and to the
+  worker's missing window context. Added regression tests for `isActiveTab`.
   bilingual with no translatable blocks, or with the service worker
   unreachable for the active-tab check, failed with *nothing* on screen (no
   skeleton, no error). `reconcileBilingual` now **falls back to opening in the
