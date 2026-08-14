@@ -6,26 +6,46 @@ import type {
 } from '@/shared/types/vocabulary';
 import { collapseWhitespace, isPhrase, normalizeTags, normalizeWord } from '@/shared/lib/text';
 import { createId } from '@/shared/lib/id';
+import { getUserId } from '@/shared/lib/user-id';
 import { db as defaultDb, type VocabularyDatabase } from './database';
+import type { NormalizedWord } from '@/features/vocabulary/types';
+import type { VocabularyNormalizationService } from '@/features/vocabulary/vocabulary-normalization-service';
+import { vocabularyNormalizationService } from '@/features/vocabulary/vocabulary-normalization-service';
 
 /**
  * Persistence boundary for vocabulary entries.
  * Callers never see Dexie types, so the storage engine stays swappable.
  */
 export class VocabularyRepository {
-  constructor(private readonly db: VocabularyDatabase = defaultDb) {}
+  constructor(
+    private readonly db: VocabularyDatabase = defaultDb,
+    private readonly normalize: VocabularyNormalizationService = vocabularyNormalizationService,
+    private readonly resolveUserId: () => Promise<string> = getUserId,
+  ) {}
 
   /**
    * Insert a new entry, or merge into the existing one when the same word was
    * already saved. Returns the stored entry either way.
+   *
+   * The save runs the word through the normalization pipeline (normalize →
+   * singularize → lemmatize → word-family resolve) so the stored concept carries
+   * its canonical `lemma` and `familyId`. Duplicate concepts are prevented two
+   * ways: a read check against `(userId, familyId)`, and a database-level unique
+   * compound index that turns a concurrent second insert into a constraint
+   * violation rather than a duplicate row.
    */
   async save(input: NewVocabularyEntry): Promise<VocabularyEntry> {
     const word = collapseWhitespace(input.word);
     if (!word) throw new Error('Cannot save an empty word');
 
-    const wordKey = normalizeWord(word);
+    const userId = await this.resolveUserId();
+    const normalized: NormalizedWord = await this.normalize.normalize(word, input.sentence);
+
+    // Set when a concurrent save already won the unique (userId, familyId) slot.
+    let concurrencyMerged: VocabularyEntry | undefined;
+
     const now = Date.now();
-    const existing = await this.db.vocabulary.where('wordKey').equals(wordKey).first();
+    const existing = await this.findByFamily(userId, normalized.familyId);
 
     if (existing) {
       const merged: VocabularyEntry = {
@@ -38,6 +58,13 @@ export class VocabularyRepository {
         tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
         favorite: input.favorite ?? existing.favorite,
         sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
+        // Enrich the canonical fields from the latest encounter, but never
+        // overwrite the user's original surface form.
+        surfaceForm: existing.surfaceForm || normalized.surfaceForm,
+        normalizedForm: normalized.normalizedForm,
+        lemma: normalized.lemma,
+        familyId: normalized.familyId,
+        partOfSpeech: normalized.partOfSpeech,
         explanation: input.explanation ?? existing.explanation,
         updatedAt: now,
       };
@@ -48,7 +75,13 @@ export class VocabularyRepository {
     const entry: VocabularyEntry = {
       id: createId(),
       word,
-      wordKey,
+      wordKey: normalizeWord(word),
+      userId,
+      surfaceForm: normalized.surfaceForm,
+      normalizedForm: normalized.normalizedForm,
+      lemma: normalized.lemma,
+      familyId: normalized.familyId,
+      partOfSpeech: normalized.partOfSpeech,
       phrase: collapseWhitespace(input.phrase ?? (isPhrase(word) ? word : '')),
       sentence: collapseWhitespace(input.sentence ?? ''),
       sourceUrl: input.sourceUrl ?? '',
@@ -61,7 +94,45 @@ export class VocabularyRepository {
       createdAt: now,
       updatedAt: now,
     };
-    await this.db.vocabulary.add(entry);
+    await this.db.vocabulary.add(entry).catch(async (error: unknown) => {
+      // The unique (userId, familyId) index makes a concurrent second save of
+      // the same family a constraint violation rather than a duplicate row.
+      // Treat that as "already saved": re-read the surviving row and return it.
+      const isConstraint =
+        error instanceof DOMException
+          ? error.name === 'ConstraintError'
+          : (error as { name?: string })?.name === 'ConstraintError';
+      if (isConstraint) {
+        const existing = await this.findByFamily(userId, normalized.familyId);
+        if (existing) {
+          // Merge the new encounter's fields into the surviving entry so the
+          // caller still gets an up-to-date record.
+          const merged = {
+            ...existing,
+            phrase: input.phrase ?? existing.phrase,
+            sentence: input.sentence ? collapseWhitespace(input.sentence) : existing.sentence,
+            sourceUrl: input.sourceUrl ?? existing.sourceUrl,
+            sourceTitle: input.sourceTitle ?? existing.sourceTitle,
+            note: input.note ?? existing.note,
+            tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
+            favorite: input.favorite ?? existing.favorite,
+            sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
+            surfaceForm: existing.surfaceForm || normalized.surfaceForm,
+            normalizedForm: normalized.normalizedForm,
+            lemma: normalized.lemma,
+            familyId: normalized.familyId,
+            partOfSpeech: normalized.partOfSpeech,
+            explanation: input.explanation ?? existing.explanation,
+            updatedAt: now,
+          };
+          await this.db.vocabulary.put(merged);
+          concurrencyMerged = merged;
+          return;
+        }
+      }
+      throw error;
+    });
+    if (concurrencyMerged) return concurrencyMerged;
     return entry;
   }
 
@@ -71,6 +142,15 @@ export class VocabularyRepository {
 
   async findByWord(word: string): Promise<VocabularyEntry | undefined> {
     return this.db.vocabulary.where('wordKey').equals(normalizeWord(word)).first();
+  }
+
+  /** Find an existing saved concept for this user by its word-family identity. */
+  async findByFamily(userId: string, familyId: string): Promise<VocabularyEntry | undefined> {
+    if (!userId || !familyId) return undefined;
+    return this.db.vocabulary
+      .where('[userId+familyId]')
+      .equals([userId, familyId])
+      .first();
   }
 
   async update(id: string, patch: VocabularyPatch): Promise<VocabularyEntry> {
@@ -83,6 +163,13 @@ export class VocabularyRepository {
       if (!word) throw new Error('Cannot save an empty word');
       next.word = word;
       next.wordKey = normalizeWord(word);
+      // Re-run the pipeline so the canonical lemma/family follow the new word.
+      const normalized = await this.normalize.normalize(word, next.sentence);
+      next.surfaceForm = normalized.surfaceForm;
+      next.normalizedForm = normalized.normalizedForm;
+      next.lemma = normalized.lemma;
+      next.familyId = normalized.familyId;
+      next.partOfSpeech = normalized.partOfSpeech;
     }
     if (patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
     if (patch.sentence !== undefined) next.sentence = collapseWhitespace(patch.sentence);

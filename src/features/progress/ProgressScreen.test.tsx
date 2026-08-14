@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ProgressScreen } from './ProgressScreen';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 vi.mock('@/storage/vocabulary-repository', () => ({
   vocabularyRepository: {
@@ -12,22 +13,14 @@ vi.mock('@/storage/vocabulary-repository', () => ({
 }));
 
 function entry(word: string, createdAt: number): VocabularyEntry {
-  return {
+  return makeVocabularyEntry({
     id: `id-${word}`,
     word,
     wordKey: `k-${word}`,
-    phrase: '',
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
-    note: '',
-    tags: [],
-    favorite: false,
     sourceLanguage: 'en',
-    explanation: null,
     createdAt,
     updatedAt: createdAt,
-  };
+  });
 }
 
 describe('ProgressScreen', () => {

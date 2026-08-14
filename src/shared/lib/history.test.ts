@@ -1,26 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { buildHistory, countInWindow } from './history';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 function entry(createdAt: number): VocabularyEntry {
-  return {
+  return makeVocabularyEntry({
     id: `id-${createdAt}`,
     word: 'w',
     wordKey: `k-${createdAt}`,
-    phrase: '',
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
-    note: '',
-    tags: [],
-    favorite: false,
     sourceLanguage: 'en',
-    explanation: null,
     createdAt,
     updatedAt: createdAt,
-  };
+  });
 }
 
 describe('buildHistory', () => {

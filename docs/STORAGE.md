@@ -176,3 +176,89 @@ application.
 
 Settings, including the API key, are **not** included in the export. This is intentional: a backup
 file that carried a live credential would be a disclosure risk every time it was shared or synced.
+
+---
+
+## Word-family normalisation and de-duplication (VOC-140)
+
+Saving a word now runs it through a normalisation pipeline so the same *concept* is never saved
+twice, even when the surface forms differ (`book` / `books`, `beautiful` / `beautifully`).
+
+Source: `src/features/vocabulary/`, `src/storage/vocabulary-repository.ts`,
+`src/storage/database.ts`. Related: [ADR-014](DECISION_LOG.md#adr-014--ai-backed-linguistic-pipeline).
+
+### Pipeline
+
+```
+surfaceForm ──▶ Normalization ──▶ Linguistic analysis (POS / singular / lemma / family)
+              (text only)         ──▶ NormalizedWord
+```
+
+The four linguistic concerns are kept as **separate responsibilities**, but the actual linguistic
+work is delegated to an injected `LinguisticAnalyzer`:
+
+| Stage | Responsibility | File |
+| --- | --- | --- |
+| Normalization | Text-level cleanup only: trim, lowercase, NFC Unicode normalisation, full-width folding, strip enclosing punctuation. **No linguistics** — `books` stays `books` here. | `word-normalizer.ts` |
+| Linguistic analysis | Produces the singular, lemma, part of speech and word-family identity for the word *in its own language*. | `linguistic-analyzer.ts` |
+| Orchestration | Runs the two stages in order, preserves the surface form, applies the fallback rule. | `vocabulary-normalization-service.ts` |
+
+**No English-specific rules are hard-coded.** The analyzer is AI-backed: when the user has an AI
+provider configured, the model is prompted (via the existing `AiProvider.complete` transport, so it
+inherits rate-limiting/retry/fallback) for the word's POS, singular, lemma and family **in whatever
+language the user encountered it**. This keeps the behaviour correct for every language the user
+studies. When no provider is configured, or a call fails, the analyzer degrades gracefully to a
+non-destructive identity (the word is its own lemma/family) so saving never hard-fails.
+
+### Canonical vocabulary identity
+
+Each `VocabularyEntry` now carries:
+
+| Field | Meaning |
+| --- | --- |
+| `surfaceForm` | Exactly what the user encountered, trimmed (`BOOKS` → `BOOKS`). Preserved verbatim; never overwritten by the canonical form. The UI uses it to show "you encountered: books". |
+| `normalizedForm` | Language-agnostic text-normalized form (`books`). |
+| `lemma` | Canonical lemma from the pipeline (`book`, `run`, `beautiful`). |
+| `familyId` | Word-family identity — the vocabulary concept. `beautiful` and `beautifully` share `beauty`; `book` and `books` share `book`. |
+| `partOfSpeech` | Best-effort POS from the analysis. |
+| `userId` | Stable per-install owner (see `src/shared/lib/user-id.ts`); scopes the concept so two users can each save the same family. |
+
+### Duplicate detection
+
+The deduplication key is **`(userId, familyId)`**. Two surface forms that resolve to the same family
+map to the same key and therefore the same vocabulary concept. A different user may still save the
+same family.
+
+Detection is **two-layered**, never a bare `SELECT → INSERT`:
+
+1. A read check: `VocabularyRepository.findByFamily(userId, familyId)` returns the existing entry and
+   the save merges into it.
+2. A **database-level unique compound index** `&[userId+familyId]` (Dexie v3). A concurrent second
+   save of the same family becomes a `ConstraintError` on insert, which the repository catches and
+   resolves as "already saved" (re-reads the surviving row and merges) — so concurrent requests
+   cannot both pass the read check and create duplicate rows.
+
+No naive string matching (`startsWith`/`contains`/`endsWith`) is ever used to decide families:
+`run` and `runaway`, and `analysis` and `analyst`, are deliberately *different* families. Family
+membership is decided only by the analyzer's output.
+
+### Fallback behaviour
+
+When the analyzer is **not confident** (no provider, unparseable output, or a transient failure), the
+pipeline does not guess. The word becomes its own family identity (`familyFallback = true`,
+`familyId = lemma`), and — critically — unrelated words are never merged through fuzzy heuristics.
+
+### Migration (v1 → v3)
+
+The schema is now at **version 3**:
+
+- v2 added the `review` scheduling table.
+- v3 adds `userId`, `lemma`, `familyId`, `normalizedForm`, `surfaceForm`, `partOfSpeech` to the
+  `vocabulary` table and the unique `[userId+familyId]` index.
+
+The v3 `.upgrade()` backfills the new fields for rows written by older versions (the `wordKey`
+becomes the initial `familyId`/`lemma`; a constant `legacy-owner` stands in for `userId` until the
+next write stamps the real per-install id). This keeps the unique index satisfiable without dropping
+user data. Existing tests open the DB at the current version; the repository tests cover
+dedup, multi-user and concurrent-save behaviour.
+

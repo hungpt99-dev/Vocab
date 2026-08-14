@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuizScreen } from './QuizScreen';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 vi.mock('@/storage/vocabulary-repository', () => ({
   vocabularyRepository: {
@@ -11,17 +12,10 @@ vi.mock('@/storage/vocabulary-repository', () => ({
 }));
 
 function entry(word: string, translation: string): VocabularyEntry {
-  return {
+  return makeVocabularyEntry({
     id: `id-${word}`,
     word,
     wordKey: `key-${word}`,
-    phrase: '',
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
-    note: '',
-    tags: [],
-    favorite: false,
     sourceLanguage: 'en',
     explanation: {
       meaning: translation,
@@ -40,7 +34,7 @@ function entry(word: string, translation: string): VocabularyEntry {
     },
     createdAt: 1,
     updatedAt: 1,
-  };
+  });
 }
 
 describe('QuizScreen', () => {

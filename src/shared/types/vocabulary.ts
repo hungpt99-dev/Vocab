@@ -40,10 +40,31 @@ export interface Explanation {
 /** A single saved vocabulary item. */
 export interface VocabularyEntry {
   id: string;
-  /** The saved word or phrase as the user selected it. */
+  /** The saved word or phrase as the user selected it (preserved verbatim). */
   word: string;
   /** Normalised lookup key: lowercase, whitespace-collapsed. */
   wordKey: string;
+  /**
+   * Identity of the user who saved this entry. Scopes the vocabulary concept so
+   * two users can each save the same word family independently. For this
+   * local-first extension the owner is a stable per-install id.
+   */
+  userId: string;
+  /**
+   * The exact surface form the user encountered (e.g. `BOOKS`, `running`).
+   * Preserved verbatim — never overwritten by the canonical lemma — so the UI
+   * can show "you encountered: books".
+   */
+  surfaceForm: string;
+  /** Language-agnostic text-normalized form (lowercase, unicode-collapsed). */
+  normalizedForm: string;
+  /** Canonical lemma produced by the linguistic pipeline (e.g. `book`, `run`). */
+  lemma: string;
+  /** Word-family identity (the vocabulary concept). Shared by inflections and
+   *  transparently-related derivations (e.g. `beautiful`/`beautifully`). */
+  familyId: string;
+  /** Best-effort part of speech decided during linguistic analysis. */
+  partOfSpeech?: string;
   /** Larger phrase the word belongs to, when the selection was multi-word. */
   phrase: string;
   /** Sentence surrounding the selection on the source page. */

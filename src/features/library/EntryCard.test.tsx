@@ -3,28 +3,25 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EntryCard } from './EntryCard';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 import { sendMessage } from '@/shared/messaging/client';
 
 vi.mock('@/shared/messaging/client', () => ({
   sendMessage: vi.fn(async () => ''),
 }));
 
-const entry: VocabularyEntry = {
+const entry: VocabularyEntry = makeVocabularyEntry({
   id: 'e1',
   word: 'serendipity',
   wordKey: 'serendipity',
-  phrase: '',
   sentence: 'Pure serendipity struck.',
   sourceUrl: 'https://example.com',
   sourceTitle: 'Example',
   note: 'from an article',
   tags: ['noun'],
-  favorite: false,
-  sourceLanguage: '',
-  explanation: null,
   createdAt: Date.UTC(2026, 0, 1),
   updatedAt: Date.UTC(2026, 0, 1),
-};
+});
 
 function setup(overrides: Partial<VocabularyEntry> = {}, explaining = false, extra: { onQuickAdd?: (word: string) => void } = {}) {
   const handlers = {
