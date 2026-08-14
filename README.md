@@ -1,4 +1,4 @@
-# vocab
+# Vocab
 
 A lightweight, **local-first** Chrome extension that saves words while you browse, highlights them on
 every page you visit, and explains them using **your own AI API key** — or, for inline translation, a

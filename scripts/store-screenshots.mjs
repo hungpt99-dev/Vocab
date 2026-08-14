@@ -378,7 +378,7 @@ function bannerHtml(width) {
     <div class="orb orb-a"></div><div class="orb orb-b"></div>
     <div class="content">
       <div class="brand">
-        <div class="logo"><img src="${icon}" alt=""/><span>vocab</span></div>
+        <div class="logo"><img src="${icon}" alt=""/><span>Vocab</span></div>
         <div class="tagline">Save words while you browse. Highlight them anywhere. Understand and remember every one.</div>
       </div>
       <div class="shots">

@@ -1,6 +1,6 @@
 # Documentation
 
-Everything needed to understand, build, extend and ship **vocab** — a local-first Chrome
+Everything needed to understand, build, extend and ship **Vocab** — a local-first Chrome
 Manifest V3 extension that saves vocabulary while you browse and explains it with your own AI key.
 
 For the product pitch, installation and quick start, see the [root README](../README.md).

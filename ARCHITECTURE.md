@@ -1,6 +1,6 @@
 # Architecture
 
-vocab is a Chrome **Manifest V3** extension built with React, TypeScript and Vite.
+Vocab is a Chrome **Manifest V3** extension built with React, TypeScript and Vite.
 It follows a clean, feature-oriented layering: UI depends on application services, which depend on
 storage and provider abstractions — never the reverse.
 

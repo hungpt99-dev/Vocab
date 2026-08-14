@@ -6,7 +6,7 @@ test('popup is usable at the narrowest supported width', async ({ page, extensio
   await page.setViewportSize({ width: 320, height: 600 });
   await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
 
-  await expect(page.getByRole('heading', { name: 'vocab' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vocab' })).toBeVisible();
   await expect(page.getByLabel('Word or phrase')).toBeVisible();
   await expect(page.getByRole('button', { name: /save to vocabulary/i })).toBeVisible();
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve vocab.
+Thanks for helping improve Vocab.
 
 ## Getting started
 

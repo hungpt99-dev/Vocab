@@ -206,7 +206,7 @@ export const OPENAI_COMPATIBLE_PRESETS: OpenAiCompatiblePreset[] = [
     defaultModel: 'openai/gpt-4o-mini',
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     requiresApiKey: true,
-    extraHeaders: { 'X-Title': 'vocab' },
+    extraHeaders: { 'X-Title': 'Vocab' },
   },
   {
     id: 'deepseek',

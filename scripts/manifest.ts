@@ -3,7 +3,7 @@ import pkg from '../package.json' assert { type: 'json' };
 export function buildManifest(): Record<string, unknown> {
   return {
     manifest_version: 3,
-    name: 'vocab',
+    name: 'Vocab',
     version: pkg.version,
     description:
       'Save words while you browse, highlight them everywhere, and explain them with your own AI key. Local-first.',
@@ -19,7 +19,7 @@ export function buildManifest(): Record<string, unknown> {
     },
     action: {
       default_popup: 'src/popup/index.html',
-      default_title: 'vocab',
+      default_title: 'Vocab',
       default_icon: {
         16: 'assets/icon16.png',
         32: 'assets/icon32.png',

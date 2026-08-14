@@ -1,6 +1,6 @@
 # Release Process
 
-How a versioned release of vocab is cut and verified. This is the manual procedure today
+How a versioned release of Vocab is cut and verified. This is the manual procedure today
 (see [Known limitations](KNOWN_LIMITATIONS.md) L9 — no automated store submission yet).
 
 Related: [Deployment](DEPLOYMENT.md), [CHANGELOG](CHANGELOG.md), the

@@ -13,8 +13,8 @@ Related: [Privacy](PRIVACY.md), [Security](SECURITY.md#data-flows).
 
 | Field | Value |
 | --- | --- |
-| Name | **vocab** |
-| Name (visible on store) | vocab |
+| Name | **Vocab** |
+| Name (visible on store) | Vocab |
 | Version | 0.1.0 (bump per `CHANGELOG.md`) |
 | Category | **Productivity** (allows "Language" tags afterwards; Education is a worse fit — reviewers flag learning extensions with external services) |
 
@@ -33,7 +33,7 @@ Related: [Privacy](PRIVACY.md), [Security](SECURITY.md#data-flows).
 ```
 Save words while you browse. Understand and remember them.
 
-vocab turns the words you meet while reading into a vocabulary
+Vocab turns the words you meet while reading into a vocabulary
 you actually keep: one click saves any word with its sentence, it is
 highlighted everywhere it appears again, and an AI explanation builds the
 meaning, translation, examples and synonyms for you.

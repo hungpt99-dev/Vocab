@@ -1,4 +1,4 @@
-# Product & Architecture Audit — vocab
+# Product & Architecture Audit — Vocab
 
 Audit date: 2026-08-02 · Auditor: Senior Staff Engineer (automated review)
 Scope: full codebase at commit `71539e3`. This is an alignment audit against the
