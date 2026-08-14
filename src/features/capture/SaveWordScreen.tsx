@@ -375,49 +375,66 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
           }
         />
 
-        {enrichWord && (
-          <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {enrichWord}
-              </p>
+        <div className="shrink-0 border-b border-slate-200 p-3 dark:border-slate-700">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {enrichWord || 'AI enrichment'}
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!enrichWord || enriching || !aiAvailable}
+              title={
+                !enrichWord
+                  ? 'Type or select a word first'
+                  : aiAvailable
+                    ? undefined
+                    : 'AI actions need an API key in settings'
+              }
+              onClick={() => void handleEnrich()}
+            >
+              <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
+              {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
+            </Button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {CONTEXT_ACTIONS.map((action) => (
               <Button
-                size="sm"
-                variant="secondary"
-                disabled={enriching || !aiAvailable}
-                title={aiAvailable ? undefined : 'AI actions need an API key in settings'}
-                onClick={() => void handleEnrich()}
-              >
-                <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
-                {enriching ? 'Enriching…' : enrich?.word === enrichWord ? 'Re-enrich' : 'AI enrich'}
-              </Button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {CONTEXT_ACTIONS.map((action) => (
-                <Button
-                  key={action.kind}
-                  size="sm"
-                  variant="ghost"
-                  disabled={explainKind !== null || !aiAvailable}
-                  onClick={() => void handleExplainKind(action.kind)}
-                  title={aiAvailable ? action.label : 'AI actions need an API key in settings'}
-                >
-                  {explainKind === action.kind ? <Spinner label="Loading…" /> : action.label}
-                </Button>
-              ))}
-            </div>
-            <div className="mt-2">
-              <Button
+                key={action.kind}
                 size="sm"
                 variant="ghost"
-                disabled={generatingRelated || !aiAvailable}
-                onClick={() => void handleGenerateRelated()}
-                title={aiAvailable ? 'Use AI to suggest related vocabulary' : 'AI actions need an API key in settings'}
+                disabled={!enrichWord || explainKind !== null || !aiAvailable}
+                onClick={() => void handleExplainKind(action.kind)}
+                title={
+                  !enrichWord
+                    ? 'Type or select a word first'
+                    : aiAvailable
+                      ? action.label
+                      : 'AI actions need an API key in settings'
+                }
               >
-                <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
-                {generatingRelated ? 'Generating…' : 'Generate related vocabulary'}
+                {explainKind === action.kind ? <Spinner label="Loading…" /> : action.label}
               </Button>
-            </div>
+            ))}
+          </div>
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!enrichWord || generatingRelated || !aiAvailable}
+              onClick={() => void handleGenerateRelated()}
+              title={
+                !enrichWord
+                  ? 'Type or select a word first'
+                  : aiAvailable
+                    ? 'Use AI to suggest related vocabulary'
+                    : 'AI actions need an API key in settings'
+              }
+            >
+              <WandIcon size={14} className="mr-1.5" aria-hidden="true" />
+              {generatingRelated ? 'Generating…' : 'Generate related vocabulary'}
+            </Button>
+          </div>
             {selection?.word === enrichWord && selection.sentence && (
               <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
                 “{selection.sentence}”
@@ -429,7 +446,6 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );
