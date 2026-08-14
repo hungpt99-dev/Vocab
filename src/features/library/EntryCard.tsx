@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { VocabularyEntry, VocabularyPatch } from '@/shared/types/vocabulary';
+import { sendMessage } from '@/shared/messaging/client';
 import { Button } from '@/shared/ui/Button';
 import { IconButton } from '@/shared/ui/IconButton';
 import { Spinner } from '@/shared/ui/Spinner';
@@ -82,6 +83,8 @@ export function EntryCard({
               <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {entry.word}
               </p>
+              <EntryTranslation text={entry.word} />
+              {entry.phrase && entry.phrase.trim() && <EntryTranslation text={entry.phrase} />}
               {entry.sentence && (
                 <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
                   “{entry.sentence}”
@@ -176,6 +179,56 @@ export function EntryCard({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Keyless Google translation of a saved word/phrase, shown automatically on
+ * the entry card (VOC-138). Works without an AI key, exactly like the
+ * bilingual-reading selection card: same message, same service-worker path
+ * (which already defaults to the user's target language). Shows a subtle
+ * skeleton while in flight and renders nothing when the call fails or the
+ * source comes back unchanged.
+ */
+function EntryTranslation({ text }: { text: string }) {
+  const [translation, setTranslation] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTranslation(null);
+    const source = text.trim();
+    if (!source) {
+      setTranslation('');
+      return;
+    }
+    void sendMessage({ type: 'translate', payload: { text: source } })
+      .then((result) => {
+        if (cancelled) return;
+        setTranslation(result && result !== source ? result : '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTranslation('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [text]);
+
+  if (translation === null) {
+    return (
+      <div
+        aria-hidden="true"
+        data-testid="entry-translation-skeleton"
+        className="mt-1 h-3 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700"
+      />
+    );
+  }
+  if (!translation) return null;
+  return (
+    <p data-role="translation" className="mt-0.5 text-xs text-brand-700 dark:text-brand-300">
+      {translation}
+    </p>
   );
 }
 
