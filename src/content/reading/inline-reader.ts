@@ -16,6 +16,7 @@ import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
 import { matchesDomain } from '../domain';
+import { translationCache, cacheKey, type CachedTranslation } from './translation-cache';
 
 /**
  * Inline bilingual reading: keeps the original page UI intact and injects the
@@ -199,7 +200,13 @@ export class InlineReader {
     }
   }
 
-  /** Translate a specific set of blocks (visible ones), skipping already-done. */
+  /**
+   * Translate a specific set of blocks (visible ones), skipping already-done
+   * blocks AND already-translated text. Results are cached per session keyed by
+   * the source text + language + mode, so reopening a page (or switching tabs and
+   * back) reuses the previous translation instead of re-calling the AI and
+   * re-flashing the skeleton. See translation-cache.ts.
+   */
   private async translateBlocks(blocks: ArticleBlock[]): Promise<void> {
     const generation = this.generation;
     const pending = blocks.filter((b) => !this.translatedBlockIds.has(b.id));
@@ -221,83 +228,111 @@ export class InlineReader {
       return;
     }
 
-    // Show a shimmering skeleton under each pending block right away, so the
-    // page feels responsive while the translation streams in (instead of a
-    // blank gap). Replaced by the real line once it arrives.
-    const skeletonByAnchor = new Map<HTMLElement, HTMLElement>();
-    for (const block of pending) {
-      const anchor = block.element instanceof HTMLElement ? block.element : null;
-      if (!anchor || this.skeletons.has(block.id)) continue;
-      const skeleton = this.buildSkeletonLine();
-      anchor.after(skeleton);
-      this.skeletons.set(block.id, skeleton);
-      skeletonByAnchor.set(anchor, skeleton);
+    // Resolve the language + mode once for the whole batch, and look up the
+    // session cache before doing any work. Fetch settings first so the cache key
+    // (which depends on the target language) doesn't create a self-referential
+    // type inference.
+    const settings = await settingsRepository.get();
+    const language = settings.targetLanguage || 'English';
+    const cached = await translationCache.get(
+      items.map((item) => cacheKey(item.text, language, this.mode)),
+    );
+
+    const toTranslate: typeof items = [];
+    let injectedSomething = false;
+
+    for (const item of items) {
+      const key = cacheKey(item.text, language, this.mode);
+      const hit = cached.get(key);
+      if (!hit) {
+        toTranslate.push(item);
+        continue;
+      }
+      // Cache hit: render directly, no skeleton, no AI call.
+      this.renderItem(item, hit.translation, hit.pairs, key);
+      injectedSomething = true;
     }
 
-    const replaceSkeleton = (anchor: HTMLElement, node: HTMLElement | null): void => {
-      const skeleton = skeletonByAnchor.get(anchor);
-      if (!skeleton) return;
-      if (node) skeleton.replaceWith(node);
-      else skeleton.remove();
-      for (const [id, sk] of this.skeletons) if (sk === skeleton) this.skeletons.delete(id);
-    };
-
-    let injectedSomething = false;
-    if (this.mode === 'word') {
-      const aligned = await this.alignItems(items);
-      if (this.generation !== generation) {
-        for (const sk of skeletonByAnchor.values()) sk.remove();
-        return;
+    if (toTranslate.length > 0) {
+      // Skeleton placeholders only for the blocks we actually have to fetch.
+      const skeletonByAnchor = new Map<HTMLElement, HTMLElement>();
+      for (const block of pending) {
+        const anchor = block.element instanceof HTMLElement ? block.element : null;
+        if (!anchor || this.skeletons.has(block.id)) continue;
+        if (!toTranslate.some((it) => it.anchor === anchor)) continue;
+        const skeleton = this.buildSkeletonLine();
+        anchor.after(skeleton);
+        this.skeletons.set(block.id, skeleton);
+        skeletonByAnchor.set(anchor, skeleton);
       }
-      let lastText: string | null = null;
-      for (const item of items) {
-        const result = aligned.map.get(item.id);
-        if (!result) continue;
-        this.applyWordGloss(item, result);
-        const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
-        if (line && line !== lastText) {
-          const node = buildSentenceBlock(line);
+
+      const replaceSkeleton = (anchor: HTMLElement, node: HTMLElement | null): void => {
+        const skeleton = skeletonByAnchor.get(anchor);
+        if (!skeleton) return;
+        if (node) skeleton.replaceWith(node);
+        else skeleton.remove();
+        for (const [id, sk] of this.skeletons) if (sk === skeleton) this.skeletons.delete(id);
+      };
+
+      const newCache = new Map<string, CachedTranslation>();
+      if (this.mode === 'word') {
+        const aligned = await this.alignItems(toTranslate);
+        if (this.generation !== generation) {
+          for (const sk of skeletonByAnchor.values()) sk.remove();
+          return;
+        }
+        let lastText: string | null = null;
+        for (const item of toTranslate) {
+          const result = aligned.map.get(item.id);
+          if (!result) continue;
+          this.applyWordGloss(item, result);
+          const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
+          if (line && line !== lastText) {
+            const node = buildSentenceBlock(line);
+            replaceSkeleton(item.anchor, node);
+            this.track(item.id, node);
+            lastText = result.translation;
+            injectedSomething = true;
+          } else {
+            replaceSkeleton(item.anchor, null);
+          }
+          newCache.set(cacheKey(item.text, language, 'word'), { translation: result.translation, pairs: result.pairs });
+        }
+        const swPerf = aligned.perf;
+        bilingualLog.content(
+          `word batch: ${toTranslate.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
+          swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
+        );
+      } else {
+        const translated = await this.translateItems(toTranslate);
+        if (this.generation !== generation) {
+          for (const sk of skeletonByAnchor.values()) sk.remove();
+          return;
+        }
+        let lastText: string | null = null;
+        for (const item of toTranslate) {
+          const translation = translated.map.get(item.id);
+          if (!translation) continue;
+          if (translation === lastText) {
+            replaceSkeleton(item.anchor, null);
+            continue;
+          }
+          lastText = translation;
+          const node = buildSentenceBlock(translation);
           replaceSkeleton(item.anchor, node);
           this.track(item.id, node);
-          lastText = result.translation;
           injectedSomething = true;
-        } else {
-          replaceSkeleton(item.anchor, null);
+          newCache.set(cacheKey(item.text, language, 'sentence'), { translation, pairs: null });
         }
+        const swPerf = translated.perf;
+        bilingualLog.content(
+          `sentence batch: ${toTranslate.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
+          swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
+        );
       }
-      const swPerf = aligned.perf;
-      bilingualLog.content(
-        `word batch: ${items.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
-        swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
-      );
-    } else {
-      const translated = await this.translateItems(items);
-      if (this.generation !== generation) {
-        for (const sk of skeletonByAnchor.values()) sk.remove();
-        return;
-      }
-      let lastText: string | null = null;
-      for (const item of items) {
-        const translation = translated.map.get(item.id);
-        if (!translation) continue;
-        if (translation === lastText) {
-          replaceSkeleton(item.anchor, null);
-          continue;
-        }
-        lastText = translation;
-        const node = buildSentenceBlock(translation);
-        replaceSkeleton(item.anchor, node);
-        this.track(item.id, node);
-        injectedSomething = true;
-      }
-      const swPerf = translated.perf;
-      bilingualLog.content(
-        `sentence batch: ${items.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
-        swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
-      );
+      if (newCache.size > 0) await translationCache.set(newCache);
     }
 
-    timer?.stop(`items=${items.length}`);
     for (const b of pending) this.translatedBlockIds.add(b.id);
 
     if (!injectedSomething && this.lastError) {
@@ -306,6 +341,25 @@ export class InlineReader {
     } else if (injectedSomething) {
       this.hideBanner();
     }
+  }
+
+  /**
+   * Render one translated item from a cached or fresh result. Shared by the cache
+   * fast-path and (for the gloss) the live align path.
+   */
+  private renderItem(
+    item: { id: string; text: string; anchor: HTMLElement },
+    translation: string,
+    pairs: Array<{ source: string; target: string }> | null,
+    cacheKeyForTrack: string,
+  ): void {
+    if (pairs && pairs.length > 0 && this.mode === 'word') {
+      this.applyWordGloss(item, { id: item.id, text: item.text, pairs, translation });
+    }
+    if (!translation) return;
+    const node = buildSentenceBlock(translation);
+    item.anchor.after(node);
+    this.track(cacheKeyForTrack, node);
   }
 
   /** Build a shimmering placeholder line shown while a block is translating. */
