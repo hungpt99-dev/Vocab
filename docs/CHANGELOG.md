@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Vocabulary normalization pipeline (VOC-140):** saving a word now runs it through a
+  normalization → linguistic-analysis pipeline that resolves a canonical lemma and word-family (`familyId`)
+  and de-duplicates by `(userId, familyId)`. The linguistic stage is AI-backed (prompted in the word's own
+  language, no English-only rules) and degrades gracefully to a non-destructive identity when no AI
+  provider is configured. `VocabularyEntry` gains `surfaceForm`, `normalizedForm`, `lemma`, `familyId`,
+  `partOfSpeech` and `userId`; the DB adds a unique `[userId+familyId]` index so concurrent saves cannot
+  create duplicate concepts.
 - Chrome Web Store release assets: `docs/STORE_LISTING.md` (paste-ready listing
   copy), `docs/PRIVACY.md` (complete data-use disclosure + store-form answers),
   and `store-assets/` (1280×800 screenshots plus a 1400×560 banner and 440×280

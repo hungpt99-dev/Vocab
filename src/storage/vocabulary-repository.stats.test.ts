@@ -3,6 +3,7 @@ import { VocabularyRepository } from './vocabulary-repository';
 import { createDatabase, type VocabularyDatabase } from './database';
 import { createId } from '@/shared/lib/id';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 function daysAgo(n: number): number {
   const d = new Date();
@@ -12,22 +13,13 @@ function daysAgo(n: number): number {
 }
 
 async function seed(db: VocabularyDatabase, word: string, createdAt: number): Promise<void> {
-  const entry: VocabularyEntry = {
+  const entry: VocabularyEntry = makeVocabularyEntry({
     id: createId(),
     word,
     wordKey: word.toLowerCase(),
-    phrase: '',
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
-    note: '',
-    tags: [],
-    favorite: false,
-    sourceLanguage: '',
-    explanation: null,
     createdAt,
     updatedAt: createdAt,
-  };
+  });
   await db.vocabulary.add(entry);
 }
 

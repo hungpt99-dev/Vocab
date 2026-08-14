@@ -4,6 +4,7 @@ import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { SelectionPopover } from './selection-popover';
 import type { MoreMenu } from './more-menu';
+import { makeVocabularyEntry } from '@/test/factories';
 
 const explanation: Explanation = {
   meaning: 'A fortunate accident.',
@@ -21,22 +22,15 @@ const explanation: Explanation = {
   generatedAt: 1,
 };
 
-const entry: VocabularyEntry = {
+const entry: VocabularyEntry = makeVocabularyEntry({
   id: '1',
   word: 'serendipity',
   wordKey: 'serendipity',
-  phrase: '',
   sentence: 'Pure serendipity.',
   sourceUrl: 'https://example.com',
   sourceTitle: 'Example',
-  note: '',
-  tags: [],
-  favorite: false,
   sourceLanguage: 'en',
-  explanation: null,
-  createdAt: 1,
-  updatedAt: 1,
-};
+});
 
 function makeDeps() {
   const anchor = document.createElement('button');

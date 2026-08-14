@@ -2,27 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LibraryList } from './LibraryList';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-const entry: VocabularyEntry = {
+const entry: VocabularyEntry = makeVocabularyEntry({
   id: 'e1',
   word: 'alpha',
   wordKey: 'alpha',
-  phrase: '',
-  sentence: '',
-  sourceUrl: '',
-  sourceTitle: '',
-  note: '',
-  tags: [],
-  favorite: false,
-  sourceLanguage: '',
-  explanation: null,
-  createdAt: 1,
-  updatedAt: 1,
-};
+});
 
 const handlers = {
   onUpdate: vi.fn(async () => undefined),

@@ -1,19 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildQuiz } from './quiz';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 function entry(word: string, translation: string, meaning = ''): VocabularyEntry {
-  return {
+  return makeVocabularyEntry({
     id: `id-${word}`,
     word,
     wordKey: `key-${word}`,
-    phrase: '',
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
-    note: '',
-    tags: [],
-    favorite: false,
     sourceLanguage: 'en',
     explanation: {
       meaning: meaning || translation,
@@ -32,7 +26,7 @@ function entry(word: string, translation: string, meaning = ''): VocabularyEntry
     },
     createdAt: 1,
     updatedAt: 1,
-  };
+  });
 }
 
 describe('buildQuiz', () => {

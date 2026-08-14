@@ -3,24 +3,16 @@ import { createDatabase } from '@/storage/database';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { ReviewRepository } from '@/storage/review-repository';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import { makeVocabularyEntry } from '@/test/factories';
 
 function makeEntry(word: string): VocabularyEntry {
-  return {
+  return makeVocabularyEntry({
     id: `id-${word}`,
     word,
     wordKey: `key-${word}`,
-    phrase: '',
     note: '',
-    explanation: null,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    favorite: false,
-    tags: [],
-    sentence: '',
-    sourceUrl: '',
-    sourceTitle: '',
     sourceLanguage: 'en',
-  };
+  });
 }
 
 describe('ReviewRepository', () => {
