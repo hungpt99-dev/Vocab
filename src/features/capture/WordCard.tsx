@@ -5,6 +5,7 @@ import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
 import { Spinner } from '@/shared/ui/Spinner';
 import { BookMarkedIcon, SettingsIcon, WandIcon } from '@/shared/ui/Icons';
+import { PronunciationButton } from '@/features/pronunciation/PronunciationButton';
 import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 
 export interface WordCardProps {
@@ -72,7 +73,10 @@ export function WordCard({
     <div className="border-b border-slate-200 p-3 dark:border-slate-700">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">{text}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">{text}</p>
+            <PronunciationButton word={text} language={selection?.sourceLanguage ?? ''} />
+          </div>
           {translating && (
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
               <Spinner /> Translating…

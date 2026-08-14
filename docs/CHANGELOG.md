@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Pronunciation / speaker button (VOC-142):** a reusable `PronunciationButton`
+  (`src/features/pronunciation/PronunciationButton.tsx`) plays a saved word's
+  pronunciation in its *own* language. It is wired into the library `EntryCard`
+  and the popup `WordCard` (next to the word). Language is taken from the entry's
+  existing `sourceLanguage` metadata (reusing `toLocale()` from `language-codes.ts`
+  to expand a name/code to a BCP-47 locale), never hardcoded to English.
+- **`PronunciationService`** (`src/features/pronunciation/pronunciation-service.ts`):
+  wraps the browser `SpeechSynthesis` API. Owns voice selection (exact locale →
+  same-language family → none), speech lifecycle, cancellation, capability
+  detection and error handling. A shared singleton guarantees only one utterance
+  plays at a time; starting another word cancels the current one. Voice selection
+  never falls back to an unrelated language — if no matching voice exists the
+  button shows a graceful "pronunciation unavailable" state instead of mispronouncing.
+  Uses `lucide-react` icons only (`Volume2` idle/playing, `Loader2` loading,
+  `VolumeX` error) — no emoji/unicode.
+
 ### Fixed
 - **Bilingual re-translation on reopen (VOC-141):** reopening a translated page (reload, or switching
   tabs away and back) no longer re-runs the whole translation pipeline. A per-session cache
