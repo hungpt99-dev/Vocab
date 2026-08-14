@@ -11,6 +11,23 @@ vi.mock('@/storage/settings-repository', () => ({
   settingsRepository: { get: vi.fn() },
 }));
 
+// Controllable in-memory translation cache so we can prove the reopen path
+// reuses prior results instead of re-calling the AI.
+const cacheStore = new Map<string, string>();
+vi.mock('./translation-cache', () => ({
+  cacheKey: (text: string, language: string, mode: string) => `${mode}|${language}|${text}`,
+  translationCache: {
+    async get(keys: string[]) {
+      const out = new Map<string, unknown>();
+      for (const k of keys) if (cacheStore.has(k)) out.set(k, JSON.parse(cacheStore.get(k)!));
+      return out;
+    },
+    async set(entries: Map<string, unknown>) {
+      for (const [k, v] of entries) cacheStore.set(k, JSON.stringify(v));
+    },
+  },
+}));
+
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** Control when sendMessage resolves so we can freeze injectAll mid-flight. */
@@ -94,6 +111,7 @@ describe('InlineReader bilingual injection', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    cacheStore.clear();
     document.body.innerHTML = '';
   });
 
@@ -324,5 +342,34 @@ describe('InlineReader bilingual injection', () => {
     expect(document.querySelectorAll('.avs-skeleton-line').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
     expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
+  });
+
+  it('reuses cached translations on reopen instead of re-calling the AI', async () => {
+    const reader = new InlineReader();
+
+    // First open: nothing cached yet, so align-words IS called.
+    resolveSend(glossResponse());
+    await reader.open();
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    const aiCallsFirstOpen = vi.mocked(sendMessage).mock.calls.length;
+
+    reader.close();
+
+    // Simulate the page reopening (e.g. tab switch back, or a reload): a fresh
+    // reader instance, but the session cache persists the prior translations.
+    const reader2 = new InlineReader();
+    resolveSend(glossResponse());
+    await reader2.open();
+    await flush();
+    await flush();
+
+    // Translations are present again...
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    // ...but the AI was NOT called a second time — the cache served them.
+    expect(vi.mocked(sendMessage).mock.calls.length).toBe(aiCallsFirstOpen);
+
+    reader2.close();
   });
 });

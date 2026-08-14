@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Bilingual re-translation on reopen (VOC-141):** reopening a translated page (reload, or switching
+  tabs away and back) no longer re-runs the whole translation pipeline. A per-session cache
+  (`src/content/reading/translation-cache.ts`, backed by `chrome.storage.session`) stores each
+  translated unit keyed by `sourceText + targetLanguage + mode`, so a reopened page reuses the prior
+  translation instantly — no second AI call, no skeleton flash. New or changed content still translates
+  fresh. The in-memory `translatedBlockIds` guard remains as the per-session fast path.
+
 ### Added
 - **Vocabulary normalization pipeline (VOC-140):** saving a word now runs it through a
   normalization → linguistic-analysis pipeline that resolves a canonical lemma and word-family (`familyId`)
