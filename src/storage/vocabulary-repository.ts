@@ -34,6 +34,20 @@ export class VocabularyRepository {
    * compound index that turns a concurrent second insert into a constraint
    * violation rather than a duplicate row.
    */
+  /**
+   * Merge a new save into an existing word-family entry.
+   *
+   * The canonical concept fields (`lemma`, `familyId`, `partOfSpeech`,
+   * `normalizedForm`) always adopt the latest linguistic analysis so the family
+   * stays internally consistent. The *display* surface fields are the trap: when
+   * the incoming word differs from the existing one's surface form (e.g. the
+   * user highlighted "apple" on the page but "apples" was already saved — both
+   * resolve to the same family), the latest save must win the visible `word`,
+   * `surfaceForm` and `wordKey`. Otherwise the popup would report "Saved apple"
+   * while the library keeps showing "apples", which reads as "it saved a
+   * different word". When the incoming word is the same as the existing surface
+   * form we keep the original (re-saving the same word must not churn it).
+   */
   async save(input: NewVocabularyEntry): Promise<VocabularyEntry> {
     const word = collapseWhitespace(input.word);
     if (!word) throw new Error('Cannot save an empty word');
@@ -48,26 +62,7 @@ export class VocabularyRepository {
     const existing = await this.findByFamily(userId, normalized.familyId);
 
     if (existing) {
-      const merged: VocabularyEntry = {
-        ...existing,
-        phrase: input.phrase ?? existing.phrase,
-        sentence: input.sentence ? collapseWhitespace(input.sentence) : existing.sentence,
-        sourceUrl: input.sourceUrl ?? existing.sourceUrl,
-        sourceTitle: input.sourceTitle ?? existing.sourceTitle,
-        note: input.note ?? existing.note,
-        tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
-        favorite: input.favorite ?? existing.favorite,
-        sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
-        // Enrich the canonical fields from the latest encounter, but never
-        // overwrite the user's original surface form.
-        surfaceForm: existing.surfaceForm || normalized.surfaceForm,
-        normalizedForm: normalized.normalizedForm,
-        lemma: normalized.lemma,
-        familyId: normalized.familyId,
-        partOfSpeech: normalized.partOfSpeech,
-        explanation: input.explanation ?? existing.explanation,
-        updatedAt: now,
-      };
+      const merged = mergeIntoExisting(existing, input, normalized, now);
       await this.db.vocabulary.put(merged);
       return merged;
     }
@@ -107,24 +102,7 @@ export class VocabularyRepository {
         if (existing) {
           // Merge the new encounter's fields into the surviving entry so the
           // caller still gets an up-to-date record.
-          const merged = {
-            ...existing,
-            phrase: input.phrase ?? existing.phrase,
-            sentence: input.sentence ? collapseWhitespace(input.sentence) : existing.sentence,
-            sourceUrl: input.sourceUrl ?? existing.sourceUrl,
-            sourceTitle: input.sourceTitle ?? existing.sourceTitle,
-            note: input.note ?? existing.note,
-            tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
-            favorite: input.favorite ?? existing.favorite,
-            sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
-            surfaceForm: existing.surfaceForm || normalized.surfaceForm,
-            normalizedForm: normalized.normalizedForm,
-            lemma: normalized.lemma,
-            familyId: normalized.familyId,
-            partOfSpeech: normalized.partOfSpeech,
-            explanation: input.explanation ?? existing.explanation,
-            updatedAt: now,
-          };
+          const merged = mergeIntoExisting(existing, input, normalized, now);
           await this.db.vocabulary.put(merged);
           concurrencyMerged = merged;
           return;
@@ -322,6 +300,61 @@ export class VocabularyRepository {
     }
     return { imported, skipped };
   }
+}
+
+/**
+ * Merge a new save into an existing word-family entry.
+ *
+ * The canonical concept fields (`lemma`, `familyId`, `partOfSpeech`,
+ * `normalizedForm`) always adopt the latest linguistic analysis so the family
+ * stays internally consistent. The *display* surface fields are the trap: when
+ * the incoming word differs from the existing one's surface form (e.g. the user
+ * highlighted "apple" on the page but "apples" was already saved — both resolve
+ * to the same family), the latest save must win the visible `word`,
+ * `surfaceForm` and `wordKey`. Otherwise the popup would report "Saved apple"
+ * while the library keeps showing "apples", which reads as "it saved a
+ * different word". When the incoming word is the same as the existing surface
+ * form we keep the original (re-saving the same word must not churn it).
+ */
+function mergeIntoExisting(
+  existing: VocabularyEntry,
+  input: NewVocabularyEntry,
+  normalized: NormalizedWord,
+  now: number,
+): VocabularyEntry {
+  const incomingWord = collapseWhitespace(input.word);
+  // Treat two saves as "the same word" when their normalized forms match
+  // (case-insensitive, punctuation-stripped) — e.g. "Apples" vs "apples".
+  // Only when the incoming normalized form is genuinely different from the
+  // existing one (e.g. the highlighted "apple" vs the saved "apples") does the
+  // latest save take over the visible surface fields. This avoids both the
+  // original bug (wrong word shown) and needless churn on a same-word re-save.
+  const isNewSurfaceForm = normalized.normalizedForm !== existing.wordKey;
+  const displayWord = isNewSurfaceForm ? incomingWord : existing.word;
+  const displaySurfaceForm = isNewSurfaceForm ? normalized.surfaceForm : existing.surfaceForm;
+
+  return {
+    ...existing,
+    word: displayWord,
+    wordKey: normalizeWord(displayWord),
+    surfaceForm: displaySurfaceForm,
+    phrase: input.phrase ?? existing.phrase,
+    sentence: input.sentence ? collapseWhitespace(input.sentence) : existing.sentence,
+    sourceUrl: input.sourceUrl ?? existing.sourceUrl,
+    sourceTitle: input.sourceTitle ?? existing.sourceTitle,
+    note: input.note ?? existing.note,
+    tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
+    favorite: input.favorite ?? existing.favorite,
+    sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
+    // Canonical concept fields adopt the latest analysis (the family identity
+    // never changes on merge, but the lemma/POS may refine).
+    normalizedForm: normalized.normalizedForm,
+    lemma: normalized.lemma,
+    familyId: normalized.familyId,
+    partOfSpeech: normalized.partOfSpeech,
+    explanation: input.explanation ?? existing.explanation,
+    updatedAt: now,
+  };
 }
 
 function matchesTerm(entry: VocabularyEntry, term: string): boolean {
