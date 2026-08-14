@@ -260,6 +260,31 @@ describe('HoverCard', () => {
     }
   });
 
+  it('cancels a pending hide when the cursor enters the card itself', () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = '<mark id="m">serendipity</mark>';
+      const anchor = document.getElementById('m') as HTMLElement;
+      const card = new HoverCard();
+      card.show(anchor, entry);
+      const element = document.getElementById('avs-hover-card') as HTMLElement;
+      expect(element.hidden).toBe(false);
+
+      // Cursor leaves the word and a deferred hide is armed…
+      card.scheduleHide();
+      vi.advanceTimersByTime(50);
+      // …then the cursor enters the card (the gap is crossed). The hide must
+      // be cancelled so the card stays open while the user interacts with it.
+      element.dispatchEvent(new MouseEvent('mouseenter'));
+      vi.advanceTimersByTime(300);
+      expect(element.hidden).toBe(false);
+
+      card.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('renders a pronunciation speaker button for the word', async () => {
     const { act } = await import('react-dom/test-utils');
     // jsdom has no SpeechSynthesis; stub it so PronunciationButton is enabled.

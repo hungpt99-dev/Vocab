@@ -95,8 +95,23 @@ export function injectStyles(doc: Document = document): void {
       font-size: var(${CARD_FONT_SIZE_VAR}, 1rem);
       line-height: var(${CARD_SPACING_VAR}, 1.5);
       box-shadow: ${elevation.overlay};
-      pointer-events: none;
+      pointer-events: auto;
     }
+    /* Invisible bridges above/below the card so the cursor can travel from the
+       highlighted word onto the card without crossing a dead gap that would
+       close it. Without these, mouseleave fires in the gap and the deferred
+       hide wins before the card is reached. */
+    .avs-card::before,
+    .avs-card::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 16px;
+      pointer-events: auto;
+    }
+    .avs-card::before { top: -16px; }
+    .avs-card::after { bottom: -16px; }
     .avs-card[hidden] { display: none; }
     .avs-card-word { font-weight: 600; margin-bottom: ${spacing.xs}; }
     .avs-card-word-row { display: flex; align-items: center; gap: ${spacing.xs}; margin-bottom: ${spacing.xs}; }

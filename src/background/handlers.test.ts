@@ -55,8 +55,8 @@ beforeEach(async () => {
       remove: vi.fn(async () => undefined),
     } as unknown as import('@/storage/review-repository').ReviewRepository,
     explain: Object.assign(new ExplainService(settings), {
-      explain: vi.fn(async () => explanation),
-      explainWith: vi.fn(async () => explanation),
+      explain: vi.fn(async () => ({ ...explanation })),
+      explainWith: vi.fn(async () => ({ ...explanation })),
     }) as unknown as ExplainService,
     translate: {
       translate: vi.fn(async () => []),
@@ -399,6 +399,52 @@ describe('createHandlers', () => {
       sender,
     );
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
+  });
+
+  it('fills a missing translation via keyless Google when the target language is not English', async () => {
+    // The AI returned no `translation`; the user's target language is Vietnamese.
+    await deps.settings.update({ targetLanguage: 'Vietnamese' });
+    (deps.translate.translate as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'w', text: 'cake', translation: 'bánh' },
+    ]);
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'cake' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: true, data: { translation: 'bánh' } });
+    expect(deps.translate.translate).toHaveBeenCalledWith(
+      [{ id: 'w', text: 'cake' }],
+      'Vietnamese',
+    );
+  });
+
+  it('does not translate when the AI already returned a translation', async () => {
+    await deps.settings.update({ targetLanguage: 'Vietnamese' });
+    // Use a one-off explanation fixture that already has a translation so we do
+    // not mutate the shared `explanation` object used by other tests.
+    (deps.explain.explain as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...explanation,
+      translation: 'bánh',
+    });
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'cake' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: true, data: { translation: 'bánh' } });
+    expect(deps.translate.translate).not.toHaveBeenCalled();
+  });
+
+  it('does not translate when the target language is English', async () => {
+    await deps.settings.update({ targetLanguage: 'English' });
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'cake' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: true, data: { translation: '' } });
+    expect(deps.translate.translate).not.toHaveBeenCalled();
   });
 
   it('handles explain with an analysis kind', async () => {

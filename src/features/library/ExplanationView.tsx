@@ -19,6 +19,11 @@ export function ExplanationView({ explanation }: { explanation: Explanation }) {
   return (
     <div className="mt-2 rounded-md bg-slate-50 p-2 dark:bg-slate-800">
       <p className="text-xs font-medium text-slate-800 dark:text-slate-100">{explanation.meaning}</p>
+      {explanation.translation && (
+        <p className="mt-1 text-xs font-medium text-brand-600 dark:text-brand-300">
+          {explanation.translation}
+        </p>
+      )}
       {explanation.simpleExplanation !== explanation.meaning && (
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{explanation.simpleExplanation}</p>
       )}

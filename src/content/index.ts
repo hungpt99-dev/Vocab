@@ -515,13 +515,19 @@ function attachHoverListeners(): void {
       showTranslation: isReadingActiveOnHost(settings, location.hostname),
     });
   };
-  const closeFor = (): void => {
-    // Defer closing so the user can move the cursor across the gap onto the card.
-    hoverCard.scheduleHide();
+  const closeFor = (event?: MouseEvent | FocusEvent): void => {
+    // If the cursor is heading onto the card (or another highlight) don't close;
+    // the card's own mouseenter keeps it open. Only defer when leaving toward the
+    // page, so the user has time to cross the gap onto the card.
+    const next = event instanceof MouseEvent ? event.relatedTarget : null;
+    if (next instanceof Node && (hoverCard.contains(next) || (next as Element).closest?.(`.${HIGHLIGHT_CLASS}`))) {
+      return;
+    }
+    hoverCard.scheduleHide(220);
   };
 
   document.addEventListener('mouseover', (event) => openFor(event.target));
-  document.addEventListener('mouseout', () => closeFor());
+  document.addEventListener('mouseout', (event) => closeFor(event));
   document.addEventListener('focusin', (event) => openFor(event.target));
   document.addEventListener('focusout', () => closeFor());
   document.addEventListener('keydown', (event) => {

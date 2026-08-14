@@ -123,6 +123,21 @@ export async function explainWord(
     language: language ?? (settings.targetLanguage || 'English'),
     promptTemplate: settings.explainPromptTemplate,
   });
+
+  // The explain prompt asks the model for a target-language `translation`, but
+  // models frequently return it empty. Fall back to the keyless Google
+  // translator (same path as bilingual reading, VOC-101) so the card's
+  // "Translation" row is never silently missing when the user wants one.
+  const target = settings.targetLanguage || 'English';
+  if (!explanation.translation && target.toLowerCase() !== 'english') {
+    try {
+      const [result] = await deps.translate.translate([{ id: 'w', text: word }], target);
+      explanation.translation = result?.translation ?? '';
+    } catch {
+      // Translation is best-effort; leave it empty if the network call fails.
+    }
+  }
+
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
     await deps.vocabulary.update(existing.id, { explanation });
