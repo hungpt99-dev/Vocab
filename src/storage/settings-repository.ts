@@ -40,8 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
-  bilingualMode: true,
-  bilingualDomains: [],
+  readingMode: 'everywhere',
+  allowedDomains: [],
   popupShowTranslation: true,
   popupShowSimplify: true,
   popupDefaultTab: 'library',
@@ -55,8 +55,6 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   radar: {
     goal: '',
-    autoScan: false,
-    domains: [],
   },
 };
 
@@ -84,23 +82,53 @@ export const LANGUAGES: readonly string[] = [
   'Czech',
 ];
 
-/** Promote the VOC-133 `goalMode` fields into the VOC-134 `radar` shape.
- * The old goal *text* lived in IndexedDB (a separate "Goal" tab); Radar now
- * keeps the goal text in Settings, so we intentionally do not port it — the
- * user re-enters it. We do preserve their auto-scan + domain preferences. */
+/**
+ * Promote the VOC-133 `goalMode` / VOC-134 `radar` fields plus the legacy
+ * `bilingualMode`/`bilingualDomains` into the unified reading model
+ * (`readingMode` + `allowedDomains`). Both Bilingual and Radar are now driven
+ * by the single tri-state `readingMode`, so:
+ *   - `bilingualMode` true (or `radar.autoScan` true) → 'everywhere' unless a
+ *     domain list was in use, in which case 'allowed' + migrated domains.
+ *   - otherwise → 'off'.
+ * The Radar goal text is intentionally NOT ported (it lived in IndexedDB and the
+ * user re-enters it in Settings); we only preserve scope/domain preferences.
+ */
 function migrateRadar(value: Partial<Settings>): Partial<Settings> {
-  const legacy = value as Partial<Settings> & { goalMode?: { autoScan?: boolean; domains?: string[] } };
-  if (legacy.goalMode && !('radar' in value)) {
-    return {
-      ...value,
-      radar: {
-        goal: '',
-        autoScan: Boolean(legacy.goalMode.autoScan),
-        domains: Array.isArray(legacy.goalMode.domains) ? legacy.goalMode.domains : [],
-      },
-    };
-  }
-  return value;
+  const legacy = value as Partial<Settings> & {
+    goalMode?: { autoScan?: boolean; domains?: string[] };
+    bilingualMode?: boolean;
+    bilingualDomains?: string[];
+    radar?: { goal?: string; autoScan?: boolean; domains?: string[] };
+  };
+
+  // Already on the new shape (has readingMode) — nothing to migrate.
+  if ('readingMode' in value) return value;
+
+  const radarLegacy = legacy.radar ?? legacy.goalMode;
+  const hadDomains =
+    (Array.isArray(legacy.bilingualDomains) && legacy.bilingualDomains.length > 0) ||
+    (Array.isArray(radarLegacy?.domains) && radarLegacy.domains.length > 0);
+  const wasOn =
+    legacy.bilingualMode === true ||
+    radarLegacy?.autoScan === true ||
+    (typeof legacy.bilingualMode === 'undefined' && legacy.bilingualDomains?.length);
+
+  const readingMode: Settings['readingMode'] = hadDomains
+    ? 'allowed'
+    : wasOn
+      ? 'everywhere'
+      : 'off';
+
+  const allowedDomains = [
+    ...(legacy.bilingualDomains ?? []),
+    ...(radarLegacy?.domains ?? []),
+  ].filter((domain, index, all) => Boolean(domain) && all.indexOf(domain) === index);
+
+  return {
+    ...value,
+    readingMode,
+    allowedDomains,
+  };
 }
 
 /** Promote the old single-provider fields into the new providers array. */

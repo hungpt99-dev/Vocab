@@ -11,7 +11,7 @@ function seedSettings(overrides: Record<string, unknown> = {}): void {
     ...DEFAULT_SETTINGS,
     providers: [{ id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'sk-test', enabled: true }],
     activeProviderId: 'p1',
-    radar: { goal: 'backend engineering', autoScan: false, domains: [] },
+    radar: { goal: 'backend engineering' },
     ...overrides,
   };
   void chromeMock().storage.local.set({ 'avs:settings': settings });
@@ -57,7 +57,7 @@ describe('RadarPanel — Quick Search', () => {
   });
 
   it('does NOT intercept Ctrl/Cmd+F when no Radar goal is set', async () => {
-    seedSettings({ radar: { goal: '', autoScan: false, domains: [] } });
+    seedSettings({ radar: { goal: '' } });
     await act(async () => {
       render(<RadarPanel />);
     });

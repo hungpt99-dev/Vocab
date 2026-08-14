@@ -86,8 +86,8 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
   return {
     enabled: settings.highlightEnabled,
     color: settings.highlightColor,
-    bilingualMode: settings.bilingualMode,
-    bilingualDomains: settings.bilingualDomains,
+    readingMode: settings.readingMode,
+    allowedDomains: settings.allowedDomains,
     targetLanguage: settings.targetLanguage,
     readingExperience: settings.readingExperience,
     entries: entries.map((entry) => ({

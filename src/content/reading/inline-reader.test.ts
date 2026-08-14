@@ -64,7 +64,7 @@ function glossResponse(): WordAlignResult[] {
 
 function stubSettings(): void {
   vi.spyOn(settingsRepository, 'get').mockResolvedValue({
-    bilingualMode: true,
+    readingMode: 'everywhere',
     targetLanguage: 'Vietnamese',
   } as never);
 }

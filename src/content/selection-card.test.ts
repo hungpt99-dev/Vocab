@@ -95,6 +95,23 @@ describe('SelectionCard', () => {
     expect(document.querySelectorAll('#avs-selection-card')).toHaveLength(0);
   });
 
+  it('mounts a speaker (pronunciation) button into the header', async () => {
+    const card = new SelectionCard();
+    card.show(makeState('serendipity'));
+    const el = document.getElementById('avs-selection-card')!;
+    // Word + speaker share the first header row; translation sits below.
+    const wordRow = el.querySelector('.avs-selection-card-word-row')!;
+    expect(wordRow.querySelector('[data-role="word"]')?.textContent).toBe('serendipity');
+    const speaker = el.querySelector('.avs-selection-card-speaker')!;
+    // The shared PronunciationButton (a real React button) is mounted into the
+    // host — give React a tick to commit it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const speakerBtn = speaker.querySelector('button');
+    expect(speakerBtn).not.toBeNull();
+    expect(speakerBtn?.getAttribute('aria-label') ?? '').toMatch(/pronunciation/i);
+    card.destroy();
+  });
+
   it('does not show a stale explain result after opening another word', async () => {
     let resolveA!: (value: unknown) => void;
     vi.mocked(sendMessage).mockImplementation((async (message: { type: string }) => {

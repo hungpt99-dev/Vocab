@@ -4,9 +4,12 @@ import type { Explanation } from '@/shared/types/vocabulary';
 import type { XRayReadingResult } from '@/shared/types/xray';
 import { aiErrorMessage } from '@/ai/types';
 import type { SelectionPayload } from '@/shared/messaging/contract';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { computePosition } from './hover-card';
 import { sendMessage } from '@/shared/messaging/client';
 import { toExplainUnit } from './explain-popover';
+import { PronunciationButton } from '@/features/pronunciation/PronunciationButton';
 import {
   ICON_BOOKMARK,
   ICON_COPY,
@@ -50,6 +53,8 @@ export class SelectionCard {
   private body: HTMLElement | null = null;
   private buttons: HTMLButtonElement[] = [];
   private state: CardState | null = null;
+  /** React root hosting the PronunciationButton (speaker) in the card header. */
+  private speakerRoot: Root | null = null;
   /** Monotonic id for the current selection; stale async results are discarded. */
   private selectionToken = 0;
   /** Analysis currently in flight, so a second click cannot fire a duplicate request. */
@@ -73,17 +78,26 @@ export class SelectionCard {
     card.setAttribute('aria-label', 'Selected text');
     card.hidden = true;
 
-    // Header: word + translation.
+    // Header: word + speaker on one row, translation below. The speaker reuses
+    // the same PronunciationButton (icon + speech logic) as the popup/hover
+    // card, mounted into a host div so it can speak the word in its own
+    // language without reimplementing the button here.
     const header = document.createElement('div');
     header.className = 'avs-selection-card-header';
+    const wordRow = document.createElement('div');
+    wordRow.className = 'avs-selection-card-word-row';
     const word = document.createElement('div');
     word.className = 'avs-selection-card-word';
     word.dataset.role = 'word';
+    const speaker = document.createElement('div');
+    speaker.className = 'avs-selection-card-speaker';
+    speaker.setAttribute('role', 'presentation');
+    wordRow.append(word, speaker);
     const translation = document.createElement('div');
     translation.className = 'avs-selection-card-translation';
     translation.dataset.role = 'translation';
     translation.textContent = 'Translating…';
-    header.append(word, translation);
+    header.append(wordRow, translation);
     card.append(header);
 
     // Actions row.
@@ -147,6 +161,11 @@ export class SelectionCard {
       translationEl.textContent = 'Translating…';
       void this.loadTranslation(state.text, translationEl);
     }
+    // Mount the reusable PronunciationButton (same component/icon/speech as the
+    // React UIs) into the header host so the selection card can speak the word
+    // too. Safe to mount with an empty language: the button disables itself
+    // until the selection's source language is known.
+    this.mountSpeaker(state.text, state.selection?.sourceLanguage ?? '');
     if (!sameSelection) {
       // A new selection ends any in-flight analysis for the previous one.
       this.pendingKind = null;
@@ -270,6 +289,30 @@ export class SelectionCard {
     button.classList.toggle('avs-selection-card-btn--loading', loading);
     button.toggleAttribute('disabled', loading);
     button.setAttribute('aria-busy', loading ? 'true' : 'false');
+  }
+
+  /**
+   * Mount the shared PronunciationButton into the header host. Re-mounts on
+   * every show so the word/language props stay in sync. The button disables
+   * itself when speech is unsupported or the language is unknown, so it is
+   * safe to always mount (mirrors the popup and hover card).
+   */
+  private mountSpeaker(word: string, language: string): void {
+    const host = this.element?.querySelector<HTMLElement>('.avs-selection-card-speaker');
+    if (!host) return;
+    this.disposeSpeaker();
+    this.speakerRoot = createRoot(host);
+    this.speakerRoot.render(
+      createElement(PronunciationButton, { word, language, className: 'avs-selection-card-speaker-btn' }),
+    );
+  }
+
+  /** Unmount the speaker React root, if any. */
+  private disposeSpeaker(): void {
+    if (this.speakerRoot) {
+      this.speakerRoot.unmount();
+      this.speakerRoot = null;
+    }
   }
 
   /**
@@ -495,6 +538,7 @@ export class SelectionCard {
 
   destroy(): void {
     this.hide();
+    this.disposeSpeaker();
     this.element?.remove();
     this.element = null;
   }

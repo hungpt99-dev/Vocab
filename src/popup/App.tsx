@@ -12,8 +12,7 @@ import { isOnboarded } from '@/shared/lib/onboarding';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, GithubIcon, GlobeIcon, LanguagesIcon, SettingsIcon, SparklesIcon, TargetIcon, UsersIcon, WandIcon } from '@/shared/ui/Icons';
-import { Switch } from '@/shared/ui/Switch';
+import { BookIcon, GithubIcon, SettingsIcon, SparklesIcon, TargetIcon, UsersIcon, WandIcon } from '@/shared/ui/Icons';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
@@ -599,9 +598,8 @@ function LibraryScreen({ onVocabularyChanged }: { onVocabularyChanged?: () => vo
 
 export function App() {
   const { settings, update } = useSettings();
-  const [activating, setActivating] = useState(false);
   const [stats, setStats] = useState<{ total: number; addedToday: number; streak: number } | null>(null);
-  // Hostname of the active tab, used to reflect/steer the per-site auto-bilingual toggle.
+  // Hostname of the active tab, used to reflect/steer the per-site reading scope.
   const [currentHost, setCurrentHost] = useState('');
 
   const refreshStats = useCallback(() => {
@@ -614,8 +612,8 @@ export function App() {
     return () => window.removeEventListener('focus', refreshStats);
   }, [refreshStats]);
 
-  // Track the active tab's hostname so the "Auto site" toggle can show whether
-  // the current site is already auto-enabled.
+  // Track the active tab's hostname so the reading-mode control can reflect and
+  // steer the per-site scope of the shared 'allowed' mode.
   useEffect(() => {
     let cancelled = false;
     void chrome.tabs
@@ -635,21 +633,11 @@ export function App() {
     };
   }, []);
 
-  const autoSiteOn = currentHost ? (settings.bilingualDomains ?? []).includes(currentHost) : false;
+  const currentHostInAllowed = currentHost
+    ? (settings.allowedDomains ?? []).includes(currentHost)
+    : false;
 
-  const toggleBilingual = useCallback(
-    async (next: boolean) => {
-      if (next) setActivating(true);
-      try {
-        await update({ bilingualMode: next });
-      } finally {
-        if (next) setActivating(false);
-      }
-    },
-    [update],
-  );
-
-  const addCurrentSiteToBilingual = useCallback(async () => {
+  const addCurrentSiteToAllowed = useCallback(async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = tab?.url;
     if (!url) return;
@@ -660,22 +648,21 @@ export function App() {
       return;
     }
     if (!hostname) return;
-    const current = settings.bilingualDomains ?? [];
-    if (current.includes(hostname)) return;
-    await update({ bilingualDomains: [...current, hostname] });
-  }, [settings.bilingualDomains, update]);
+    const current = settings.allowedDomains ?? [];
+    const nextDomains = current.includes(hostname) ? current : [...current, hostname];
+    // Adding a site implies at least 'allowed' scope so it actually takes effect.
+    await update({
+      allowedDomains: nextDomains,
+      readingMode: settings.readingMode === 'off' ? 'allowed' : settings.readingMode,
+    });
+  }, [settings.allowedDomains, settings.readingMode, update]);
 
-  const removeCurrentSiteFromBilingual = useCallback(async () => {
+  const removeCurrentSiteFromAllowed = useCallback(async () => {
     const host = currentHost;
     if (!host) return;
-    const current = settings.bilingualDomains ?? [];
-    await update({ bilingualDomains: current.filter((domain) => domain !== host) });
-  }, [currentHost, settings.bilingualDomains, update]);
-
-  const toggleAutoSite = useCallback(() => {
-    if (autoSiteOn) void removeCurrentSiteFromBilingual();
-    else void addCurrentSiteToBilingual();
-  }, [autoSiteOn, addCurrentSiteToBilingual, removeCurrentSiteFromBilingual]);
+    const current = settings.allowedDomains ?? [];
+    await update({ allowedDomains: current.filter((domain) => domain !== host) });
+  }, [currentHost, settings.allowedDomains, update]);
 
   return (
     <ToastProvider>
@@ -714,38 +701,72 @@ export function App() {
             </Button>
           </div>
 
-          {/* Row 2 — Auto site (primary) + Bilingual (secondary) */}
+          {/* Row 2 — unified reading-mode control (Bilingual + Radar scope) */}
           <div className="flex items-center justify-center gap-2 border-t border-slate-100 px-7 py-2 dark:border-slate-800">
-            <span
-              className={`flex shrink-0 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                autoSiteOn
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-900/60 dark:text-brand-200 dark:hover:bg-brand-900'
-              }`}
+            <div
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800"
+              role="radiogroup"
+              aria-label="Reading mode"
+            >
+              {(
+                [
+                  { value: 'off' as const, label: 'Off' },
+                  { value: 'allowed' as const, label: 'Allowed sites' },
+                  { value: 'everywhere' as const, label: 'Everywhere' },
+                ]
+              ).map((option) => {
+                const active = settings.readingMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => void update({ readingMode: option.value })}
+                    title={
+                      option.value === 'off'
+                        ? 'No inline translations or Radar auto-find'
+                        : option.value === 'allowed'
+                          ? 'Translations + Radar auto-find on your allowed sites only'
+                          : 'Translations + Radar auto-find on every page'
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-brand-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Add the current site to the allowed list (only meaningful in 'allowed' mode). */}
+            <button
+              type="button"
+              onClick={() =>
+                currentHostInAllowed ? void removeCurrentSiteFromAllowed() : void addCurrentSiteToAllowed()
+              }
+              disabled={!currentHost}
               title={
-                autoSiteOn
-                  ? `Auto-bilingual is on for ${currentHost || 'this site'} — toggle to turn off`
-                  : 'Auto-enable bilingual mode on the current site'
+                !currentHost
+                  ? 'No active site to add'
+                  : currentHostInAllowed
+                    ? `Remove ${currentHost} from allowed sites`
+                    : `Add ${currentHost} to allowed sites`
+              }
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-base font-semibold transition-colors ${
+                currentHostInAllowed
+                  ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-900/60 dark:text-brand-200'
+                  : 'border-slate-200 text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:text-slate-400'
+              } ${!currentHost ? 'cursor-not-allowed opacity-50' : ''}`}
+              aria-label={
+                currentHostInAllowed ? 'Remove current site from allowed sites' : 'Add current site to allowed sites'
               }
             >
-              <GlobeIcon size={15} className="shrink-0" aria-hidden="true" />
-              <span className="max-[360px]:hidden whitespace-nowrap">Auto site</span>
-              <Switch checked={autoSiteOn} onChange={() => void toggleAutoSite()} label="Auto site" />
-            </span>
-
-            <span
-              className="flex shrink-0 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-              title="Bilingual mode (inline translations)"
-            >
-              <LanguagesIcon size={15} aria-hidden="true" />
-              <span className="max-[360px]:hidden whitespace-nowrap">Bilingual</span>
-              <Switch
-                checked={settings.bilingualMode}
-                loading={activating}
-                onChange={toggleBilingual}
-                label="Bilingual mode"
-              />
-            </span>
+              {currentHostInAllowed ? '−' : '+'}
+            </button>
           </div>
         </header>
 

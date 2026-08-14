@@ -15,7 +15,7 @@ import type { WordAlignResult, BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
 import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
-import { matchesDomain } from '../domain';
+import { isReadingActiveOnHost } from '@/shared/types/settings';
 import { translationCache, cacheKey, type CachedTranslation } from './translation-cache';
 
 /**
@@ -77,9 +77,9 @@ export class InlineReader {
     this.generation += 1;
     this.lastError = null;
 
-    // Bilingual is active when the global switch is on OR the current domain is in
-    // the auto-enable list. The control and translation honour this effective state.
-    const effective = settings.bilingualMode || matchesDomain(location.hostname, settings.bilingualDomains);
+    // Reading aids are active when the tri-state reading mode is on for this
+    // host: 'everywhere' always, 'allowed' only on the shared allowedDomains.
+    const effective = isReadingActiveOnHost(settings, location.hostname);
 
     this.buildControl(effective);
     this.prefsListener = watchReadingPreferences((next) => {

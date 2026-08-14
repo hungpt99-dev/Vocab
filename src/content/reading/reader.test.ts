@@ -155,7 +155,7 @@ describe('BilingualReader', () => {
   it('hides translations when bilingual mode is off', async () => {
     stubTranslate();
     document.body.innerHTML = '<article><p>Hello world.</p></article>';
-    await chromeMock().storage.local.set({ 'avs:settings': { bilingualMode: false } });
+    await chromeMock().storage.local.set({ 'avs:settings': { readingMode: 'off' } });
     const reader = new BilingualReader();
     await reader.open();
 

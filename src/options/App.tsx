@@ -20,7 +20,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: 'providers', label: 'AI providers', icon: KeyIcon },
-  { id: 'bilingual', label: 'Bilingual reading', icon: LanguagesIcon },
+  { id: 'bilingual', label: 'Reading', icon: LanguagesIcon },
   { id: 'radar', label: 'Vocabulary Radar', icon: TargetIcon },
   { id: 'popup', label: 'Popup', icon: SlidersIcon },
   { id: 'appearance', label: 'Appearance', icon: PaletteIcon },

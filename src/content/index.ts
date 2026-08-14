@@ -3,7 +3,7 @@ import { SETTINGS_KEY, settingsRepository } from '@/storage/settings-repository'
 import { sendMessage } from '@/shared/messaging/client';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
-import { isRadarEnabled } from '@/shared/types/settings';
+import { isRadarEnabled, isReadingActiveOnHost } from '@/shared/types/settings';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import {
   highlightRadarRoot,
@@ -284,9 +284,10 @@ async function refresh(): Promise<void> {
     // Non-fatal: gating will assume no AI key until the next refresh.
   }
 
-  // Bilingual (inline) reading is independent of word highlighting: sync it first
-  // so the headbar + inline translations appear even when no words are saved.
-  syncBilingual(data.bilingualMode, data.bilingualDomains);
+  // Bilingual (inline) reading is driven by the shared reading mode: 'everywhere'
+  // always, 'allowed' only on the shared allowedDomains, 'off' never. Sync it
+  // first so the headbar + inline translations appear even when no words are saved.
+  syncBilingual(data.readingMode, data.allowedDomains);
 
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
@@ -363,11 +364,14 @@ async function runRadarAutoScan(): Promise<void> {
     removeRadarHighlights();
     return;
   }
-  // Respect the per-domain allow-list, mirroring bilingualDomains behaviour.
-  const host = location.hostname.replace(/^www\./i, '').toLowerCase();
-  if (settings.radar.domains.length > 0 && !matchesDomain(host, settings.radar.domains)) {
-    removeRadarHighlights();
-    return;
+  // Respect the shared reading scope: 'allowed' limits Radar auto-find to the
+  // shared allowedDomains; 'everywhere' runs it on every readable page.
+  if (settings.readingMode === 'allowed') {
+    const host = location.hostname.replace(/^www\./i, '').toLowerCase();
+    if (!matchesDomain(host, settings.allowedDomains)) {
+      removeRadarHighlights();
+      return;
+    }
   }
 
   try {
@@ -427,18 +431,21 @@ async function reconcileBilingual(): Promise<void> {
   }
 }
 
-function syncBilingual(enabled: boolean, domains: readonly string[]): void {
-  // Auto-enable for configured domains even when the global switch is off.
-  const active = enabled || matchesDomain(location.hostname, domains);
+function syncBilingual(readingMode: 'off' | 'allowed' | 'everywhere', domains: readonly string[]): void {
+  // 'everywhere' → always active here; 'allowed' → only on the shared domain
+  // list; 'off' → never. Reuses the same scope logic as Radar auto-find.
+  const active =
+    readingMode === 'everywhere' ||
+    (readingMode === 'allowed' && matchesDomain(location.hostname, domains));
   bilingualActiveHere = active;
   if (!active) {
-    // Bilingual is off for this page: any local opt-out is moot.
+    // Reading aids are off for this page: any local opt-out is moot.
     localBilingualOff = false;
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
     return;
   }
-  // Bilingual is on, but this tab may have opted out locally.
+  // Reading aids are on, but this tab may have opted out locally.
   if (localBilingualOff) {
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
@@ -505,7 +512,7 @@ function attachHoverListeners(): void {
     const settings = await settingsRepository.get();
     hoverCard.show(mark, entry, {
       showOriginal: true,
-      showTranslation: settings.bilingualMode,
+      showTranslation: isReadingActiveOnHost(settings, location.hostname),
     });
   };
   const closeFor = (): void => {

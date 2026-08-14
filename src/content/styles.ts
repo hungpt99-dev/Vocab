@@ -144,12 +144,25 @@ export function injectStyles(doc: Document = document): void {
       padding: ${spacing.md} ${spacing.lg};
       border-bottom: 1px solid var(--avs-overlay-divider);
     }
+    .avs-selection-card-word-row {
+      display: flex;
+      align-items: center;
+      gap: ${spacing.sm};
+    }
     .avs-selection-card-word {
       font-size: 18px;
       font-weight: 700;
       line-height: 1.25;
       color: var(--avs-overlay-text);
       word-break: break-word;
+    }
+    .avs-selection-card-speaker {
+      display: inline-flex;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .avs-selection-card-speaker-btn {
+      color: var(--avs-overlay-accent);
     }
     .avs-selection-card-translation {
       font-size: 14px;

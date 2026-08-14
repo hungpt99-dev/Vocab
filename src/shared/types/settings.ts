@@ -67,11 +67,20 @@ export interface Settings {
   highlightColor: string;
   /** Ask the AI automatically the first time a word is saved. */
   autoExplainOnSave: boolean;
-  /** Bilingual mode: show translations/meanings inline in the user's language. */
-  bilingualMode: boolean;
-  /** Domains (hostnames) that automatically turn on bilingual mode, regardless
-   *  of the global `bilingualMode` setting. Empty = only the global switch applies. */
-  bilingualDomains: string[];
+  /**
+   * Tri-state reading mode that drives BOTH Bilingual (inline translations) and
+   * Vocabulary Radar auto-find from a single control:
+   *   - 'off'        → no inline translations; Radar auto-find does not run.
+   *   - 'allowed'    → translations + Radar auto-find on `allowedDomains` only.
+   *   - 'everywhere' → translations + Radar auto-find on every readable page.
+   * Replaces the old separate `bilingualMode` global switch and the per-feature
+   * domain lists, so there is one source of truth for where reading aids appear.
+   */
+  readingMode: 'off' | 'allowed' | 'everywhere';
+  /** Hostnames where reading aids (Bilingual + Radar auto-find) activate in
+   *  'allowed' mode. Empty in 'allowed' mode means "nowhere"; in 'everywhere'
+   *  mode it is ignored. Subdomains are included by the matcher. */
+  allowedDomains: string[];
   /** Popup: auto-fetch the keyless translation of the highlighted word on open. */
   popupShowTranslation: boolean;
   /** Popup: show the Simplify action for the highlighted word. */
@@ -84,29 +93,48 @@ export interface Settings {
   /** Reading overlay presentation, applied live to open pages. */
   readingExperience: ReadingExperience;
   /** Vocabulary Radar: a natural-language goal used to surface vocabulary that
-   * is relevant to what you want to learn. Lived as a separate "Goal" tab
-   * (VOC-132), but per user request it now lives in Settings and shares the
-   * per-domain auto behaviour with Bilingual mode (VOC-134). */
+   * is relevant to what you want to learn. Auto-find is governed by the shared
+   * `readingMode` (off / allowed / everywhere) — the same tri-state that drives
+   * Bilingual — so there is a single place to choose where reading aids appear. */
   radar: {
     /** The free-text learning goal (the source of truth for what to find). */
     goal: string;
-    /** Auto-scan + highlight relevant words on pages where Radar is active. */
-    autoScan: boolean;
-    /** Hostnames where auto-scan runs. Empty = every readable page. */
-    domains: string[];
   };
 }
 
 /**
- * True when Radar should actively find vocabulary: a goal must be set, and either
- * the explicit Radar auto-find switch is on OR Bilingual mode is enabled (per the
- * user's request, enabling Bilingual also enables Radar). Mirrors how Bilingual
- * mode is evaluated so the two can be toggled together.
+ * True when Radar should actively find vocabulary: a goal must be set AND the
+ * shared reading mode must be on ('allowed' or 'everywhere'). Mirrors how
+ * Bilingual is now evaluated — both are driven by the single `readingMode`.
  */
 export function isRadarEnabled(settings: Settings): boolean {
   const hasGoal = Boolean(settings.radar?.goal.trim());
   if (!hasGoal) return false;
-  return Boolean(settings.radar?.autoScan || settings.bilingualMode);
+  return settings.readingMode !== 'off';
+}
+
+/**
+ * Whether reading aids (Bilingual inline translations and Radar auto-find)
+ * should be active on the given hostname, given the tri-state `readingMode`:
+ *   - 'off'        → never.
+ *   - 'everywhere' → always.
+ *   - 'allowed'    → only when the hostname matches `allowedDomains`.
+ * `host` should be the lowercased hostname with any leading "www." stripped.
+ */
+export function isReadingActiveOnHost(settings: Settings, host: string): boolean {
+  if (settings.readingMode === 'off') return false;
+  if (settings.readingMode === 'everywhere') return true;
+  return matchesDomainList(host, settings.allowedDomains);
+}
+
+/** Domain matcher used by the reading scope logic. */
+function matchesDomainList(host: string, domains: readonly string[]): boolean {
+  if (domains.length === 0) return false;
+  const normalized = host.replace(/^www\./i, '').toLowerCase();
+  return domains.some((domain) => {
+    const base = domain.replace(/^www\./i, '').toLowerCase();
+    return normalized === base || normalized.endsWith(`.${base}`);
+  });
 }
 
 export type SettingsPatch = Partial<Settings>;

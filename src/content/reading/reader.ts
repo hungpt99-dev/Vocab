@@ -103,7 +103,7 @@ export class BilingualReader {
   private observer: IntersectionObserver | null = null;
   private prefs: ReadingPreferences = DEFAULT_READING_PREFS;
   private language = 'English';
-  private bilingualMode = true;
+  private readingMode: 'off' | 'allowed' | 'everywhere' = 'everywhere';
   private sourceBlocks: ArticleBlock[] = [];
   private matcher: VocabularyMatcher | null = null;
   private previouslyFocused: Element | null = null;
@@ -126,7 +126,7 @@ export class BilingualReader {
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.prefs = prefs;
     this.language = settings.targetLanguage || 'English';
-    this.bilingualMode = settings.bilingualMode;
+    this.readingMode = settings.readingMode;
     this.sourceBlocks = blocks;
 
     const active = document.activeElement;
@@ -519,18 +519,18 @@ export class BilingualReader {
     this.root.className = `avs-reader avs-layout-${this.prefs.layout}`;
   }
 
-  /** Reflect alignment + bilingual mode on the overlay root for CSS and tests. */
+  /** Reflect alignment + reading mode on the overlay root for CSS and tests. */
   private applyAlignmentState(): void {
     if (!this.root) return;
     this.root.dataset.align = this.prefs.alignment;
-    this.root.dataset.bilingual = this.bilingualMode ? 'on' : 'off';
+    this.root.dataset.bilingual = this.readingMode !== 'off' ? 'on' : 'off';
   }
 
-  /** Hide the translation column entirely when bilingual mode is disabled. */
+  /** Hide the translation column entirely when reading mode is off. */
   private applyBilingualState(): void {
     if (!this.root) return;
     for (const col of this.root.querySelectorAll<HTMLElement>('.avs-block-tgt')) {
-      col.hidden = !this.bilingualMode;
+      col.hidden = this.readingMode === 'off';
     }
   }
 

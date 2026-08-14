@@ -99,11 +99,12 @@ export type MessageType = Message['type'];
 export interface HighlightData {
   enabled: boolean;
   color: string;
-  /** Whether bilingual (inline) reading is enabled; the content script shows the
-   * headbar and injects translations on the page when this is true. */
-  bilingualMode: boolean;
-  /** Domains (hostnames) that auto-enable bilingual mode on matching pages. */
-  bilingualDomains: string[];
+  /** Whether the shared reading mode (Bilingual + Radar auto-find) is on for the
+   * current page, computed by the background so the content script doesn't need
+   * to re-derive scope. One of: 'off' | 'allowed' | 'everywhere'. */
+  readingMode: 'off' | 'allowed' | 'everywhere';
+  /** When readingMode is 'allowed', the hostnames reading aids activate on. */
+  allowedDomains: string[];
   /** Target language for inline translations. */
   targetLanguage: string;
   /** Reading overlay presentation, applied live via CSS custom properties. */

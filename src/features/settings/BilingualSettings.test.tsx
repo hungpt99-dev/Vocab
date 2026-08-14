@@ -8,8 +8,8 @@ const baseSettings: Settings = {
   activeProviderId: 'keyless',
   providers: { keyless: { id: 'keyless', kind: 'keyless' } },
   targetLanguage: 'English',
-  bilingualMode: false,
-  bilingualDomains: [],
+  readingMode: 'everywhere',
+  allowedDomains: [],
   explainPromptTemplate: '',
 } as unknown as Settings;
 

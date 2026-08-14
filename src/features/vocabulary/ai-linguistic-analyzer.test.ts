@@ -34,14 +34,14 @@ const SETTINGS_WITH_KEY: Settings = {
   highlightEnabled: true,
   highlightColor: '#fff',
   autoExplainOnSave: false,
-  bilingualMode: true,
-  bilingualDomains: [],
+  readingMode: 'everywhere',
+  allowedDomains: [],
   popupShowTranslation: true,
   popupShowSimplify: true,
   popupDefaultTab: 'library',
   explainPromptTemplate: '',
   readingExperience: { showOriginal: true, showTranslation: true, width: 320, fontSize: 16, spacing: 1.5 },
-  radar: { goal: '', autoScan: false, domains: [] },
+  radar: { goal: '' },
 };
 
 // No active provider at all -> runWithFallback throws `unknown_provider`.
