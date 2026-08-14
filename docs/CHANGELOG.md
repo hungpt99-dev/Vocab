@@ -13,6 +13,14 @@ All notable changes to this project are documented here. The format is based on
   and the popup `WordCard` (next to the word). Language is taken from the entry's
   existing `sourceLanguage` metadata (reusing `toLocale()` from `language-codes.ts`
   to expand a name/code to a BCP-47 locale), never hardcoded to English.
+- **On-page hover card now has the speaker too:** the reading-overlay tooltip that
+  appears on a highlighted word on any webpage mounts the *same* `PronunciationButton`
+  (reusing the shared `pronunciationService`), so pronunciation works wherever a
+  saved word is shown — not just the library and popup. Required plumbing: added
+  `sourceLanguage` to the highlight payload (`HighlightData`/`buildHighlightData`)
+  so the on-page card knows the word's language (no new language field; reuses the
+  existing `VocabularyEntry.sourceLanguage`). The card speaker is styled to match
+  the existing overlay (`.avs-card-speaker-btn`).
 - **`PronunciationService`** (`src/features/pronunciation/pronunciation-service.ts`):
   wraps the browser `SpeechSynthesis` API. Owns voice selection (exact locale →
   same-language family → none), speech lifecycle, cancellation, capability

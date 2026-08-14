@@ -85,10 +85,9 @@ function getSynth(): SpeechSynthesis | null {
 export class BrowserPronunciationService implements PronunciationService {
   private readonly listeners = new Set<(state: PronunciationState) => void>();
   private current: { word: string; language: string } | null = null;
-  private readonly supported = getSynth() !== null;
 
   isSupported(): boolean {
-    return this.supported;
+    return getSynth() !== null;
   }
 
   subscribe(listener: (state: PronunciationState) => void): () => void {

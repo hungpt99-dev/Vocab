@@ -108,7 +108,7 @@ export interface HighlightData {
   targetLanguage: string;
   /** Reading overlay presentation, applied live via CSS custom properties. */
   readingExperience: ReadingExperience;
-  entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt'> & {
+  entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt' | 'sourceLanguage'> & {
     meaning: string;
     pronunciation: string;
     explanation: VocabularyEntry['explanation'];

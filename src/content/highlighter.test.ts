@@ -9,7 +9,7 @@ import {
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 
 function entry(word: string): HighlightEntry {
-  return { id: word, word, wordKey: word.toLowerCase(), note: 'n', createdAt: 1, meaning: 'm', pronunciation: '', explanation: null };
+  return { id: word, word, wordKey: word.toLowerCase(), note: 'n', createdAt: 1, sourceLanguage: 'English', meaning: 'm', pronunciation: '', explanation: null };
 }
 
 const matcher = new VocabularyMatcher([entry('cake'), entry('piece of cake')]);
