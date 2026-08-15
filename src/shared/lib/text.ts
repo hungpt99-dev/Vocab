@@ -91,7 +91,7 @@ export function tokenizeWords(text: string): string[] {
 }
 
 /** Matches terminal punctuation that can end a sentence. */
-const SENTENCE_TERMINATORS = /[.!?。！？]/u;
+const SENTENCE_TERMINATORS = /[.!?\u3002\uff01\uff1f]/u;
 
 /** Common abbreviations whose trailing period is not a sentence boundary. */
 const ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'e.g', 'i.e', 'u.s', 'u.k']);
@@ -149,7 +149,7 @@ export function splitIntoSentences(input: string): string[] {
     if (isIntraSentenceBoundary(text, index)) continue;
 
     let end = index + 1;
-    while (end < text.length && /[」』”’)\]＞]/.test(text[end] ?? '')) end += 1;
+    while (end < text.length && /[\u300d\u300f”’)\]＞]/.test(text[end] ?? '')) end += 1;
     // For Latin text a terminator followed by letters/digits with no space is
     // mid-sentence (e.g. a URL), so only close when the rest is blank or starts
     // with a space. CJK sentences are not space-delimited, so always split.

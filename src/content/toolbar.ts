@@ -86,7 +86,7 @@ export function classifySelection(text: string): SelectionUnit {
   const collapsed = text.trim();
   if (!collapsed) return 'word';
   if (isPhrase(collapsed)) {
-    const sentenceCount = (collapsed.match(/[.!?。！？]+(\s|$)/gu) ?? []).length;
+    const sentenceCount = (collapsed.match(/[.!?\u3002\uff01\uff1f]+(\s|$)/gu) ?? []).length;
     if (sentenceCount >= 2) return 'paragraph';
     if (sentenceCount === 1) return 'sentence';
     return 'phrase';

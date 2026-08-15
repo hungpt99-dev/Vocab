@@ -7,7 +7,7 @@ import { detectLanguage, isPhrase } from './text';
 export type SelectionUnit = 'word' | 'phrase' | 'sentence' | 'paragraph';
 
 /** Sentence/paragraph boundary: terminal punctuation followed by whitespace or end. */
-const SENTENCE_END = /[.!?。！？]+(\s|$)/gu;
+const SENTENCE_END = /[.!?\u3002\uff01\uff1f]+(\s|$)/gu;
 
 export interface SelectionInfo {
   /** Detected unit of the selection. */
