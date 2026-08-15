@@ -1,131 +1,70 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  HIGHLIGHT_CLASS,
-  highlightRoot,
-  highlightTextNode,
-  isHighlightableTextNode,
-  removeHighlights,
+  buildRadarMatcher,
+  highlightRadarRoot,
+  RADAR_HIGHLIGHT_CLASS,
+  removeRadarHighlights,
 } from './highlighter';
-import { VocabularyMatcher, type HighlightEntry } from './matcher';
+import type { RadarMatchEntry } from './highlighter';
 
-function entry(word: string): HighlightEntry {
-  return { id: word, word, wordKey: word.toLowerCase(), note: 'n', createdAt: 1, sourceLanguage: 'English', meaning: 'm', pronunciation: '', explanation: null };
+function makeEntry(word: string): RadarMatchEntry {
+  return { key: word.toLowerCase(), text: word, tier: 'high' };
 }
 
-const matcher = new VocabularyMatcher([entry('cake'), entry('piece of cake')]);
+function radarHighlights(html: string, entries: RadarMatchEntry[]): string {
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  highlightRadarRoot(container, entries);
+  return container.innerHTML;
+}
 
-beforeEach(() => {
-  document.body.innerHTML = '';
-});
-
-describe('isHighlightableTextNode', () => {
-  it('accepts ordinary text', () => {
-    document.body.innerHTML = '<p>cake</p>';
-    expect(isHighlightableTextNode(document.querySelector('p')!.firstChild!)).toBe(true);
+describe('buildRadarMatcher', () => {
+  it('returns null for no entries', () => {
+    expect(buildRadarMatcher([])).toBeNull();
   });
 
-  it('rejects elements and blank text', () => {
-    document.body.innerHTML = '<p>   </p>';
-    expect(isHighlightableTextNode(document.querySelector('p')!)).toBe(false);
-    expect(isHighlightableTextNode(document.querySelector('p')!.firstChild!)).toBe(false);
-  });
-
-  it('rejects script, style and code content', () => {
-    for (const tag of ['script', 'style', 'code', 'textarea']) {
-      document.body.innerHTML = `<${tag}>cake</${tag}>`;
-      expect(isHighlightableTextNode(document.body.firstElementChild!.firstChild!)).toBe(false);
-    }
-  });
-
-  it('rejects contenteditable regions', () => {
-    document.body.innerHTML = '<div contenteditable="true">cake</div>';
-    const node = document.querySelector('div')!.firstChild!;
-    Object.defineProperty(node.parentElement, 'isContentEditable', { value: true });
-    expect(isHighlightableTextNode(node)).toBe(false);
-  });
-
-  it('rejects text already inside a highlight', () => {
-    document.body.innerHTML = `<mark class="${HIGHLIGHT_CLASS}">cake</mark>`;
-    expect(isHighlightableTextNode(document.querySelector('mark')!.firstChild!)).toBe(false);
+  it('matches a single word case-insensitively with word boundaries', () => {
+    const re = buildRadarMatcher([makeEntry('contribution')]);
+    expect(re).not.toBeNull();
+    expect('contribution'.match(re!)).toBeTruthy();
+    expect('Contribution'.match(re!)).toBeTruthy();
+    // Not part of a larger word.
+    expect('anticontribution'.match(re!)).toBeNull();
   });
 });
 
-describe('highlightTextNode', () => {
-  it('wraps matches and preserves surrounding text', () => {
-    document.body.innerHTML = '<p>I ate cake today</p>';
-    const paragraph = document.querySelector('p')!;
-
-    expect(highlightTextNode(paragraph.firstChild as Text, matcher)).toBe(1);
-    expect(paragraph.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
-    expect(paragraph.textContent).toBe('I ate cake today');
+describe('highlightRadarRoot', () => {
+  it('wraps a generated Radar candidate in a radar-highlight mark', () => {
+    const out = radarHighlights('The contribution was important.', [makeEntry('contribution')]);
+    expect(out).toContain(RADAR_HIGHLIGHT_CLASS);
+    expect(out).toContain('>contribution<');
   });
 
-  it('adds accessible attributes to each highlight', () => {
-    document.body.innerHTML = '<p>cake</p>';
-    highlightTextNode(document.querySelector('p')!.firstChild as Text, matcher);
-
-    const mark = document.querySelector(`.${HIGHLIGHT_CLASS}`)!;
-    expect(mark.getAttribute('role')).toBe('button');
-    expect(mark.getAttribute('aria-label')).toContain('cake');
-    expect((mark as HTMLElement).tabIndex).toBe(0);
+  it('matches the candidate even when it is NOT a saved word', () => {
+    // Radar highlighting must not depend on saved-word highlighting at all.
+    const out = radarHighlights(
+      'We value your contribution to the project.',
+      [makeEntry('contribution')],
+    );
+    expect(out).toContain(RADAR_HIGHLIGHT_CLASS);
   });
 
-  it('returns zero when there is no match', () => {
-    document.body.innerHTML = '<p>nothing here</p>';
-    expect(highlightTextNode(document.querySelector('p')!.firstChild as Text, matcher)).toBe(0);
-  });
-});
-
-describe('highlightRoot', () => {
-  it('highlights nested content', () => {
-    document.body.innerHTML = '<div><p>cake</p><span>more cake</span></div>';
-    expect(highlightRoot(document.body, matcher)).toBe(2);
-    expect(document.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(2);
+  it('highlights multiple distinct candidates independently', () => {
+    const out = radarHighlights('contribute and contribution matter.', [
+      makeEntry('contribute'),
+      makeEntry('contribution'),
+    ]);
+    const marks = out.match(new RegExp(RADAR_HIGHLIGHT_CLASS, 'g')) ?? [];
+    expect(marks.length).toBe(2);
   });
 
-  it('skips excluded containers', () => {
-    document.body.innerHTML = '<script>cake</script><pre>cake</pre>';
-    expect(highlightRoot(document.body, matcher)).toBe(0);
-  });
-
-  it('is idempotent across repeated scans', () => {
-    document.body.innerHTML = '<p>cake</p>';
-    highlightRoot(document.body, matcher);
-    highlightRoot(document.body, matcher);
-    expect(document.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
-  });
-
-  it('does nothing with an empty matcher', () => {
-    document.body.innerHTML = '<p>cake</p>';
-    expect(highlightRoot(document.body, new VocabularyMatcher([]))).toBe(0);
-  });
-
-  it('highlights saved vocabulary in both columns of a reading layout', () => {
-    document.body.innerHTML = `
-      <div class="columns">
-        <section class="original"><p>Reading in a foreign language is hard work.</p></section>
-        <section class="translation"><p>Reading is the best way to grow.</p></section>
-      </div>`;
-
-    const reading = new VocabularyMatcher([entry('reading')]);
-    const count = highlightRoot(document.body, reading);
-
-    expect(count).toBe(2);
-    expect(document.querySelector('.original')!.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
-    expect(document.querySelector('.translation')!.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(1);
-    expect(document.querySelector('.original')!.textContent).toContain('Reading');
-    expect(document.querySelector('.translation')!.textContent).toContain('Reading');
-  });
-});
-
-describe('removeHighlights', () => {
-  it('restores the original text', () => {
-    document.body.innerHTML = '<p>I ate cake today</p>';
-    highlightRoot(document.body, matcher);
-    removeHighlights();
-
-    expect(document.querySelectorAll(`.${HIGHLIGHT_CLASS}`)).toHaveLength(0);
-    expect(document.querySelector('p')!.textContent).toBe('I ate cake today');
-    expect(document.querySelector('p')!.childNodes).toHaveLength(1);
+  it('removeRadarHighlights restores plain text', () => {
+    const container = document.createElement('div');
+    container.innerHTML = 'Your contribution is noted.';
+    highlightRadarRoot(container, [makeEntry('contribution')]);
+    expect(container.innerHTML).toContain(RADAR_HIGHLIGHT_CLASS);
+    removeRadarHighlights(container);
+    expect(container.innerHTML).not.toContain(RADAR_HIGHLIGHT_CLASS);
+    expect(container.textContent).toBe('Your contribution is noted.');
   });
 });

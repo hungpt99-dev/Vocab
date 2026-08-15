@@ -347,16 +347,26 @@ function refreshHighlights(data: HighlightData): void {
 
   removeHighlights();
   removeRadarHighlights();
-  if (!data.enabled || matcher.size === 0) {
-    stopObserving();
-    return;
-  }
 
-  scan(document.body);
-  startObserving();
+  // Saved-word highlighting is gated by its own toggle and only runs when
+  // there is at least one saved word to mark on the page.
+  const radarActive = data.radar.length > 0;
+  if (data.enabled && matcher.size > 0) {
+    scan(document.body);
+  }
+  // Keep the observer alive whenever EITHER saved-word or Radar highlighting is
+  // active, so both re-apply on SPA navigation / late-loading content.
+  if ((data.enabled && matcher.size > 0) || radarActive) {
+    startObserving();
+  } else {
+    stopObserving();
+  }
 
   // Vocabulary Radar: highlight generated candidates from the user's saved
   // vocabulary. Driven purely by the persisted Radar list — no AI page scan.
+  // Radar is INDEPENDENT of the saved-word highlight toggle above: turning
+  // saved-word highlighting off (or having no saved words on the page) must
+  // NOT suppress Radar highlights.
   applyRadarHighlights(data.radar);
 }
 
