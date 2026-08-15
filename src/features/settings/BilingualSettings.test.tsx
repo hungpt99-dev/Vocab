@@ -2,12 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BilingualSettings } from './BilingualSettings';
 import type { Settings } from '@/shared/types/settings';
+import type { Language } from '@/shared/types/language';
 
 const baseSettings: Settings = {
   apiProvider: 'keyless',
   activeProviderId: 'keyless',
   providers: { keyless: { id: 'keyless', kind: 'keyless' } },
-  targetLanguage: 'English',
+  targetLanguage: { code: 'en-US', name: 'English' },
   readingMode: 'everywhere',
   allowedDomains: [],
   explainPromptTemplate: '',
@@ -24,11 +25,12 @@ describe('BilingualSettings target language', () => {
   });
 
   it('keeps a custom target language value selectable', () => {
+    const klingon: Language = { code: 'zz-ZZ', name: 'Klingon' };
     render(
-      <BilingualSettings settings={{ ...baseSettings, targetLanguage: 'Klingon' }} onChange={vi.fn()} />,
+      <BilingualSettings settings={{ ...baseSettings, targetLanguage: klingon }} onChange={vi.fn()} />,
     );
     const option = screen.getByRole('option', { name: /Klingon \(custom\)/i });
     expect(option).toBeTruthy();
-    expect((option as HTMLOptionElement).value).toBe('Klingon');
+    expect((option as HTMLOptionElement).value).toBe('zz-ZZ');
   });
 });

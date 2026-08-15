@@ -30,7 +30,7 @@ const SETTINGS_WITH_KEY: Settings = {
     { id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'test-key', baseUrl: '', model: 'gpt-4o', enabled: true },
   ],
   activeProviderId: 'p1',
-  targetLanguage: 'English',
+  targetLanguage: { code: 'en-US', name: 'English' },
   highlightEnabled: true,
   highlightColor: '#fff',
   autoExplainOnSave: false,

@@ -14,6 +14,8 @@ export const AI_PROVIDER_IDS = [
 
 export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 
+import type { Language } from './language';
+
 export interface SavedProvider {
   /** Stable local id, e.g. "prov_3f2a". */
   id: string;
@@ -61,8 +63,8 @@ export interface Settings {
   activeProviderId: string;
   /** Optional provider tried once when the active one fails. */
   fallbackProviderId?: string;
-  /** Language explanations are written in (the user's language). */
-  targetLanguage: string;
+  /** Language explanations and translations are written in (the user's language). */
+  targetLanguage: Language;
   highlightEnabled: boolean;
   highlightColor: string;
   /** Ask the AI automatically the first time a word is saved. */

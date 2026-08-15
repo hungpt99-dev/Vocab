@@ -16,7 +16,7 @@ function Harness() {
 function seedSettings(providers: unknown[], activeProviderId: string): void {
   (chromeMock().storage.local.get as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (key?: string) => {
     if (key === 'avs:settings') {
-      return { 'avs:settings': { providers, activeProviderId, targetLanguage: 'English' } };
+      return { 'avs:settings': { providers, activeProviderId, targetLanguage: { code: 'en-US', name: 'English' } } };
     }
     return {};
   });

@@ -1,4 +1,6 @@
 import type { Settings, SavedProvider, SettingsPatch, AiProviderId } from '@/shared/types/settings';
+import type { Language } from '@/shared/types/language';
+import { asLanguage, DEFAULT_LANGUAGE } from '@/shared/types/language';
 import { DEFAULT_HIGHLIGHT_COLOR, reading as readingTokens } from '@/shared/styles/tokens';
 
 export const SETTINGS_KEY = 'avs:settings';
@@ -36,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   providers: defaultProviders(),
   activeProviderId: 'prov_default',
   fallbackProviderId: undefined,
-  targetLanguage: 'English',
+  targetLanguage: DEFAULT_LANGUAGE,
   highlightEnabled: true,
   highlightColor: DEFAULT_HIGHLIGHT_COLOR,
   autoExplainOnSave: false,
@@ -58,29 +60,34 @@ export const DEFAULT_SETTINGS: Settings = {
   },
 };
 
-/** Common UI languages for the bilingual target-language picker. */
-export const LANGUAGES: readonly string[] = [
-  'English',
-  'Vietnamese',
-  'Spanish',
-  'French',
-  'German',
-  'Italian',
-  'Portuguese',
-  'Russian',
-  'Chinese',
-  'Japanese',
-  'Korean',
-  'Indonesian',
-  'Thai',
-  'Arabic',
-  'Hindi',
-  'Dutch',
-  'Turkish',
-  'Polish',
-  'Ukrainian',
-  'Czech',
+/** Common UI languages for the bilingual target-language picker (full languages). */
+export const LANGUAGES: readonly Language[] = [
+  { code: 'en-US', name: 'English' },
+  { code: 'vi-VN', name: 'Vietnamese' },
+  { code: 'es-ES', name: 'Spanish' },
+  { code: 'fr-FR', name: 'French' },
+  { code: 'de-DE', name: 'German' },
+  { code: 'it-IT', name: 'Italian' },
+  { code: 'pt-PT', name: 'Portuguese' },
+  { code: 'ru-RU', name: 'Russian' },
+  { code: 'zh-CN', name: 'Chinese' },
+  { code: 'ja-JP', name: 'Japanese' },
+  { code: 'ko-KR', name: 'Korean' },
+  { code: 'id-ID', name: 'Indonesian' },
+  { code: 'th-TH', name: 'Thai' },
+  { code: 'ar-SA', name: 'Arabic' },
+  { code: 'hi-IN', name: 'Hindi' },
+  { code: 'nl-NL', name: 'Dutch' },
+  { code: 'tr-TR', name: 'Turkish' },
+  { code: 'pl-PL', name: 'Polish' },
+  { code: 'uk-UA', name: 'Ukrainian' },
+  { code: 'cs-CZ', name: 'Czech' },
 ];
+
+/** Look up a built-in Language by its BCP-47 code, or undefined if custom. */
+export function languageByCode(code: string): Language | undefined {
+  return LANGUAGES.find((language) => language.code === code);
+}
 
 /**
  * Promote the VOC-133 `goalMode` / VOC-134 `radar` fields plus the legacy
@@ -131,6 +138,18 @@ function migrateRadar(value: Partial<Settings>): Partial<Settings> {
   };
 }
 
+/** Promote a legacy string `targetLanguage` ('Vietnamese') to a full `Language`. */
+function migrateTargetLanguage(value: Partial<Settings>): Partial<Settings> {
+  const existing = value.targetLanguage;
+  if (existing && typeof existing === 'object' && 'code' in existing && 'name' in existing) {
+    return value; // Already a Language.
+  }
+  if (typeof existing === 'string') {
+    return { ...value, targetLanguage: asLanguage(existing) };
+  }
+  return value; // Falls back to DEFAULT_SETTINGS.targetLanguage (a Language).
+}
+
 /** Promote the old single-provider fields into the new providers array. */
 function migrateLegacy(value: Partial<Settings> & Partial<LegacySettings>): Partial<Settings> {
   if (Array.isArray(value.providers) && value.providers.length > 0) return value;
@@ -162,7 +181,8 @@ export class SettingsRepository {
     const stored = await chrome.storage.local.get(SETTINGS_KEY);
     const value = (stored[SETTINGS_KEY] as (Partial<Settings> & Partial<LegacySettings>) | undefined) ?? {};
     const merged = migrateRadar(migrateLegacy(value));
-    return { ...DEFAULT_SETTINGS, ...merged };
+    const withLanguage = migrateTargetLanguage(merged);
+    return { ...DEFAULT_SETTINGS, ...withLanguage };
   }
 
   async update(patch: SettingsPatch): Promise<Settings> {

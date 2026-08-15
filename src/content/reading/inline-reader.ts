@@ -298,7 +298,7 @@ export class InlineReader {
     // (which depends on the target language) doesn't create a self-referential
     // type inference.
     const settings = await settingsRepository.get();
-    const language = settings.targetLanguage || 'English';
+    const language = settings.targetLanguage?.name || 'English';
     // On a forced refresh we deliberately ignore the session cache so every
     // block is re-fetched from the translation service, even if it was already
     // translated this session.
@@ -500,7 +500,7 @@ export class InlineReader {
     let perf: BilingualPerf | undefined;
     try {
       const settings = await settingsRepository.get();
-      const language = settings.targetLanguage || 'English';
+      const language = settings.targetLanguage?.name || 'English';
       const results = await sendMessage({
         type: 'align-words',
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
@@ -524,7 +524,7 @@ export class InlineReader {
     let perf: BilingualPerf | undefined;
     try {
       const settings = await settingsRepository.get();
-      const language = settings.targetLanguage || 'English';
+      const language = settings.targetLanguage?.name || 'English';
       const result = await sendMessage({
         type: 'translate-article',
         payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },

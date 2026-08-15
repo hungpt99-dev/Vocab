@@ -125,7 +125,7 @@ export class BilingualReader {
     injectReadingStyles();
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.prefs = prefs;
-    this.language = settings.targetLanguage || 'English';
+    this.language = settings.targetLanguage?.name || 'English';
     this.readingMode = settings.readingMode;
     this.sourceBlocks = blocks;
 

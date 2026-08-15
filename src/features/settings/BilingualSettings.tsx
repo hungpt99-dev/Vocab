@@ -1,5 +1,7 @@
 import { useId, useMemo } from 'react';
 import type { Settings } from '@/shared/types/settings';
+import type { Language } from '@/shared/types/language';
+import { asLanguage } from '@/shared/types/language';
 import { LANGUAGES } from '@/storage/settings-repository';
 import type { SelectOption } from '@/shared/ui/Select';
 import { Select } from '@/shared/ui/Select';
@@ -14,31 +16,32 @@ export interface BilingualSettingsProps {
 const DEFAULT_PROMPT_HINT =
   'Tokens: {{language}} {{word}} {{context}} {{kind}}. Leave blank to use the built-in prompt.';
 
-const LANGUAGE_OPTIONS: readonly SelectOption[] = LANGUAGES.map((language) => ({
-  value: language,
-  label: language,
-}));
-
 interface TargetLanguageSelectProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: Language;
+  onChange: (value: Language) => void;
 }
 
 function TargetLanguageSelect({ value, onChange }: TargetLanguageSelectProps) {
   const options = useMemo<readonly SelectOption[]>(() => {
-    const known = LANGUAGE_OPTIONS;
-    if (value && !known.some((option) => option.value === value)) {
-      return [...known, { value, label: `${value} (custom)` }];
+    const known = LANGUAGES.map((language) => ({ value: language.code, label: language.name }));
+    // Include a custom (out-of-list) value so it remains selectable.
+    if (value && !known.some((option) => option.value === value.code)) {
+      return [...known, { value: value.code, label: `${value.name} (custom)` }];
     }
     return known;
   }, [value]);
+
   return (
     <Select
       label="Target language"
       options={options}
       hint="Pick the language you want explanations and translations in."
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
+      value={value.code}
+      onChange={(event) => {
+        const code = event.target.value;
+        const builtIn = LANGUAGES.find((language) => language.code === code);
+        onChange(builtIn ?? asLanguage(code));
+      }}
     />
   );
 }

@@ -137,7 +137,7 @@ export function RadarPanel() {
             word: candidate.text,
             context: candidate.context,
             pageTitle: '',
-            language: settings.targetLanguage || 'English',
+            language: settings.targetLanguage?.name || 'English',
             kind: 'vocabulary',
           },
         });

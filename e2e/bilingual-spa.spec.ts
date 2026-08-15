@@ -82,7 +82,7 @@ test('bilingual translates a new page after an in-tab SPA (pushState) navigation
               activeProviderId: 'local-mock',
               // NOTE: language is set as a bare string here only to exercise the
               // settings migration path; the refactor makes this a Language object.
-              targetLanguage: 'Vietnamese',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
               bilingualMode: true,
               autoExplainOnSave: false,
             };

@@ -162,7 +162,7 @@ function seedSettings() {
     ],
     activeProviderId: 'prov_default',
     fallbackProviderId: undefined,
-    targetLanguage: 'Vietnamese',
+    targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
     highlightEnabled: true,
     highlightColor: '#fde68a',
     autoExplainOnSave: false,

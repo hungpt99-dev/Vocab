@@ -9,7 +9,7 @@ const SEED = `(() => {
   const s = {
     providers: [{ id: 'prov_default', type: 'openai', name: 'OpenAI', apiKey: '', baseUrl: '', model: '', enabled: true }],
     activeProviderId: 'prov_default',
-    targetLanguage: 'Vietnamese',
+    targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
     highlightEnabled: true, highlightColor: '#ffd400', autoExplainOnSave: false,
     bilingualMode: true, explainPromptTemplate: '',
     readingExperience: { showOriginal: true, showTranslation: true, width: 'normal', fontSize: 'normal', spacing: 'normal' },

@@ -403,7 +403,7 @@ describe('createHandlers', () => {
 
   it('fills a missing translation via keyless Google when the target language is not English', async () => {
     // The AI returned no `translation`; the user's target language is Vietnamese.
-    await deps.settings.update({ targetLanguage: 'Vietnamese' });
+    await deps.settings.update({ targetLanguage: { code: 'vi-VN', name: 'Vietnamese' } });
     (deps.translate.translate as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'w', text: 'cake', translation: 'bánh' },
     ]);
@@ -420,7 +420,7 @@ describe('createHandlers', () => {
   });
 
   it('does not translate when the AI already returned a translation', async () => {
-    await deps.settings.update({ targetLanguage: 'Vietnamese' });
+    await deps.settings.update({ targetLanguage: { code: 'vi-VN', name: 'Vietnamese' } });
     // Use a one-off explanation fixture that already has a translation so we do
     // not mutate the shared `explanation` object used by other tests.
     (deps.explain.explain as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -437,7 +437,7 @@ describe('createHandlers', () => {
   });
 
   it('does not translate when the target language is English', async () => {
-    await deps.settings.update({ targetLanguage: 'English' });
+    await deps.settings.update({ targetLanguage: { code: 'en-US', name: 'English' } });
     const result = await dispatch(
       createHandlers(deps),
       { type: 'explain', payload: { word: 'cake' } },
@@ -492,7 +492,7 @@ describe('translateUnit default language', () => {
     const translate = { translate: vi.fn(async () => [{ id: 'unit', text: 'unit', translation: 'x' }]) };
     const depsWithLang: BackgroundDeps = {
       ...deps,
-      settings: { get: vi.fn(async () => ({ ...(await deps.settings.get()), targetLanguage: 'Vietnamese' })) } as unknown as import('@/storage/settings-repository').SettingsRepository,
+      settings: { get: vi.fn(async () => ({ ...(await deps.settings.get()), targetLanguage: { code: 'vi-VN', name: 'Vietnamese' } })) } as unknown as import('@/storage/settings-repository').SettingsRepository,
       translate: translate as unknown as TranslateService,
     };
     const result = await translateUnit(depsWithLang, { text: 'hello' });

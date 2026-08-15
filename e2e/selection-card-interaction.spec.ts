@@ -82,7 +82,7 @@ test('the selection card stays open while the user interacts with it', async ({ 
                     },
                   ],
                   activeProviderId: 'local-mock',
-                  targetLanguage: 'Vietnamese',
+                  targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
                   bilingualMode: false,
                   autoExplainOnSave: false,
                 },

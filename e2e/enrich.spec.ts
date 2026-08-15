@@ -72,7 +72,7 @@ test('popup shows highlighted word, enriches inline, and saves all enrich data',
               ...existing,
               providers: [p],
               activeProviderId: 'local-mock',
-              targetLanguage: 'Vietnamese',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
               bilingualMode: false,
               autoExplainOnSave: false,
             };

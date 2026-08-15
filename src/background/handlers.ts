@@ -88,7 +88,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
     color: settings.highlightColor,
     readingMode: settings.readingMode,
     allowedDomains: settings.allowedDomains,
-    targetLanguage: settings.targetLanguage,
+    targetLanguage: settings.targetLanguage?.name || 'English',
     readingExperience: settings.readingExperience,
     entries: entries.map((entry) => ({
       id: entry.id,
@@ -120,7 +120,7 @@ export async function explainWord(
     kind,
     pageTitle,
     precedingText,
-    language: language ?? (settings.targetLanguage || 'English'),
+    language: language ?? (settings.targetLanguage?.name || 'English'),
     promptTemplate: settings.explainPromptTemplate,
   });
 
@@ -128,7 +128,7 @@ export async function explainWord(
   // models frequently return it empty. Fall back to the keyless Google
   // translator (same path as bilingual reading, VOC-101) so the card's
   // "Translation" row is never silently missing when the user wants one.
-  const target = settings.targetLanguage || 'English';
+  const target = settings.targetLanguage?.name || 'English';
   if (!explanation.translation && target.toLowerCase() !== 'english') {
     try {
       const [result] = await deps.translate.translate([{ id: 'w', text: word }], target);
@@ -165,7 +165,7 @@ export async function saveDifficultWords(
     word: input.word,
     context: input.context,
     kind: 'vocabulary',
-    language: settings.targetLanguage || 'English',
+    language: settings.targetLanguage?.name || 'English',
     promptTemplate: settings.explainPromptTemplate,
   });
 
@@ -223,7 +223,7 @@ export async function translateUnit(
   if (!language) {
     try {
       const settings = await deps.settings.get();
-      language = settings.targetLanguage || 'English';
+      language = settings.targetLanguage?.name || 'English';
     } catch {
       language = 'English';
     }
@@ -318,7 +318,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     translate: (message) => translateUnit(deps, message.payload),
     'translate-blocks': async (message) => {
       const settings = await deps.settings.get();
-      const language = settings.targetLanguage || 'English';
+      const language = settings.targetLanguage?.name || 'English';
       const paragraphs = message.payload.blocks.map((text, index) => ({ id: String(index), text }));
       const results = await deps.translate.translate(paragraphs, language);
       const byId = new Map(results.map((result) => [result.id, result.translation]));

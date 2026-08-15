@@ -64,7 +64,7 @@ test('bilingual mode translates only the active tab, not all open tabs', async (
               ...existing,
               providers: [p],
               activeProviderId: 'local-mock',
-              targetLanguage: 'Vietnamese',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
               bilingualMode: true,
               autoExplainOnSave: false,
             };
