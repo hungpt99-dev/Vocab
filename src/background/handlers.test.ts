@@ -20,6 +20,14 @@ import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
 
+vi.mock('@/features/radar/radar-generator', () => ({
+  radarGeneratorService: {
+    generate: vi.fn(async () => ({
+      candidates: [{ word: 'neighbor', relationship: 'related', reason: 'A connected term.' }],
+    })),
+  },
+}));
+
 const explanation: Explanation = {
   meaning: 'A fortunate accident.',
   simpleExplanation: 'Good luck.',
@@ -457,6 +465,19 @@ describe('createHandlers', () => {
       language: 'English',
       promptTemplate: '',
     });
+  });
+
+  it('handles radar:generate by enriching then producing Radar candidates', async () => {
+    const saved = await deps.vocabulary.save({ word: 'risk', sentence: 'We mitigate risk.' });
+    expect((await deps.vocabulary.findByWord('risk'))?.explanation).toBeNull();
+
+    const result = await dispatch(createHandlers(deps), { type: 'radar:generate', payload: { id: saved.id } }, sender);
+
+    expect(result.ok).toBe(true);
+    // The un-enriched word was enriched so generation had meaning to work with.
+    expect(deps.explain.explain).toHaveBeenCalled();
+    // Candidates were generated and broadcast.
+    expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({ type: 'radar-changed' });
   });
 
   it('handles save-difficult-words', async () => {

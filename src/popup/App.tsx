@@ -74,9 +74,12 @@ function LibraryScreen({
       const word = related.trim();
       if (!word) return;
       try {
-        await vocabularyRepository.save({ word });
+        const saved = await vocabularyRepository.save({ word });
         await reload();
         onVocabularyChanged?.();
+        // The related word is now a saved, un-enriched candidate — kick off Radar
+        // candidate generation so it can power the page highlight loop.
+        void sendMessage({ type: 'radar:generate', payload: { id: saved.id } }).catch(() => undefined);
         notify(`Saved “${word}”.`, 'success');
       } catch (cause) {
         notify(cause instanceof Error ? cause.message : 'Could not save that word.', 'error');

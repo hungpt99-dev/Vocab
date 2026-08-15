@@ -338,6 +338,16 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
+    'radar:generate': async (message) => {
+      const entry = await deps.vocabulary.get(message.payload.id);
+      if (!entry) return;
+      // Ensure the word is enriched so generation has meaning/part-of-speech to work with.
+      if (!entry.explanation) {
+        await explainWord(deps, entry.word, entry.sentence, 'word', entry.sourceTitle);
+      }
+      const updated = (await deps.vocabulary.findByWord(entry.word)) ?? entry;
+      await generateRadarForWord(updated);
+    },
     'radar:remove': async (message) => {
       await radarStore.removeByWordKey(message.payload.wordKey);
       await broadcast({ type: 'radar-changed' });

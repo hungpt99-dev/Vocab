@@ -90,7 +90,8 @@ export type Message =
       };
     }
   | { type: 'radar:remove'; payload: { wordKey: string } }
-  | { type: 'radar:list' };
+  | { type: 'radar:list' }
+  | { type: 'radar:generate'; payload: { id: string } };
 
 export type MessageType = Message['type'];
 
@@ -149,6 +150,7 @@ export interface ResponseMap {
   'radar:save': VocabularyEntry;
   'radar:remove': void;
   'radar:list': import('@/features/radar/types').RadarEntryView[];
+  'radar:generate': void;
 }
 
 export type MessageResult<T extends MessageType> =
