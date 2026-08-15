@@ -93,7 +93,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
     targetLanguage: settings.targetLanguage?.name || 'English',
     readingExperience: settings.readingExperience,
     radar:
-      settings.radar?.enabled && settings.readingMode !== 'off'
+      settings.radar?.enabled
         ? (await radarStore.listViews()).map((r) => ({
             word: r.word,
             wordKey: r.wordKey,

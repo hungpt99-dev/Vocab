@@ -16,6 +16,7 @@ import { TranslateService } from '@/ai/translate-service';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
+import { radarStore } from '@/features/radar/radar-store';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -192,6 +193,33 @@ describe('buildHighlightData', () => {
   it('defaults the pronunciation to empty when absent', async () => {
     await deps.vocabulary.save({ word: 'gamma' });
     expect((await buildHighlightData(deps)).entries[0]?.pronunciation).toBe('');
+  });
+
+  it('includes Radar candidates even when reading mode is "off"', async () => {
+    // Radar must NOT depend on the Off / Allowed sites / Everywhere mode.
+    await radarStore.clear();
+    await deps.settings.update({ readingMode: 'off' });
+    const saved = await deps.vocabulary.save({ word: 'risk', sentence: 'We take risk.' });
+    await radarStore.addCandidates(saved, [
+      { word: 'hazard', relationship: 'related', reason: 'A connected term.' },
+    ]);
+
+    const data = await buildHighlightData(deps);
+    expect(data.readingMode).toBe('off');
+    expect(data.radar.length).toBeGreaterThan(0);
+    expect(data.radar.some((r) => r.wordKey === 'hazard')).toBe(true);
+  });
+
+  it('omits Radar when radar is disabled (regardless of reading mode)', async () => {
+    await radarStore.clear();
+    await deps.settings.update({ readingMode: 'everywhere', radar: { enabled: false } });
+    const saved = await deps.vocabulary.save({ word: 'risk', sentence: 'We take risk.' });
+    await radarStore.addCandidates(saved, [
+      { word: 'hazard', relationship: 'related', reason: 'A connected term.' },
+    ]);
+
+    const data = await buildHighlightData(deps);
+    expect(data.radar).toEqual([]);
   });
 });
 
