@@ -2,6 +2,7 @@ import type { VocabularyEntry } from '@/shared/types/vocabulary';
 import { settingsRepository } from '@/storage/settings-repository';
 import { radarGeneratorService } from './radar-generator';
 import { radarStore } from './radar-store';
+import type { RadarCandidateInput } from './types';
 
 /**
  * Background-side orchestration for Vocab Radar.
@@ -12,39 +13,70 @@ import { radarStore } from './radar-store';
  * saved word is deleted). It owns no UI and no AI page-scanning.
  */
 
-/** Generate Radar candidates for a freshly saved + enriched word. */
+/**
+ * Generate Radar candidates for a freshly saved + enriched word.
+ *
+ * Primary path: a dedicated AI call produces distinct discovery candidates.
+ * Fallback: if that call fails or returns nothing, seed Radar from the word's
+ * OWN explanation (relatedWords / synonyms / collocations / relatedPhrases) —
+ * the "Related vocabulary" the user already sees. This guarantees Radar is
+ * never silently empty after an explain, regardless of AI quirks.
+ */
 export async function generateRadarForWord(entry: VocabularyEntry): Promise<number> {
   const settings = await settingsRepository.get();
   if (!settings.radar?.enabled) return 0;
 
   const explanation = entry.explanation;
-  const existingRelated = explanation
-    ? [
-        ...(explanation.relatedWords ?? []),
-        ...(explanation.synonyms ?? []),
-        ...(explanation.collocations ?? []),
-        ...(explanation.relatedPhrases ?? []),
-      ]
-    : [];
+  const seedFromExplanation = (): RadarCandidateInput[] => {
+    if (!explanation) return [];
+    const seen = new Set<string>();
+    const out: RadarCandidateInput[] = [];
+    for (const raw of [
+      ...(explanation.relatedWords ?? []),
+      ...(explanation.synonyms ?? []),
+      ...(explanation.antonyms ?? []),
+      ...(explanation.collocations ?? []),
+      ...(explanation.relatedPhrases ?? []),
+    ]) {
+      const word = raw.trim();
+      if (!word) continue;
+      const key = word.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ word, relationship: 'related', reason: `From “${entry.word}” explanation` });
+    }
+    return out;
+  };
 
+  let candidates: RadarCandidateInput[] = [];
+  let usedFallback = false;
   try {
-    const { candidates } = await radarGeneratorService.generate(settings, {
+    const result = await radarGeneratorService.generate(settings, {
       word: entry.word,
       partOfSpeech: explanation?.partOfSpeech ?? entry.partOfSpeech,
       meaning: explanation?.meaning,
-      existingRelated: existingRelated.length ? existingRelated : undefined,
+      existingRelated: seedFromExplanation().map((c) => c.word),
     });
-    if (candidates.length > 0) {
-      await radarStore.addCandidates(entry, candidates);
-      await broadcastRadarChanged();
-    }
-    return candidates.length;
+    candidates = result.candidates ?? [];
   } catch (error) {
-    // Best-effort: a failed AI call must not break the save. Surface it so the
-    // failure is visible instead of silently leaving Radar empty.
-    console.warn(`[radar] generation failed for "${entry.word}":`, error);
-    return 0;
+    console.warn(`[radar] AI generation failed for "${entry.word}" — falling back to explanation terms:`, error);
   }
+
+  if (candidates.length === 0) {
+    candidates = seedFromExplanation();
+    usedFallback = candidates.length > 0;
+  }
+
+  if (candidates.length > 0) {
+    await radarStore.addCandidates(entry, candidates);
+    await broadcastRadarChanged();
+    console.info(
+      `[radar] generated ${candidates.length} candidate(s) for "${entry.word}"${usedFallback ? ' (from explanation fallback)' : ''}`,
+    );
+  } else {
+    console.warn(`[radar] no candidates for "${entry.word}" (no AI output and no explanation terms)`);
+  }
+  return candidates.length;
 }
 
 /** Remove a word from Radar after it has been saved as official vocabulary. */
