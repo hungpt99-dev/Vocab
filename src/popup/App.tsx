@@ -8,7 +8,7 @@ import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
-import { BookIcon, GithubIcon, PlusIcon, SettingsIcon, TargetIcon, UsersIcon } from '@/shared/ui/Icons';
+import { BookIcon, GithubIcon, PlusIcon, RotateCwIcon, SettingsIcon, TargetIcon, UsersIcon } from '@/shared/ui/Icons';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SkeletonList } from '@/shared/ui/Skeleton';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
@@ -247,6 +247,7 @@ export function App() {
   // Hostname of the active tab, used to reflect/steer the per-site reading scope.
   const [currentHost, setCurrentHost] = useState('');
 
+
   const refreshStats = useCallback(() => {
     void vocabularyRepository.stats().then(setStats).catch(() => undefined);
   }, []);
@@ -281,6 +282,25 @@ export function App() {
   const currentHostInAllowed = currentHost
     ? (settings.allowedDomains ?? []).includes(currentHost)
     : false;
+
+  const [refreshingTranslation, setRefreshingTranslation] = useState(false);
+
+  // Re-translate the current page's bilingual content, bypassing the session
+  // cache. Sent to the active tab's content script, which owns the reader.
+  // Failures surface on the page itself (the reader shows a banner), so the
+  // popup only manages the button's pending state here.
+  const refreshPageTranslation = useCallback(async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    setRefreshingTranslation(true);
+    try {
+      await sendMessage({ type: 'bilingual:refresh' });
+    } catch {
+      // The content script reports translation failures via its own banner.
+    } finally {
+      setRefreshingTranslation(false);
+    }
+  }, []);
 
   const addCurrentSiteToAllowed = useCallback(async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -411,6 +431,30 @@ export function App() {
               }
             >
               {currentHostInAllowed ? '−' : '+'}
+            </button>
+
+            {/* Re-translate the current page's bilingual content, bypassing the
+                session cache. Disabled when there's no active site or Bilingual
+                is off (nothing on the page to refresh). */}
+            <button
+              type="button"
+              onClick={() => void refreshPageTranslation()}
+              disabled={!currentHost || settings.readingMode === 'off' || refreshingTranslation}
+              title={
+                !currentHost
+                  ? 'No active site to refresh'
+                  : settings.readingMode === 'off'
+                    ? 'Turn on Bilingual reading to use this'
+                    : 'Re-translate this page (bypass cache)'
+              }
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-base font-semibold transition-colors ${
+                !currentHost || settings.readingMode === 'off'
+                  ? 'cursor-not-allowed border-slate-200 text-slate-400 opacity-50 dark:border-slate-700 dark:text-slate-500'
+                  : 'border-slate-200 text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:text-slate-400'
+              }`}
+              aria-label="Re-translate this page"
+            >
+              <RotateCwIcon size={14} className={refreshingTranslation ? 'animate-spin' : ''} aria-hidden="true" />
             </button>
           </div>
         </header>

@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Minimize2,
   MoreHorizontal,
+  RotateCw,
   ScanSearch,
   Settings,
   Sparkles,
@@ -53,3 +54,5 @@ export const ICON_ALIGN_SENTENCE = icon(AlignVerticalJustifyStart);
 export const ICON_GLOSS_WORD = icon(AlignHorizontalSpaceBetween);
 /** X-Ray Reading: see through complex text to the simple idea inside. */
 export const ICON_XRAY = icon(ScanSearch);
+/** Re-translate the current page's bilingual content, bypassing the cache. */
+export const ICON_REFRESH = icon(RotateCw);

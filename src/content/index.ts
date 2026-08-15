@@ -84,6 +84,7 @@ registerMessageHandlers({
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
+  'bilingual:refresh': () => void reader.refresh(),
   'bilingual:reconcile': () => void reconcileBilingual(),
   'radar:scan': (message) => runRadarScanHere(message.payload?.goal),
 });

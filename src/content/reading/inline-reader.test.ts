@@ -372,4 +372,27 @@ describe('InlineReader bilingual injection', () => {
 
     reader2.close();
   });
+
+  it('re-translates on refresh(), bypassing the session cache', async () => {
+    const reader = new InlineReader();
+    resolveSend(glossResponse());
+    await reader.open();
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+
+    const aiCallsAfterOpen = vi.mocked(sendMessage).mock.calls.length;
+
+    // A forced refresh() MUST re-translate even though the blocks are cached.
+    resolveSend(glossResponse());
+    await reader.refresh();
+    await flush();
+    await flush();
+
+    // The AI was called again (the cache was bypassed)…
+    expect(vi.mocked(sendMessage).mock.calls.length).toBeGreaterThan(aiCallsAfterOpen);
+    // …and the translations are re-injected (still present on the page).
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    reader.close();
+  });
 });

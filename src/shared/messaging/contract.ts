@@ -69,6 +69,7 @@ export type Message =
   | { type: 'translate-article'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
   | { type: 'align-words'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
   | { type: 'toggle-bilingual-reading' }
+  | { type: 'bilingual:refresh' }
   | { type: 'am-i-active-tab' }
   | { type: 'bilingual:reconcile' }
   | { type: 'open-options' }
@@ -132,6 +133,7 @@ export interface ResponseMap {
   'translate-article': TranslatedParagraphPayload[];
   'align-words': WordAlignResult[];
   'toggle-bilingual-reading': void;
+  'bilingual:refresh': void;
   'am-i-active-tab': boolean;
   'bilingual:reconcile': void;
   'open-options': void;

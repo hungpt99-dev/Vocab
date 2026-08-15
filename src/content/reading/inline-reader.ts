@@ -14,7 +14,7 @@ import { WordGlossPopover } from './word-gloss-popover';
 import type { WordAlignResult, BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
-import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD } from '../icons';
+import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD, ICON_REFRESH } from '../icons';
 import { isReadingActiveOnHost } from '@/shared/types/settings';
 import { translationCache, cacheKey, type CachedTranslation } from './translation-cache';
 
@@ -57,6 +57,28 @@ export class InlineReader {
       return false;
     }
     return this.open();
+  }
+
+  /** Force a re-translation of the page, bypassing the session cache. */
+  async refresh(): Promise<void> {
+    if (!this.active) {
+      // Nothing is open to refresh; opening it fresh will translate from scratch.
+      void this.open();
+      return;
+    }
+    const blocks = extractArticle();
+    if (blocks.length === 0) return;
+    this.generation += 1;
+    this.restoreHost();
+    for (const nodes of this.injected.values()) {
+      for (const node of nodes) node.remove();
+    }
+    this.injected.clear();
+    this.translatedBlockIds.clear();
+    this.clearSkeletons();
+    this.observer?.disconnect();
+    this.observer = null;
+    await this.observeBlocks(blocks, true);
   }
 
   async open(): Promise<boolean> {
@@ -169,7 +191,7 @@ export class InlineReader {
    * more are translated as the reader scrolls. This keeps first paint instant
    * and avoids translating an entire long article up front.
    */
-  private async observeBlocks(blocks: ArticleBlock[]): Promise<void> {
+  private async observeBlocks(blocks: ArticleBlock[], force = false): Promise<void> {
     const generation = this.generation;
     const visible = blocks.filter((b) => {
       const el = b.element;
@@ -183,7 +205,7 @@ export class InlineReader {
 
     // Translate what's already (near) visible right away, so the first screenful
     // appears without waiting for a scroll.
-    if (visible.length > 0) await this.translateBlocks(visible);
+    if (visible.length > 0) await this.translateBlocks(visible, force);
 
     // A close()/rerender() may have superseded this run while we awaited the
     // eager batch; if so, don't set up the observer (it would fire stale work).
@@ -196,7 +218,7 @@ export class InlineReader {
           .filter((e) => e.isIntersecting)
           .map((e) => blocks.find((b) => b.element === e.target))
           .filter((b): b is ArticleBlock => Boolean(b));
-        if (entering.length > 0) void this.translateBlocks(entering);
+        if (entering.length > 0) void this.translateBlocks(entering, force);
       },
       // Start translating a block a full viewport before it scrolls into view.
       { rootMargin: '200% 0px 200% 0px' },
@@ -213,7 +235,7 @@ export class InlineReader {
    * back) reuses the previous translation instead of re-calling the AI and
    * re-flashing the skeleton. See translation-cache.ts.
    */
-  private async translateBlocks(blocks: ArticleBlock[]): Promise<void> {
+  private async translateBlocks(blocks: ArticleBlock[], force = false): Promise<void> {
     const generation = this.generation;
     const pending = blocks.filter((b) => !this.translatedBlockIds.has(b.id));
     if (pending.length === 0) return;
@@ -240,9 +262,14 @@ export class InlineReader {
     // type inference.
     const settings = await settingsRepository.get();
     const language = settings.targetLanguage || 'English';
-    const cached = await translationCache.get(
-      items.map((item) => cacheKey(item.text, language, this.mode)),
-    );
+    // On a forced refresh we deliberately ignore the session cache so every
+    // block is re-fetched from the translation service, even if it was already
+    // translated this session.
+    const cached = force
+      ? new Map()
+      : await translationCache.get(
+          items.map((item) => cacheKey(item.text, language, this.mode)),
+        );
 
     const toTranslate: typeof items = [];
     let injectedSomething = false;
@@ -558,6 +585,14 @@ export class InlineReader {
       void setReadingPreferences({ mode: next });
     });
 
+    const refresh = document.createElement('button');
+    refresh.type = 'button';
+    refresh.className = 'avs-inline-btn';
+    refresh.innerHTML = ICON_REFRESH;
+    refresh.title = 'Re-translate this page (bypass cache)';
+    refresh.setAttribute('aria-label', 'Re-translate this page');
+    refresh.addEventListener('click', () => void this.refresh());
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'avs-inline-btn';
@@ -566,7 +601,7 @@ export class InlineReader {
     close.setAttribute('aria-label', 'Close bilingual reading');
     close.addEventListener('click', () => this.close());
 
-    control.append(label, toggle, align, close);
+    control.append(label, toggle, align, refresh, close);
     document.body.append(control);
     this.control = control;
     this.modeButton = align;
