@@ -106,6 +106,17 @@ function LibraryScreen({
     [update, notify],
   );
 
+  const handleGenerateRadar = useCallback(
+    async (entry: VocabularyEntry) => {
+      try {
+        await sendMessage({ type: 'radar:generate', payload: { id: entry.id } });
+      } catch (cause) {
+        notify(aiErrorMessage(cause), 'error');
+      }
+    },
+    [notify],
+  );
+
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
 
   return (
@@ -235,6 +246,7 @@ function LibraryScreen({
               onToggleFavorite={toggleFavorite}
               onExplain={handleExplain}
               onQuickAdd={handleQuickAdd}
+              onGenerateRadar={handleGenerateRadar}
             />
           )}
         </>

@@ -13,9 +13,9 @@ import { radarStore } from './radar-store';
  */
 
 /** Generate Radar candidates for a freshly saved + enriched word. */
-export async function generateRadarForWord(entry: VocabularyEntry): Promise<void> {
+export async function generateRadarForWord(entry: VocabularyEntry): Promise<number> {
   const settings = await settingsRepository.get();
-  if (!settings.radar?.enabled) return;
+  if (!settings.radar?.enabled) return 0;
 
   const explanation = entry.explanation;
   const existingRelated = explanation
@@ -38,8 +38,12 @@ export async function generateRadarForWord(entry: VocabularyEntry): Promise<void
       await radarStore.addCandidates(entry, candidates);
       await broadcastRadarChanged();
     }
-  } catch {
-    // Generation is best-effort: a failed AI call must not break the save.
+    return candidates.length;
+  } catch (error) {
+    // Best-effort: a failed AI call must not break the save. Surface it so the
+    // failure is visible instead of silently leaving Radar empty.
+    console.warn(`[radar] generation failed for "${entry.word}":`, error);
+    return 0;
   }
 }
 

@@ -480,6 +480,21 @@ describe('createHandlers', () => {
     expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({ type: 'radar-changed' });
   });
 
+  it('handles radar:generate-all by generating for every enriched saved word lacking Radar', async () => {
+    const a = await deps.vocabulary.save({ word: 'alpha', sentence: 'Alpha one.' });
+    await deps.vocabulary.update(a.id, { explanation });
+    const b = await deps.vocabulary.save({ word: 'beta', sentence: 'Beta two.' });
+    await deps.vocabulary.update(b.id, { explanation });
+    // A saved word with no explanation is skipped.
+    await deps.vocabulary.save({ word: 'gamma', sentence: 'Gamma three.' });
+
+    const result = await dispatch(createHandlers(deps), { type: 'radar:generate-all' }, sender);
+
+    expect(result.ok).toBe(true);
+    // Both enriched words produced candidates and broadcast at least one change.
+    expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({ type: 'radar-changed' });
+  }, 15000);
+
   it('handles save-difficult-words', async () => {
     (deps.explain.explain as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...explanation,

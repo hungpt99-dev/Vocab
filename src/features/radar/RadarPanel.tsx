@@ -64,6 +64,11 @@ export function RadarPanel() {
     [load],
   );
 
+  const onGenerateAll = useCallback(async () => {
+    await sendMessage({ type: 'radar:generate-all' });
+    await load();
+  }, [load]);
+
   const onRemove = useCallback(
     async (item: RadarEntryView) => {
       await sendMessage({ type: 'radar:remove', payload: { wordKey: item.wordKey } });
@@ -100,7 +105,7 @@ export function RadarPanel() {
       {state.status === 'loading' ? (
         <p className="text-xs text-slate-400">Loading your Radar…</p>
       ) : items.length === 0 ? (
-        <EmptyState enabled={settings.radar?.enabled ?? true} />
+        <EmptyState enabled={settings.radar?.enabled ?? true} onGenerate={onGenerateAll} />
       ) : filtered.length === 0 ? (
         <p className="text-xs text-slate-400">No Radar words match “{query}”.</p>
       ) : (
@@ -137,7 +142,7 @@ export function RadarPanel() {
   );
 }
 
-function EmptyState({ enabled }: { enabled: boolean }) {
+function EmptyState({ enabled, onGenerate }: { enabled: boolean; onGenerate: () => void }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
       <SparklesIcon size={16} className="mx-auto text-slate-400" aria-hidden="true" />
@@ -146,6 +151,11 @@ function EmptyState({ enabled }: { enabled: boolean }) {
           ? 'No Radar words yet. Save and enrich a word to grow your Radar.'
           : 'Radar is turned off in Settings.'}
       </p>
+      {enabled && (
+        <Button size="sm" variant="secondary" className="mt-3" onClick={() => void onGenerate()}>
+          Generate from saved words
+        </Button>
+      )}
     </div>
   );
 }

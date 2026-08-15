@@ -348,6 +348,15 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       const updated = (await deps.vocabulary.findByWord(entry.word)) ?? entry;
       await generateRadarForWord(updated);
     },
+    'radar:generate-all': async () => {
+      const saved = await deps.vocabulary.list({ sortBy: 'word', sortDirection: 'asc' });
+      for (const entry of saved) {
+        if (!entry.explanation) continue;
+        const has = await radarStore.findByWordKey(entry.wordKey);
+        if (has) continue;
+        await generateRadarForWord(entry);
+      }
+    },
     'radar:remove': async (message) => {
       await radarStore.removeByWordKey(message.payload.wordKey);
       await broadcast({ type: 'radar-changed' });
