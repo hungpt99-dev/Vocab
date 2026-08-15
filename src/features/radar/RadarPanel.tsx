@@ -27,9 +27,10 @@ export function RadarPanel() {
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  // Quick Search bar state. Reuses the exact Radar scan pipeline — the query is
-  // passed as a one-off goal override, so nothing about the search/AI/result
-  // logic is duplicated.
+  // Radar smart search bar state. Reuses the exact Radar scan pipeline — the query
+  // is passed as a one-off goal override, so nothing about the search/AI/result
+  // logic is duplicated. Works without a learning goal (unlike the goal-based
+  // "Find for my Radar" scan, which needs a goal to auto-find words on page open).
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -76,7 +77,7 @@ export function RadarPanel() {
     [goal, aiAvailable, showPrivacy],
   );
 
-  // Quick Search is triggered explicitly (Enter or the search button), NOT on
+  // Radar smart search is triggered explicitly (Enter or the search button), NOT on
   // every keystroke — running a live AI scan per character is slow and wasteful.
   const runQuickSearch = useCallback(() => {
     const q = query.trim();
@@ -157,7 +158,7 @@ export function RadarPanel() {
         Vocabulary Radar finds words on this page that match your learning goal (set in Settings).
       </p>
 
-      {/* Quick Search bar — an explicit entry point into the existing Radar scan.
+      {/* Radar smart search bar — an explicit entry point into the existing Radar scan.
           Type, then press Enter or the search button; it does NOT auto-search on
           every keystroke. Esc clears the query. */}
       <div className="relative">
@@ -180,9 +181,9 @@ export function RadarPanel() {
               runQuickSearch();
             }
           }}
-          placeholder="Search vocabulary…  (Ctrl/Cmd + F)"
-          aria-label="Search vocabulary with Vocab Radar"
-          title="Type a query, then press Enter or the search button to scan with Vocab Radar. Press Ctrl/Cmd + F to focus."
+          placeholder="Radar smart search…  (Ctrl/Cmd + F)"
+          aria-label="Radar smart search — find vocabulary on this page"
+          title="Type a query, then press Enter or the search button to run a Radar smart search of this page. Works without a learning goal. Press Ctrl/Cmd + F to focus."
           className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
         {query && (
@@ -203,8 +204,8 @@ export function RadarPanel() {
       {!goal.trim() ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tip: set a learning goal in Settings to also run a one-click scan of the
-            whole page. You can search this page right now without one.
+            Tip: set a learning goal to auto-find words when you open a page. The smart
+            search below works right now — no goal needed.
           </p>
           <Button variant="secondary" size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
             <SettingsIcon size={13} className="mr-1.5" aria-hidden="true" />
@@ -220,7 +221,7 @@ export function RadarPanel() {
             title={
               !aiAvailable
                 ? 'AI actions need an API key in settings'
-                : 'Find vocabulary relevant to your Radar goal on this page'
+                : 'Auto-find vocabulary relevant to your learning goal on this page'
             }
           >
             <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />

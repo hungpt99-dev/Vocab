@@ -49,10 +49,10 @@ describe('RadarPanel — Quick Search', () => {
       render(<RadarPanel />);
     });
     // Wait for settings to load so the shortcut is enabled.
-    await screen.findByLabelText(/Search vocabulary with Vocab Radar/i);
+    await screen.findByLabelText(/Radar smart search/i);
 
     fireEvent.keyDown(document, { key: 'f', ctrlKey: true });
-    const input = screen.getByLabelText(/Search vocabulary with Vocab Radar/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/Radar smart search/i) as HTMLInputElement;
     expect(input).toHaveFocus();
   });
 
@@ -61,13 +61,13 @@ describe('RadarPanel — Quick Search', () => {
     await act(async () => {
       render(<RadarPanel />);
     });
-    await screen.findByLabelText(/Search vocabulary with Vocab Radar/i);
+    await screen.findByLabelText(/Radar smart search/i);
 
     const event = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true, cancelable: true });
     const prevented = !document.dispatchEvent(event);
     // Browser's own find must not be suppressed when Radar is unusable.
     expect(prevented).toBe(false);
-    const input = screen.getByLabelText(/Search vocabulary with Vocab Radar/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/Radar smart search/i) as HTMLInputElement;
     expect(input).not.toHaveFocus();
   });
 
@@ -75,7 +75,7 @@ describe('RadarPanel — Quick Search', () => {
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
 
     // Typing alone must NOT trigger a scan (no auto-search while typing).
     await userEvent.type(input, 'serendip');
@@ -98,7 +98,7 @@ describe('RadarPanel — Quick Search', () => {
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
     await userEvent.type(input, 'idempotent');
 
     // The redundant floating "Search" button was removed — the search bar is the
@@ -119,7 +119,7 @@ describe('RadarPanel — Quick Search', () => {
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
 
     await userEvent.type(input, 'serendipity');
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -143,7 +143,7 @@ describe('RadarPanel — Quick Search', () => {
     expect(screen.queryByText(/Set a learning goal in Settings to use Vocab Radar/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /Find for my Radar/i })).toBeNull();
 
-    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
     await userEvent.type(input, 'idempotent');
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(
