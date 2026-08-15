@@ -133,4 +133,25 @@ describe('RadarPanel — Quick Search', () => {
     // The previously fetched result stays visible (state preserved, not destroyed).
     expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument();
   });
+
+  it('lets you search without a learning goal set (no blocking prompt)', async () => {
+    seedSettings({ radar: { goal: '' } });
+    await act(async () => {
+      render(<RadarPanel />);
+    });
+    // The blocking "Set a learning goal in Settings to use Vocab Radar" prompt is gone.
+    expect(screen.queryByText(/Set a learning goal in Settings to use Vocab Radar/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Find for my Radar/i })).toBeNull();
+
+    const input = (await screen.findByLabelText(/Search vocabulary with Vocab Radar/i)) as HTMLInputElement;
+    await userEvent.type(input, 'idempotent');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(
+      () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
+    const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
+    expect(scanCall![0].payload).toEqual({ goal: 'idempotent' });
+  });
 });

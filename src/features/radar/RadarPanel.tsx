@@ -201,18 +201,14 @@ export function RadarPanel() {
       </div>
 
       {!goal.trim() ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            Set a learning goal in Settings to use Vocab Radar.
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Tip: set a learning goal in Settings to also run a one-click scan of the
+            whole page. You can search this page right now without one.
           </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="mt-2"
-            onClick={() => void chrome.runtime.openOptionsPage()}
-          >
+          <Button variant="secondary" size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
             <SettingsIcon size={13} className="mr-1.5" aria-hidden="true" />
-            Open Settings
+            Set a learning goal
           </Button>
         </div>
       ) : (
