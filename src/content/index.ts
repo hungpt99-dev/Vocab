@@ -28,6 +28,7 @@ import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
 import { extractArticle } from './reading/extract';
+import { installSpaNavHandler } from './spa';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { normalizeFamilyKey } from '@/features/radar/rank';
 // The inline reader imports from './domain' directly to keep the module graph
@@ -96,6 +97,9 @@ async function bootstrap(): Promise<void> {
   attachHoverListeners();
   attachSelectionToolbar();
   watchSettings();
+  // Re-translate after an in-tab (SPA) navigation: client-side routers swap the
+  // page without a full reload, so nothing else re-triggers Bilingual.
+  installSpaNavHandler(scheduleBilingualRefresh);
   await refresh();
 }
 
@@ -425,6 +429,27 @@ function scheduleRadarAutoScan(): void {
   radarRescanTimer = setTimeout(() => {
     void runRadarAutoScan();
   }, RADAR_RESCAN_MS);
+}
+
+/** Debounce before re-translating after an in-tab (SPA) navigation. */
+const SPA_REFRESH_MS = 400;
+let bilingualRefreshTimer: number | undefined;
+
+/**
+ * Re-translate the current page after an SPA route change. The reader keeps its
+ * translated DOM across tab switches (hide/show), but a same-tab SPA navigation
+ * swaps in genuinely new content that was never translated, so we re-extract and
+ * re-translate it. Guarded to the visible, open, bilingual-active tab so we don't
+ * burn AI calls on backgrounded or hidden readers.
+ */
+function scheduleBilingualRefresh(): void {
+  if (!reader.isOpen) return;
+  if (document.visibilityState !== 'visible') return;
+  if (!bilingualActiveHere || localBilingualOff) return;
+  clearTimeout(bilingualRefreshTimer);
+  bilingualRefreshTimer = window.setTimeout(() => {
+    void reader.refresh();
+  }, SPA_REFRESH_MS);
 }
 
 async function runRadarAutoScan(): Promise<void> {
