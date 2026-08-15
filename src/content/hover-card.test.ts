@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CARD_ACTION_EVENT, computePosition, formatSavedDate, HoverCard } from './hover-card';
+import { computePosition, formatSavedDate, HoverCard } from './hover-card';
 import type { HighlightEntry } from './matcher';
 
 const entry: HighlightEntry = {
@@ -146,46 +146,6 @@ describe('HoverCard', () => {
     expect(document.getElementById('avs-hover-card')!.textContent).not.toContain('Pronunciation');
   });
 
-  it('renders an AI-explain shortcut that dispatches the card action', () => {
-    document.body.innerHTML = '<mark id="m">serendipity</mark>';
-    const anchor = document.getElementById('m') as HTMLElement;
-    const card = new HoverCard();
-    card.show(anchor, entry);
-
-    const button = document.querySelector<HTMLButtonElement>('.avs-card-explain')!;
-    expect(button).not.toBeNull();
-    expect(button.textContent).toBe('AI explain');
-
-    const dispatched: HighlightEntry[] = [];
-    document.addEventListener(CARD_ACTION_EVENT, (event) => {
-      dispatched.push((event as CustomEvent<{ entry: HighlightEntry }>).detail.entry);
-    });
-    button.click();
-
-    expect(dispatched).toHaveLength(1);
-    expect(dispatched[0]?.word).toBe('serendipity');
-
-    card.destroy();
-  });
-
-  it('reflects the loading state while an explanation is requested', () => {
-    document.body.innerHTML = '<mark id="m">serendipity</mark>';
-    const anchor = document.getElementById('m') as HTMLElement;
-    const card = new HoverCard();
-    card.show(anchor, entry);
-
-    card.setExplaining(true);
-    const button = document.querySelector<HTMLButtonElement>('.avs-card-explain')!;
-    expect(button.disabled).toBe(true);
-    expect(button.textContent).toBe('Explaining…');
-
-    card.setExplaining(false);
-    expect(button.disabled).toBe(false);
-    expect(button.textContent).toBe('AI explain');
-
-    card.destroy();
-  });
-
   it('re-renders in place with fresh information and stays open', () => {
     document.body.innerHTML = '<mark id="m">serendipity</mark>';
     const anchor = document.getElementById('m') as HTMLElement;
@@ -209,8 +169,8 @@ describe('HoverCard', () => {
     const card = new HoverCard();
     card.show(anchor, entry);
 
-    const button = document.querySelector('.avs-card-explain')!;
-    expect(card.contains(button)).toBe(true);
+    const wordRow = document.querySelector('.avs-card-word')!;
+    expect(card.contains(wordRow)).toBe(true);
     expect(card.contains(document.body)).toBe(false);
 
     card.destroy();

@@ -14,14 +14,6 @@ export interface HoverCardOptions {
 
 const DEFAULT_OPTIONS: HoverCardOptions = { showOriginal: true, showTranslation: true };
 
-/** Custom event dispatched when a card shortcut is activated. */
-export const CARD_ACTION_EVENT = 'avs-card-action';
-
-export interface CardActionDetail {
-  action: 'explain';
-  entry: HighlightEntry;
-}
-
 /** Format an epoch timestamp for display in the hover card. */
 export function formatSavedDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, {
@@ -50,7 +42,6 @@ export function computePosition(
 /** Accessible tooltip showing the meaning, pronunciation, note and an AI shortcut. */
 export class HoverCard {
   private element: HTMLElement | null = null;
-  private explaining = false;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
   private speakerRoot: Root | null = null;
 
@@ -74,7 +65,6 @@ export class HoverCard {
 
   show(anchor: HTMLElement, entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     this.cancelHide();
-    this.explaining = false;
 
     const card = this.ensureElement();
     this.render(entry, options);
@@ -104,16 +94,6 @@ export class HoverCard {
     this.render(entry);
   }
 
-  /** Toggle the loading state of the AI-explain shortcut. */
-  setExplaining(explaining: boolean): void {
-    this.explaining = explaining;
-    const button = this.element?.querySelector<HTMLButtonElement>('.avs-card-explain');
-    if (button) {
-      button.disabled = explaining;
-      button.textContent = explaining ? 'Explaining…' : 'AI explain';
-    }
-  }
-
   hide(anchor?: HTMLElement): void {
     anchor?.removeAttribute('aria-describedby');
     if (this.element) this.element.hidden = true;
@@ -141,7 +121,7 @@ export class HoverCard {
   private render(entry: HighlightEntry, options: HoverCardOptions = DEFAULT_OPTIONS): void {
     if (!this.element) return;
     this.disposeSpeaker();
-    this.element.replaceChildren(...renderContent(entry, this.explaining, options));
+    this.element.replaceChildren(...renderContent(entry, options));
 
     // Mount the reusable PronunciationButton (same component/icon/font as the
     // React UIs) into a host so the on-page card can speak the word too.
@@ -166,7 +146,7 @@ export class HoverCard {
   }
 }
 
-function renderContent(entry: HighlightEntry, explaining: boolean, options: HoverCardOptions): HTMLElement[] {
+function renderContent(entry: HighlightEntry, options: HoverCardOptions): HTMLElement[] {
   const nodes: HTMLElement[] = [];
 
   if (options.showOriginal) {
@@ -212,28 +192,11 @@ function renderContent(entry: HighlightEntry, explaining: boolean, options: Hove
     if (explanation.relatedPhrases?.length) nodes.push(list('Related phrases', explanation.relatedPhrases));
   } else if (options.showTranslation) {
     if (entry.pronunciation) nodes.push(row('Pronunciation', entry.pronunciation));
-    nodes.push(row('Meaning', entry.meaning || 'No explanation yet — use AI explain below.'));
+    nodes.push(row('Meaning', entry.meaning || 'No explanation yet.'));
   }
 
   if (entry.note) nodes.push(row('Note', entry.note));
   nodes.push(row('Saved', formatSavedDate(entry.createdAt)));
-
-  const explain = document.createElement('button');
-  explain.type = 'button';
-  explain.className = 'avs-card-explain';
-  explain.textContent = explaining ? 'Explaining…' : 'AI explain';
-  explain.disabled = explaining;
-  explain.setAttribute('aria-label', `Explain "${entry.word}" with AI`);
-  explain.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    document.dispatchEvent(
-      new CustomEvent<CardActionDetail>(CARD_ACTION_EVENT, {
-        detail: { action: 'explain', entry },
-      }),
-    );
-  });
-  nodes.push(explain);
 
   return nodes;
 }
