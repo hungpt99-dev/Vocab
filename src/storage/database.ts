@@ -3,7 +3,7 @@ import type { VocabularyEntry } from '@/shared/types/vocabulary';
 import type { RadarEntry } from '@/features/radar/types';
 
 export const DB_NAME = 'vocab';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export interface ReviewRecord {
   /** Matches the vocabulary entry's id so a review card links to its word. */
@@ -73,6 +73,26 @@ export function createDatabase(name: string = DB_NAME): VocabularyDatabase {
   db.version(4)
     .stores({
       radar: 'id, &wordKey, userId, sourceId, createdAt',
+    });
+  // VOC-165: key deduplication on the exact word (userId + `wordKey`) instead of
+  // the AI-derived familyId. The old (userId, familyId) compound index could
+  // fold a newly-saved word into an *existing* entry sharing a family — e.g.
+  // saving "apples" silently overwrote "apple", making the old word vanish from
+  // the list. Dropping the family index and relying on the unique `&wordKey`
+  // keeps every distinct saved word as its own entry. Legacy rows without a
+  // userId are stamped so wordKey+userId queries still match them.
+  db.version(5)
+    .stores({
+      vocabulary:
+        'id, &wordKey, userId, familyId, word, lemma, createdAt, updatedAt, favorite, *tags',
+    })
+    .upgrade((trans) => {
+      return trans
+        .table('vocabulary')
+        .toCollection()
+        .modify((entry: Record<string, unknown>) => {
+          if (!entry.userId) entry.userId = 'legacy-owner';
+        });
     });
   return db;
 }

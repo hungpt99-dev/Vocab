@@ -45,7 +45,7 @@ function makeRepo(userId = 'user-a'): VocabularyRepository {
   return new VocabularyRepository(db, normalizerFor(FAMILY_MAP), async () => userId);
 }
 
-describe('VocabularyRepository word-family deduplication', () => {
+describe('VocabularyRepository deduplication (exact word)', () => {
   it('stores a new entry with canonical fields from the pipeline', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
@@ -58,27 +58,25 @@ describe('VocabularyRepository word-family deduplication', () => {
     expect(await repo.count()).toBe(1);
   });
 
-  it('merges book + books into one concept for the same user', async () => {
+  it('keeps book + books as TWO separate entries (distinct words, not family-merged)', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
     const first = await repo.save({ word: 'book' });
     const second = await repo.save({ word: 'books' });
 
-    expect(second.id).toBe(first.id);
-    expect(await repo.count()).toBe(1);
+    expect(second.id).not.toBe(first.id);
+    expect(await repo.count()).toBe(2);
   });
 
-  it('merges beautiful + beautifully when the resolver shares a family', async () => {
+  it('keeps beautiful + beautifully as TWO separate entries', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
-    const first = await repo.save({ word: 'beautiful' });
-    const second = await repo.save({ word: 'beautifully' });
-
-    expect(second.id).toBe(first.id);
-    expect(await repo.count()).toBe(1);
+    await repo.save({ word: 'beautiful' });
+    await repo.save({ word: 'beautifully' });
+    expect(await repo.count()).toBe(2);
   });
 
-  it('does NOT merge run + runaway (different families)', async () => {
+  it('keeps run + runaway as two separate entries', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
     await repo.save({ word: 'run' });
@@ -86,7 +84,7 @@ describe('VocabularyRepository word-family deduplication', () => {
     expect(await repo.count()).toBe(2);
   });
 
-  it('does NOT merge analysis + analyst (different families)', async () => {
+  it('keeps analysis + analyst as two separate entries', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
     await repo.save({ word: 'analysis' });
@@ -94,7 +92,17 @@ describe('VocabularyRepository word-family deduplication', () => {
     expect(await repo.count()).toBe(2);
   });
 
-  it('lets two users each save the same family independently', async () => {
+  it('merges a re-save of the EXACT same word for the same user', async () => {
+    const repo = makeRepo();
+    await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
+    const first = await repo.save({ word: 'book' });
+    const second = await repo.save({ word: 'BOOK' });
+
+    expect(second.id).toBe(first.id);
+    expect(await repo.count()).toBe(1);
+  });
+
+  it('lets two users each save the same word independently', async () => {
     const db = createDatabase(`multiuser-${++dbCounter}`);
     await db.open();
     const repoA = new VocabularyRepository(db, normalizerFor(FAMILY_MAP), async () => 'user-a');
@@ -109,25 +117,33 @@ describe('VocabularyRepository word-family deduplication', () => {
     expect(await repoA.count()).toBe(2);
   });
 
-  it('keeps the original surface form when merging a later variant', async () => {
+  it('keeps the original surface form when merging a later identical word', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
     const first = await repo.save({ word: 'BOOKS' });
     expect(first.surfaceForm).toBe('BOOKS');
   });
 
-  it('prevents duplicate rows under concurrent saves of the same family', async () => {
+  it('does not lose an existing entry when a different word is saved', async () => {
+    const repo = makeRepo();
+    await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
+    const first = await repo.save({ word: 'book' });
+    await repo.save({ word: 'books' });
+    const stillThere = await repo.findByWord('book');
+    expect(stillThere?.id).toBe(first.id);
+    expect(await repo.count()).toBe(2);
+  });
+
+  it('prevents duplicate rows under concurrent saves of the SAME word', async () => {
     const db = createDatabase(`concurrent-${++dbCounter}`);
     await db.open();
     const repo = new VocabularyRepository(db, normalizerFor(FAMILY_MAP), async () => 'user-a');
 
-    // Fire several saves of the same family "in parallel" — the unique
-    // (userId, familyId) constraint should collapse them to one row.
     const results = await Promise.all([
       repo.save({ word: 'book' }),
-      repo.save({ word: 'books' }),
       repo.save({ word: 'book' }),
-      repo.save({ word: 'books' }),
+      repo.save({ word: 'BOOK' }),
+      repo.save({ word: 'book' }),
     ]);
 
     const ids = new Set(results.map((r) => r.id));
@@ -136,13 +152,13 @@ describe('VocabularyRepository word-family deduplication', () => {
   });
 });
 
-describe('VocabularyRepository.findByFamily', () => {
-  it('finds an existing concept by (userId, familyId)', async () => {
+describe('VocabularyRepository.findByWordKey', () => {
+  it('finds an existing entry by exact word key', async () => {
     const repo = makeRepo('user-x');
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
     await repo.save({ word: 'books' });
-    const found = await repo.findByFamily('user-x', 'book');
+    const found = await repo.findByWordKey('user-x', 'books');
     expect(found?.word).toBe('books');
-    expect(await repo.findByFamily('user-x', 'nope')).toBeUndefined();
+    expect(await repo.findByWordKey('user-x', 'nope')).toBeUndefined();
   });
 });

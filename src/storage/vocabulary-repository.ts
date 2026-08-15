@@ -11,6 +11,21 @@ import { db as defaultDb, type VocabularyDatabase } from './database';
 import type { NormalizedWord } from '@/features/vocabulary/types';
 import type { VocabularyNormalizationService } from '@/features/vocabulary/vocabulary-normalization-service';
 import { vocabularyNormalizationService } from '@/features/vocabulary/vocabulary-normalization-service';
+import { broadcast } from '@/shared/messaging/client';
+
+/**
+ * Notify open tabs that the vocabulary changed so the Library list refreshes.
+ * Best-effort: when there is no extension runtime (e.g. unit tests, or a
+ * non-extension context), this is a no-op rather than a throw.
+ */
+async function notifyVocabularyChanged(): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return;
+  try {
+    await broadcast({ type: 'vocabulary-changed' });
+  } catch {
+    // No listeners / runtime unavailable — the save itself already succeeded.
+  }
+}
 
 /**
  * Persistence boundary for vocabulary entries.
@@ -55,15 +70,17 @@ export class VocabularyRepository {
     const userId = await this.resolveUserId();
     const normalized: NormalizedWord = await this.normalize.normalize(word, input.sentence);
 
-    // Set when a concurrent save already won the unique (userId, familyId) slot.
+    // Set when a concurrent save already won the unique (userId, wordKey) slot.
     let concurrencyMerged: VocabularyEntry | undefined;
 
     const now = Date.now();
-    const existing = await this.findByFamily(userId, normalized.familyId);
+    const wordKey = normalizeWord(word);
+    const existing = await this.findByWordKey(userId, wordKey);
 
     if (existing) {
       const merged = mergeIntoExisting(existing, input, normalized, now);
       await this.db.vocabulary.put(merged);
+      await notifyVocabularyChanged();
       return merged;
     }
 
@@ -98,7 +115,7 @@ export class VocabularyRepository {
           ? error.name === 'ConstraintError'
           : (error as { name?: string })?.name === 'ConstraintError';
       if (isConstraint) {
-        const existing = await this.findByFamily(userId, normalized.familyId);
+        const existing = await this.findByWordKey(userId, wordKey);
         if (existing) {
           // Merge the new encounter's fields into the surviving entry so the
           // caller still gets an up-to-date record.
@@ -111,6 +128,7 @@ export class VocabularyRepository {
       throw error;
     });
     if (concurrencyMerged) return concurrencyMerged;
+    await notifyVocabularyChanged();
     return entry;
   }
 
@@ -122,12 +140,12 @@ export class VocabularyRepository {
     return this.db.vocabulary.where('wordKey').equals(normalizeWord(word)).first();
   }
 
-  /** Find an existing saved concept for this user by its word-family identity. */
-  async findByFamily(userId: string, familyId: string): Promise<VocabularyEntry | undefined> {
-    if (!userId || !familyId) return undefined;
+  /** Find an existing saved entry for this exact word (case/punctuation-normalized). */
+  async findByWordKey(userId: string, wordKey: string): Promise<VocabularyEntry | undefined> {
+    if (!userId || !wordKey) return undefined;
     return this.db.vocabulary
-      .where('[userId+familyId]')
-      .equals([userId, familyId])
+      .where('wordKey').equals(wordKey)
+      .filter((entry) => entry.userId === userId)
       .first();
   }
 
@@ -153,6 +171,7 @@ export class VocabularyRepository {
     if (patch.sentence !== undefined) next.sentence = collapseWhitespace(patch.sentence);
 
     await this.db.vocabulary.put(next);
+    await notifyVocabularyChanged();
     return next;
   }
 
@@ -164,6 +183,7 @@ export class VocabularyRepository {
 
   async remove(id: string): Promise<void> {
     await this.db.vocabulary.delete(id);
+    await notifyVocabularyChanged();
   }
 
   async clear(): Promise<void> {

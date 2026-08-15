@@ -24,23 +24,22 @@ function makeRepo(): VocabularyRepository {
   return repo;
 }
 
-describe('REPRO: popup save highlighted word merges into another saved word', () => {
-  it('saving "apple" when "apples" already exists surfaces the highlighted word', async () => {
+describe('REPRO: saving a word keeps distinct words as separate entries', () => {
+  it('saving "apple" when "apples" already exists keeps BOTH (old word not overwritten)', async () => {
     const repo = makeRepo();
     await (repo as unknown as { db: { open(): Promise<void> } }).db.open();
 
-    await repo.save({ word: 'apples' });
+    const first = await repo.save({ word: 'apples' });
     const result = await repo.save({ word: 'apple', sentence: 'I ate an apple.' });
 
-    // The library must now show the word the user just highlighted.
+    // Each distinct word is its own entry — the previously saved word survives.
+    expect(result.id).not.toBe(first.id);
     expect(result.word).toBe('apple');
-    expect(result.surfaceForm).toBe('apple');
     expect(result.wordKey).toBe('apple');
-    // It's still the SAME family entry (no duplicate row).
-    expect(await repo.count()).toBe(1);
-    // The earlier surface form is superseded; lemma/family stay canonical.
-    expect(result.lemma).toBe('apple');
-    expect(result.familyId).toBe('apple');
+    expect(await repo.count()).toBe(2);
+    // The original "apples" entry is still present and unchanged.
+    const apples = await repo.findByWord('apples');
+    expect(apples?.id).toBe(first.id);
   });
 
   it('re-saving the same surface form does NOT churn the existing entry', async () => {
