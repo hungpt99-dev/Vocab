@@ -114,3 +114,116 @@ test('bilingual translates a new page after an in-tab SPA (pushState) navigation
     server.close();
   }
 });
+
+/**
+ * Regression for the "SPA doesn't translate well" report: real SPAs (Next.js,
+ * React Router, …) mount the new route ASYNCHRONOUSLY — the new DOM appears a
+ * few hundred ms after pushState (data fetch / transition). A single one-shot
+ * refresh fires too early, finds no article, and bails, leaving the page
+ * untranslated until a manual reload. The fix polls briefly for the new content.
+ */
+test('bilingual translates an async (delayed-mount) SPA route', async ({ context, extensionId }) => {
+  const PORT = 8768;
+  const server = createServer((req, res) => {
+    if (req.url?.startsWith('/v1')) {
+      const body = JSON.stringify({
+        meaning: '[MOCK] meaning',
+        simpleExplanation: '[MOCK] simple',
+        translation: '[MOCK] bản dịch',
+        examples: ['[MOCK] example.'],
+        synonyms: [],
+        antonyms: [],
+        relatedWords: [],
+        pronunciation: '/mok/',
+        collocations: [],
+        grammar: '[MOCK] noun',
+        provider: 'local-mock',
+        model: 'mock-1',
+        generatedAt: Date.now(),
+      });
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(JSON.stringify({ choices: [{ message: { content: body } }] }));
+      return;
+    }
+    const html = `<!doctype html><html lang="en"><head><title>Async SPA</title></head>
+<body><main>
+  <a href="/about" id="go-about">About</a>
+  <div id="view-home"><p id="home">Pure serendipity on the home view.</p></div>
+  <div id="view-about" hidden></div>
+</main>
+<script>
+  document.getElementById('go-about').addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState({}, '', '/about');
+    document.getElementById('view-home').hidden = true;
+    // New content is mounted only AFTER a delay, simulating a data fetch.
+    setTimeout(() => {
+      document.getElementById('view-about').innerHTML =
+        '<p id="about">A different concept appears on the about view.</p>';
+      document.getElementById('view-about').hidden = false;
+    }, 600);
+  });
+  window.addEventListener('popstate', () => {});
+</script></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(html);
+  });
+  await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', r));
+  const pageUrl = `http://127.0.0.1:${PORT}/`;
+
+  try {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+    await popup.evaluate(
+      ([port]) =>
+        new Promise<void>((resolve) => {
+          const p = {
+            id: 'local-mock',
+            name: 'Local Mock',
+            type: 'ollama',
+            baseUrl: `http://localhost:${port}/v1`,
+            apiKey: '',
+            model: 'mock-1',
+            isBuiltIn: false,
+            requiresApiKey: false,
+            enabled: true,
+          };
+          chrome.storage.local.get('avs:settings', (cur) => {
+            const existing = (cur['avs:settings'] as Record<string, unknown> | undefined) ?? {};
+            const s = {
+              ...existing,
+              providers: [p],
+              activeProviderId: 'local-mock',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              bilingualMode: true,
+              autoExplainOnSave: false,
+            };
+            chrome.storage.local.set({ 'avs:settings': s }, () => resolve());
+          });
+        }),
+      [PORT],
+    );
+    await popup.reload();
+    await popup.waitForTimeout(600);
+    await popup.close();
+
+    const page = await context.newPage();
+    await page.goto(pageUrl);
+    await page.bringToFront();
+    await expect(page.locator('.avs-inline-control').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
+
+    // In-tab SPA navigation with a DELAYED mount of the new content.
+    await page.click('#go-about');
+    await expect(page).toHaveURL(/\/about$/);
+    // Without polling, the refresh bails at 400ms (content not yet mounted) and
+    // the page stays untranslated. With polling, the new content must appear
+    // AND be translated.
+    await expect(page.locator('main')).toContainText('A different concept appears', { timeout: 10_000 });
+    await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});

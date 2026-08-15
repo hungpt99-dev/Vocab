@@ -433,6 +433,8 @@ function scheduleRadarAutoScan(): void {
 
 /** Debounce before re-translating after an in-tab (SPA) navigation. */
 const SPA_REFRESH_MS = 400;
+const SPA_REFRESH_POLL_MS = 250;
+const SPA_REFRESH_MAX_ATTEMPTS = 8;
 let bilingualRefreshTimer: number | undefined;
 
 /**
@@ -443,13 +445,25 @@ let bilingualRefreshTimer: number | undefined;
  * burn AI calls on backgrounded or hidden readers.
  */
 function scheduleBilingualRefresh(): void {
-  if (!reader.isOpen) return;
   if (document.visibilityState !== 'visible') return;
   if (!bilingualActiveHere || localBilingualOff) return;
   clearTimeout(bilingualRefreshTimer);
-  bilingualRefreshTimer = window.setTimeout(() => {
-    void reader.refresh();
-  }, SPA_REFRESH_MS);
+  // SPAs mount the new route asynchronously (data fetch / transition), so the
+  // article may not exist yet at nav time. Poll briefly for content, then
+  // (re)open the reader. `reader.refresh()` handles both already-open (in-place)
+  // and not-yet-open (fresh) states; the only requirement is that the new DOM
+  // has actually painted before we call it.
+  let attempts = 0;
+  const attempt = () => {
+    if (extractArticle().length > 0) {
+      void reader.refresh();
+      return;
+    }
+    if (attempts++ < SPA_REFRESH_MAX_ATTEMPTS) {
+      bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_POLL_MS);
+    }
+  };
+  bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_MS);
 }
 
 async function runRadarAutoScan(): Promise<void> {
