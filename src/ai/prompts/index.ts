@@ -11,5 +11,4 @@ export {
 } from './explain-selection.prompt';
 export { XRAY_SYSTEM_PROMPT, buildXRayUserPrompt } from './xray.prompt';
 export { TRANSLATE_SYSTEM_PROMPT, buildTranslateUserPrompt } from './translate.prompt';
-export { RADAR_SYSTEM_PROMPT_V1, RADAR_PROMPT_VERSION, buildRadarUserPrompt } from './radar.prompt';
 export { ALIGN_SYSTEM_PROMPT, buildAlignUserPrompt } from './translate.prompt';

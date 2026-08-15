@@ -75,26 +75,22 @@ export type Message =
   | { type: 'open-options' }
   | { type: 'vocabulary-changed' }
   | { type: 'settings-changed' }
+  | { type: 'radar-changed' }
   | { type: 'show-toast'; payload: { message: string; variant: 'success' | 'error' } }
+  | { type: 'delete-entry'; payload: { id: string } }
   | {
-      type: 'radar:scan';
-      /** Optional one-off goal override (e.g. a quick-search query). When absent,
-       * the content script uses the user's saved Radar goal from Settings. */
-      payload?: { goal?: string };
-    }
-  | {
-      type: 'radar:analyze';
+      type: 'radar:save';
       payload: {
-        /** The user's free-text learning goal (the source of truth for what to find). */
-        goal: string;
-        /** Normalised page URL, used for caching. */
-        pageUrl: string;
-        /** Pre-extracted page text (content script path). */
-        pageText: string;
-        /** Families (normalized keys) the user already knows/saved — excluded. */
-        knownFamilies?: string[];
+        word: string;
+        wordKey: string;
+        sentence?: string;
+        sourceUrl?: string;
+        sourceTitle?: string;
+        sourceLanguage?: string;
       };
-    };
+    }
+  | { type: 'radar:remove'; payload: { wordKey: string } }
+  | { type: 'radar:list' };
 
 export type MessageType = Message['type'];
 
@@ -112,6 +108,14 @@ export interface HighlightData {
   targetLanguage: string;
   /** Reading overlay presentation, applied live via CSS custom properties. */
   readingExperience: ReadingExperience;
+  /** Generated Radar candidates (from saved vocabulary) to highlight on the page. */
+  radar: Array<{
+    word: string;
+    wordKey: string;
+    relationship: string;
+    reason: string;
+    sourceWords: string[];
+  }>;
   entries: Array<Pick<VocabularyEntry, 'id' | 'word' | 'wordKey' | 'note' | 'createdAt' | 'sourceLanguage'> & {
     meaning: string;
     pronunciation: string;
@@ -139,9 +143,12 @@ export interface ResponseMap {
   'open-options': void;
   'vocabulary-changed': void;
   'settings-changed': void;
+  'radar-changed': void;
   'show-toast': void;
-  'radar:scan': import('@/features/radar/radar-service').AnalyzePageResult;
-  'radar:analyze': import('@/features/radar/radar-service').AnalyzePageResult;
+  'delete-entry': void;
+  'radar:save': VocabularyEntry;
+  'radar:remove': void;
+  'radar:list': import('@/features/radar/types').RadarEntryView[];
 }
 
 export type MessageResult<T extends MessageType> =

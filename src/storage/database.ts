@@ -1,8 +1,9 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { VocabularyEntry } from '@/shared/types/vocabulary';
+import type { RadarEntry } from '@/features/radar/types';
 
 export const DB_NAME = 'vocab';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export interface ReviewRecord {
   /** Matches the vocabulary entry's id so a review card links to its word. */
@@ -20,6 +21,7 @@ export interface ReviewRecord {
 export type VocabularyDatabase = Dexie & {
   vocabulary: EntityTable<VocabularyEntry, 'id'>;
   review: EntityTable<ReviewRecord, 'id'>;
+  radar: EntityTable<RadarEntry, 'id'>;
 };
 
 /**
@@ -64,6 +66,13 @@ export function createDatabase(name: string = DB_NAME): VocabularyDatabase {
           if (!entry.lemma) entry.lemma = wordKey;
           if (!entry.familyId) entry.familyId = wordKey;
         });
+    });
+  // VOC-160: Radar vocabulary store. Each row is a generated candidate derived
+  // from a saved word; `wordKey` is unique so the same candidate is never
+  // stored twice (multiple saved sources are merged into `sourceIds`).
+  db.version(4)
+    .stores({
+      radar: 'id, &wordKey, userId, sourceId, createdAt',
     });
   return db;
 }

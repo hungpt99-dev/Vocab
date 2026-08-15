@@ -94,25 +94,20 @@ export interface Settings {
   explainPromptTemplate: string;
   /** Reading overlay presentation, applied live to open pages. */
   readingExperience: ReadingExperience;
-  /** Vocabulary Radar: a natural-language goal used to surface vocabulary that
-   * is relevant to what you want to learn. Auto-find is governed by the shared
-   * `readingMode` (off / allowed / everywhere) — the same tri-state that drives
-   * Bilingual — so there is a single place to choose where reading aids appear. */
+  /** Vocabulary Radar: generated vocabulary candidates sourced from the user's own saved & enriched words. Highlighting on pages is governed by the shared `readingMode` (off / allowed / everywhere) — the same tri-state that drives Bilingual — so there is a single place to choose where reading aids appear. `enabled` is the master on/off for the whole feature. */
   radar: {
-    /** The free-text learning goal (the source of truth for what to find). */
-    goal: string;
+    /** Master switch for Radar (generation + highlighting). */
+    enabled: boolean;
   };
 }
 
 /**
- * True when Radar should actively find vocabulary: a goal must be set AND the
- * shared reading mode must be on ('allowed' or 'everywhere'). Mirrors how
- * Bilingual is now evaluated — both are driven by the single `readingMode`.
+ * Master gate for the Radar feature. Radar is generated from saved vocabulary and
+ * highlighted on pages. It is on only when `radar.enabled` is true; *where* it
+ * highlights is decided by the shared `readingMode` (see isReadingActiveOnHost).
  */
 export function isRadarEnabled(settings: Settings): boolean {
-  const hasGoal = Boolean(settings.radar?.goal.trim());
-  if (!hasGoal) return false;
-  return settings.readingMode !== 'off';
+  return Boolean(settings.radar?.enabled);
 }
 
 /**

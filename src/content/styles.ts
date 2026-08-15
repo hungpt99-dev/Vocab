@@ -894,6 +894,56 @@ export function injectStyles(doc: Document = document): void {
       background-color: var(--avs-overlay-surface-alt);
       border-bottom-color: var(--avs-overlay-muted);
     }
+    .avs-radar-highlight {
+      cursor: pointer;
+      background-color: rgba(168, 85, 247, 0.18);
+      border-bottom: 2px solid rgba(168, 85, 247, 0.55);
+      border-radius: 3px;
+      padding: 0 1px;
+      transition: background-color ${motion.fast} ${motion.easing};
+    }
+    .avs-radar-highlight:hover {
+      background-color: rgba(168, 85, 247, 0.3);
+    }
+    .avs-radar-card {
+      display: flex;
+      flex-direction: column;
+      gap: ${spacing.xs};
+      width: 220px;
+      padding: ${spacing.md} ${spacing.md};
+      border-radius: ${radius.md};
+      background: var(--avs-overlay-surface);
+      color: var(--avs-overlay-text);
+      box-shadow: ${elevation.overlay};
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .avs-radar-card__word {
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .avs-radar-card__related {
+      color: var(--avs-overlay-muted);
+      font-size: 11px;
+    }
+    .avs-radar-card__reason {
+      color: var(--avs-overlay-muted);
+      font-style: italic;
+    }
+    .avs-radar-card__save {
+      margin-top: ${spacing.xs};
+      padding: ${spacing.xs} ${spacing.md};
+      border: none;
+      border-radius: ${radius.md};
+      background: var(--avs-brand);
+      color: var(--avs-overlay-text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .avs-radar-card__save:hover {
+      filter: brightness(1.08);
+    }
     .avs-word-gloss {
       position: fixed;
       z-index: ${zIndex.overlay};

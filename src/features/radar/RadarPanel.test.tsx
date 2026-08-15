@@ -1,188 +1,148 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RadarPanel } from './RadarPanel';
 import { chromeMock } from '@/test/chrome-mock';
 import { DEFAULT_SETTINGS } from '@/storage/settings-repository';
-import type { AnalyzePageResult } from './radar-service';
+import type { RadarEntryView } from './types';
 
 function seedSettings(overrides: Record<string, unknown> = {}): void {
   const settings = {
     ...DEFAULT_SETTINGS,
-    providers: [{ id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'sk-test', enabled: true }],
+    providers: [{ id: 'p1', type: 'openai', name: 'OpenAI', apiKey: 'sk-x', enabled: true }],
     activeProviderId: 'p1',
-    radar: { goal: 'backend engineering' },
+    radar: { enabled: true },
     ...overrides,
   };
   void chromeMock().storage.local.set({ 'avs:settings': settings });
 }
 
-const SAMPLE_RESULT: AnalyzePageResult = {
-  candidates: [
-    { key: 'idempotent', familyKey: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'API', context: 'x', tier: 'high' },
-  ],
-  chunksAnalyzed: 1,
-  chunksTotal: 1,
-  partial: false,
-};
+/** Mock the background `radar:list` response for the panel. */
+function seedRadarList(items: RadarEntryView[]): void {
+  chromeMock().runtime.sendMessage.mockImplementation(async (message: { type: string }) => {
+    if (message.type === 'radar:list') return { ok: true, data: items };
+    return { ok: true, data: null };
+  });
+}
 
-describe('RadarPanel — Quick Search', () => {
+const SAMPLE_ITEMS: RadarEntryView[] = [
+  {
+    id: 'r1',
+    word: 'alleviate',
+    wordKey: 'alleviate',
+    normalizedForm: 'alleviate',
+    lemma: 'alleviate',
+    familyId: 'alleviate',
+    phrase: '',
+    userId: 'u1',
+    sourceIds: ['s1'],
+    relationship: 'synonym',
+    reason: 'A direct synonym of mitigate.',
+    createdAt: 1,
+    updatedAt: 1,
+    sourceWords: ['mitigate'],
+  },
+  {
+    id: 'r2',
+    word: 'counteract',
+    wordKey: 'counteract',
+    normalizedForm: 'counteract',
+    lemma: 'counteract',
+    familyId: 'counteract',
+    phrase: '',
+    userId: 'u1',
+    sourceIds: ['s1'],
+    relationship: 'antonym',
+    reason: 'The opposite of mitigate.',
+    createdAt: 2,
+    updatedAt: 2,
+    sourceWords: ['mitigate'],
+  },
+];
+
+describe('RadarPanel — local list', () => {
   beforeEach(() => {
     seedSettings();
-    (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-      async (message: { type: string }) => {
-        if (message.type === 'radar:scan') {
-          return { ok: true, data: SAMPLE_RESULT };
-        }
-        return { ok: true, data: null };
-      },
-    );
+    chromeMock().runtime.sendMessage.mockReset();
   });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    void chromeMock().storage.local.clear();
   });
 
-  it('focuses the search input on Ctrl/Cmd+F when Radar is usable', async () => {
+  it('shows an empty state when there are no Radar words', async () => {
+    seedRadarList([]);
     await act(async () => {
       render(<RadarPanel />);
     });
-    // Wait for settings to load so the shortcut is enabled.
-    await screen.findByLabelText(/Radar smart search/i);
-
-    fireEvent.keyDown(document, { key: 'f', ctrlKey: true });
-    const input = screen.getByLabelText(/Radar smart search/i) as HTMLInputElement;
-    expect(input).toHaveFocus();
+    await waitFor(() => expect(screen.getByText(/No Radar words yet/i)).toBeInTheDocument());
   });
 
-  it('does NOT intercept Ctrl/Cmd+F when no Radar goal is set', async () => {
-    seedSettings({ radar: { goal: '' } });
+  it('lists Radar words with their source relationship', async () => {
+    seedRadarList(SAMPLE_ITEMS);
     await act(async () => {
       render(<RadarPanel />);
     });
-    await screen.findByLabelText(/Radar smart search/i);
-
-    const event = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true, cancelable: true });
-    const prevented = !document.dispatchEvent(event);
-    // Browser's own find must not be suppressed when Radar is unusable.
-    expect(prevented).toBe(false);
-    const input = screen.getByLabelText(/Radar smart search/i) as HTMLInputElement;
-    expect(input).not.toHaveFocus();
+    expect(screen.getByText('alleviate')).toBeInTheDocument();
+    expect(screen.getByText('counteract')).toBeInTheDocument();
+    expect(screen.getAllByText(/Related to: mitigate/i)).toHaveLength(2);
   });
 
-  it('runs the existing radar scan only when the Search button/Enter is used, not on every keystroke', async () => {
+  it('filters the list locally without calling AI (no radar:scan / explain)', async () => {
+    seedRadarList(SAMPLE_ITEMS);
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Search radar words/i)) as HTMLInputElement;
 
-    // Typing alone must NOT trigger a scan (no auto-search while typing).
-    await userEvent.type(input, 'serendip');
-    expect(chromeMock().runtime.sendMessage).not.toHaveBeenCalled();
+    await userEvent.type(input, 'allev');
+    await waitFor(() => expect(screen.queryByText('counteract')).not.toBeInTheDocument());
+    expect(screen.getByText('alleviate')).toBeInTheDocument();
 
-    // Pressing Enter runs the scan with the typed query as the goal override.
-    fireEvent.keyDown(input, { key: 'Enter' });
-    await waitFor(
-      () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
-
+    // Local search must not trigger any AI-backed message.
     const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
-    const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
-    expect(scanCall).toBeDefined();
-    expect(scanCall![0].payload).toEqual({ goal: 'serendip' });
+    expect(calls.some((c) => c[0]?.type === 'radar:scan')).toBe(false);
+    expect(calls.some((c) => c[0]?.type === 'explain')).toBe(false);
   });
 
-  it('always shows a single "Find for my Radar" button that submits a typed query', async () => {
-    seedSettings({ radar: { goal: '' } });
+  it('Save moves a Radar word into Saved Vocabulary (radar:save) and refreshes', async () => {
+    let listAfter = SAMPLE_ITEMS;
+    chromeMock().runtime.sendMessage.mockImplementation(async (message: { type: string; payload?: unknown }) => {
+      if (message.type === 'radar:list') return { ok: true, data: listAfter };
+      if (message.type === 'radar:save') {
+        listAfter = listAfter.filter((i) => i.wordKey !== (message.payload as { wordKey: string }).wordKey);
+        return { ok: true, data: { id: 'new', word: 'alleviate' } };
+      }
+      return { ok: true, data: null };
+    });
+
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
+    const saveButtons = await screen.findAllByRole('button', { name: 'Save' });
+    await userEvent.click(saveButtons[0]!);
 
-    // One action button, always visible (not gated behind a learning goal), and
-    // disabled only when there is nothing to scan (empty bar AND no goal).
-    const findBtn = screen.getByRole('button', { name: /Find for my Radar/i });
-    expect(findBtn).toBeInTheDocument();
-    expect(findBtn).toBeDisabled();
-
-    await userEvent.type(input, 'idempotent');
-    expect(findBtn).not.toBeDisabled();
-
-    await userEvent.click(findBtn);
-    await waitFor(
-      () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
-    const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
-    const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
-    expect(scanCall![0].payload).toEqual({ goal: 'idempotent' });
+    await waitFor(() => expect(screen.queryByText('alleviate')).not.toBeInTheDocument());
+    expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'radar:save',
+      payload: { word: 'alleviate', wordKey: 'alleviate', sourceLanguage: '' },
+    });
   });
 
-  it('shows a query-aware empty result instead of a generic "no content" message', async () => {
-    seedSettings({ radar: { goal: '' } });
-    // Return zero candidates so the scan resolves to the empty state.
-    (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-      async (message: { type: string }) => {
-        if (message.type === 'radar:scan') {
-          return { ok: true, data: { candidates: [], chunksAnalyzed: 1, chunksTotal: 1, partial: false } };
-        }
-        return { ok: true, data: null };
-      },
-    );
+  it('Remove deletes a Radar word (radar:remove)', async () => {
+    chromeMock().runtime.sendMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'radar:list') return { ok: true, data: SAMPLE_ITEMS };
+      return { ok: true, data: null };
+    });
     await act(async () => {
       render(<RadarPanel />);
     });
-    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
-    await userEvent.type(input, 'dsfas');
-    fireEvent.keyDown(input, { key: 'Enter' });
-    await waitFor(
-      () => expect(screen.getByText(/No vocabulary found matching/i)).toBeInTheDocument(),
-      { timeout: 2000 },
+    const removeBtn = await screen.findByRole('button', { name: /Remove alleviate/i });
+    await userEvent.click(removeBtn);
+    await waitFor(() =>
+      expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'radar:remove',
+        payload: { wordKey: 'alleviate' },
+      }),
     );
-    expect(screen.getByText(/dsfas/)).toBeInTheDocument();
-    expect(screen.queryByText(/enough readable content/i)).toBeNull();
-  });
-
-  it('clears the search query with Esc without destroying Radar state', async () => {
-    await act(async () => {
-      render(<RadarPanel />);
-    });
-    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
-
-    await userEvent.type(input, 'serendipity');
-    fireEvent.keyDown(input, { key: 'Enter' });
-    await waitFor(() => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(), {
-      timeout: 2000,
-    });
-    expect(input).toHaveValue('serendipity');
-
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(input).toHaveValue('');
-    // The previously fetched result stays visible (state preserved, not destroyed).
-    expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument();
-  });
-
-  it('lets you search without a learning goal set (no blocking prompt, Find button visible)', async () => {
-    seedSettings({ radar: { goal: '' } });
-    await act(async () => {
-      render(<RadarPanel />);
-    });
-    // The blocking "Set a learning goal in Settings to use Vocab Radar" prompt is gone.
-    expect(screen.queryByText(/Set a learning goal in Settings to use Vocab Radar/i)).toBeNull();
-    // The single action button is always visible, even with no goal set.
-    expect(screen.getByRole('button', { name: /Find for my Radar/i })).toBeInTheDocument();
-
-    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
-    await userEvent.type(input, 'idempotent');
-    fireEvent.keyDown(input, { key: 'Enter' });
-    await waitFor(
-      () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
-    const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
-    const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
-    expect(scanCall![0].payload).toEqual({ goal: 'idempotent' });
   });
 });

@@ -131,16 +131,17 @@ describe('popup feature tabs — Review, Quiz, Radar', () => {
     expect(screen.queryByRole('button', { name: /Add filter|Clear filters/i })).toBeNull();
   });
 
-  it('Radar: single search affordance, no duplicate Search button', async () => {
+  it('Radar: local list search only, no AI search affordance', async () => {
     await act(async () => {
       render(<App />);
     });
     await clickTab(/^Radar/i);
 
-    expect(screen.getByLabelText(/Search vocabulary with Vocab Radar/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Search$/i })).toBeNull();
-    expect(
-      screen.getByText(/Find for my Radar|Set a learning goal in Settings/i),
-    ).toBeInTheDocument();
+    // The Radar tab is a plain list with a local, deterministic search box.
+    const search = screen.getByLabelText(/Search radar words/i);
+    expect(search).toBeInTheDocument();
+    // No AI page-scan / discovery affordance remains.
+    expect(screen.queryByRole('button', { name: /Find for my Radar/i })).toBeNull();
+    expect(screen.queryByText(/Set a learning goal in Settings/i)).toBeNull();
   });
 });

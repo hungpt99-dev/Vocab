@@ -3,7 +3,6 @@ import type { Explanation, VocabularyEntry } from '@/shared/types/vocabulary';
 import type { DifficultWordsPayload, HighlightData, SelectionPayload } from '@/shared/messaging/contract';
 import type { HandlerMap } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
-import { AiError } from '@/ai/types';
 import { ExplainService, explainService as defaultExplainService } from '@/ai/explain-service';
 import {
   TranslateService,
@@ -18,7 +17,8 @@ import {
   vocabularyRepository as defaultVocabularyRepository,
 } from '@/storage/vocabulary-repository';
 import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
-import { radarVocabularyService as defaultRadarService } from '@/features/radar/radar-service';
+import { generateRadarForWord, removeRadarWord, dropRadarSource } from '@/features/radar/radar-background';
+import { radarStore } from '@/features/radar/radar-store';
 
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
@@ -26,7 +26,6 @@ export interface BackgroundDeps {
   explain: ExplainService;
   translate: TranslateService;
   review: ReviewRepository;
-  radarService: typeof defaultRadarService;
 }
 
 export const defaultDeps: BackgroundDeps = {
@@ -35,7 +34,6 @@ export const defaultDeps: BackgroundDeps = {
   explain: defaultExplainService,
   translate: defaultTranslationService,
   review: defaultReviewRepository,
-  radarService: defaultRadarService,
 };
 
 /** Read the current selection from the active tab, if any. */
@@ -69,7 +67,11 @@ export async function saveSelection(
         pageTitle: selection.sourceTitle,
         precedingText: selection.precedingText,
       });
-      return await deps.vocabulary.update(saved.id, { explanation });
+      const enriched = await deps.vocabulary.update(saved.id, { explanation });
+      // Generating Radar candidates from the freshly enriched word is best-effort
+      // and must not block or fail the save.
+      void generateRadarForWord(enriched);
+      return enriched;
     } catch {
       // Auto-explain is best-effort; the entry is already safely stored.
     }
@@ -90,6 +92,16 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
     allowedDomains: settings.allowedDomains,
     targetLanguage: settings.targetLanguage?.name || 'English',
     readingExperience: settings.readingExperience,
+    radar:
+      settings.radar?.enabled && settings.readingMode !== 'off'
+        ? (await radarStore.listViews()).map((r) => ({
+            word: r.word,
+            wordKey: r.wordKey,
+            relationship: r.relationship,
+            reason: r.reason,
+            sourceWords: r.sourceWords,
+          }))
+        : [],
     entries: entries.map((entry) => ({
       id: entry.id,
       word: entry.word,
@@ -140,8 +152,10 @@ export async function explainWord(
 
   const existing = await deps.vocabulary.findByWord(word);
   if (existing) {
-    await deps.vocabulary.update(existing.id, { explanation });
+    const updated = await deps.vocabulary.update(existing.id, { explanation });
     await broadcast({ type: 'vocabulary-changed' });
+    // Re-generate Radar candidates from the now-enriched saved word.
+    void generateRadarForWord(updated);
   }
   return explanation;
 }
@@ -232,56 +246,15 @@ export async function translateUnit(
   return results[0]?.translation ?? '';
 }
 
-/**
- * Vocabulary Radar: analyse the active page against the user's Radar goal and
- * return ranked candidate vocabulary. Two entry points:
- *  - `radarScan` is called by the popup; it asks the PAGE (which has the
- *    article text and the correct tab context) to analyse itself. This avoids
- *    the old bug where the worker re-queried the active tab while the popup was
- *    focused and resolved to the popup window (no page text → empty results).
- *  - `radarAnalyze` is the page-side worker; it runs the shared AI pipeline
- *    (chunks/validates/merges/ranks) and respects cache + partial failures.
- * The natural-language goal text (from Settings) is the source of truth.
- */
-export async function radarAnalyze(
+/** Delete a saved vocabulary entry and drop it as a Radar source. */
+export async function deleteVocabulary(
   deps: BackgroundDeps,
-  payload: { goal: string; pageUrl: string; pageText: string; knownFamilies?: string[] },
-): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
-  const settings = await deps.settings.get();
-  const goal = payload.goal.trim();
-  if (!goal) {
-    throw new AiError('config', 'Set a Radar goal in Settings first.');
-  }
-  const pageText = payload.pageText;
-  if (!pageText || !pageText.trim()) {
-    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
-  }
-  return deps.radarService.analyzePage(settings, {
-    goal,
-    pageText,
-    pageUrl: payload.pageUrl,
-    knownFamilies: payload.knownFamilies,
-  });
+  id: string,
+): Promise<void> {
+  await deps.vocabulary.remove(id);
+  await dropRadarSource(id);
+  await broadcast({ type: 'vocabulary-changed' });
 }
-
-/**
- * Popup entry point. Ask the active tab's content script to scan itself
- * (`radar:scan` → `radar:analyze` with the page's own extracted text). Returns
- * the ranked candidates so the popup can show them without a tab round-trip.
- */
-export async function radarScan(): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    throw new AiError('config', 'No active page to scan.');
-  }
-  try {
-    const result = await sendToTab(tab.id, { type: 'radar:scan' });
-    return result as import('@/features/radar/radar-service').AnalyzePageResult;
-  } catch {
-    throw new AiError('config', 'Could not read the page content (try reloading the page).');
-  }
-}
-
 /** Build the handler map used by the service worker's message router. */
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
   return {
@@ -348,7 +321,27 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     'bilingual:reconcile': () => undefined,
     'vocabulary-changed': () => undefined,
     'settings-changed': () => undefined,
-    'radar:scan': () => radarScan(),
-    'radar:analyze': (message) => radarAnalyze(deps, message.payload),
+    'delete-entry': async (message) => {
+      await deleteVocabulary(deps, message.payload.id);
+    },
+    'radar:save': async (message) => {
+      // Move a Radar candidate into Saved Vocabulary, then remove it from Radar.
+      const { word, sentence, sourceUrl, sourceTitle, sourceLanguage } = message.payload;
+      const entry = await deps.vocabulary.save({
+        word,
+        sentence,
+        sourceUrl,
+        sourceTitle,
+        sourceLanguage,
+      });
+      await removeRadarWord(message.payload.wordKey);
+      await broadcast({ type: 'vocabulary-changed' });
+      return entry;
+    },
+    'radar:remove': async (message) => {
+      await radarStore.removeByWordKey(message.payload.wordKey);
+      await broadcast({ type: 'radar-changed' });
+    },
+    'radar:list': async () => radarStore.listViews(),
   };
 }

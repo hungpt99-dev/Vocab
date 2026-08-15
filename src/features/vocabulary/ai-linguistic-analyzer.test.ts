@@ -41,7 +41,7 @@ const SETTINGS_WITH_KEY: Settings = {
   popupDefaultTab: 'library',
   explainPromptTemplate: '',
   readingExperience: { showOriginal: true, showTranslation: true, width: 320, fontSize: 16, spacing: 1.5 },
-  radar: { goal: '' },
+  radar: { enabled: true },
 };
 
 // No active provider at all -> runWithFallback throws `unknown_provider`.

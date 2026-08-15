@@ -1,167 +1,86 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AnalyzePageResult } from './radar-service';
-import type { RankedCandidate } from './types';
-import { vocabularyRepository } from '@/storage/vocabulary-repository';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/shared/hooks/useSettings';
-import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { sendMessage } from '@/shared/messaging/client';
-import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
-import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, SettingsIcon } from '@/shared/ui/Icons';
-import { tints } from '@/shared/styles/tokens';
+import { SearchIcon, TrashIcon, TargetIcon, SparklesIcon } from '@/shared/ui/Icons';
+import type { RadarEntryView } from './types';
 
-type ScanState =
-  | { status: 'idle' }
-  | { status: 'scanning'; done: number; total: number }
-  | { status: 'done'; result: AnalyzePageResult }
-  | { status: 'empty' }
-  | { status: 'error'; message: string };
+type RadarState = { status: 'loading' } | { status: 'ready'; items: RadarEntryView[] };
 
-/** Minimum query length before the Search button/Enter is enabled (avoids noise on single chars). */
-const MIN_QUERY_LENGTH = 2;
-
+/**
+ * Vocab Radar tab — a passive list of generated vocabulary candidates.
+ *
+ * Radar words are generated from the user's saved & enriched vocabulary (in the
+ * background). This tab does NOT search the web or ask AI for discoveries: the
+ * search box is a fast, local, deterministic filter over the existing Radar list.
+ */
 export function RadarPanel() {
   const { settings } = useSettings();
-  const { available: aiAvailable } = useAiAvailable();
-  const [scan, setScan] = useState<ScanState>({ status: 'idle' });
-  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
-  const [showPrivacy, setShowPrivacy] = useState(false);
-
-  // Radar smart search bar state. Reuses the exact Radar scan pipeline — the query
-  // is passed as a one-off goal override, so nothing about the search/AI/result
-  // logic is duplicated. Works without a learning goal (unlike the goal-based
-  // "Find for my Radar" scan, which needs a goal to auto-find words on page open).
+  const [state, setState] = useState<RadarState>({ status: 'loading' });
   const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const goal = settings.radar?.goal ?? '';
-
-  /**
-   * Run a Radar scan against the current page, optionally with a one-off goal
-   * override (the Quick Search query). This is the single entry point for both
-   * the "Find for my Radar" button and the search bar — existing loading,
-   * result, error and empty states are preserved untouched.
-   */
-  const runScan = useCallback(
-    async (goalOverride?: string) => {
-      const effectiveGoal = goalOverride?.trim() || goal.trim();
-      if (!effectiveGoal || !aiAvailable) return;
-      if (!showPrivacy) setShowPrivacy(true);
-      setScan({ status: 'scanning', done: 0, total: 0 });
-      try {
-        // Ask the PAGE to scan itself — it already has the article text and the
-        // correct tab context. This fixes the old bug where the background tried
-        // to re-query the active tab while the popup was focused (and resolved to
-        // the popup window, returning no page text).
-        const result = await sendMessage({
-          type: 'radar:scan',
-          payload: goalOverride?.trim() ? { goal: goalOverride.trim() } : undefined,
-        });
-        if (!result || result.candidates.length === 0) {
-          setScan({ status: 'empty' });
-        } else {
-          setScan({ status: 'done', result });
-          const keys = new Set<string>();
-          await Promise.all(
-            result.candidates.map(async (c) => {
-              const entry = await vocabularyRepository.findByWord(c.text);
-              if (entry) keys.add(c.key);
-            }),
-          );
-          setSavedKeys(keys);
-        }
-      } catch (cause) {
-        setScan({ status: 'error', message: aiErrorMessage(cause) });
-      }
-    },
-    [goal, aiAvailable, showPrivacy],
-  );
-
-  // Radar smart search is triggered explicitly (Enter or the search button), NOT on
-  // every keystroke — running a live AI scan per character is slow and wasteful.
-  const runQuickSearch = useCallback(() => {
-    const q = query.trim();
-    if (q.length < MIN_QUERY_LENGTH) return;
-    void runScan(q);
-  }, [query, runScan]);
-
-  const onTriggerShortcut = useCallback(() => {
-    if (!goal.trim() || !aiAvailable) return;
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, [goal, aiAvailable]);
-
-  // Global Ctrl/Cmd + F handler. When Radar is usable, intercept the shortcut
-  // and focus the Radar search bar (the browser's built-in find is suppressed).
-  // When Radar is not usable (no goal / no AI), we do nothing so the browser's
-  // normal find still works.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && (event.key === 'f' || event.key === 'F')) {
-        const usable = goal.trim().length > 0 && aiAvailable;
-        if (!usable) return;
-        event.preventDefault();
-        onTriggerShortcut();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [goal, aiAvailable, onTriggerShortcut]);
-
-  const ignoreCandidate = useCallback((key: string) => {
-    setScan((prev) =>
-      prev.status === 'done'
-        ? { status: 'done', result: { ...prev.result, candidates: prev.result.candidates.filter((c) => c.key !== key) } }
-        : prev,
-    );
+  const load = useCallback(async () => {
+    try {
+      const items = ((await sendMessage({ type: 'radar:list' })) as RadarEntryView[]) ?? [];
+      setState({ status: 'ready', items });
+    } catch {
+      setState({ status: 'ready', items: [] });
+    }
   }, []);
 
-  const saveCandidate = useCallback(
-    async (candidate: RankedCandidate) => {
-      await vocabularyRepository.save({
-        word: candidate.text,
-        sentence: candidate.context ?? '',
-        note: candidate.reason,
-        tags: ['radar'],
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Keep the list fresh when the background broadcasts a Radar change.
+  useEffect(() => {
+    const onChange = (message: { type?: string }): void => {
+      if (message?.type === 'radar-changed') void load();
+    };
+    chrome.runtime.onMessage.addListener(onChange);
+    return () => chrome.runtime.onMessage.removeListener(onChange);
+  }, [load]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const base = state.status === 'ready' ? state.items ?? [] : [];
+    if (!normalizedQuery) return base;
+    return base.filter(
+      (item) =>
+        item.word.toLowerCase().includes(normalizedQuery) ||
+        item.reason.toLowerCase().includes(normalizedQuery) ||
+        item.sourceWords.some((s) => s.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [state, normalizedQuery]);
+
+  const onSave = useCallback(
+    async (item: RadarEntryView) => {
+      await sendMessage({
+        type: 'radar:save',
+        payload: { word: item.word, wordKey: item.wordKey, sourceLanguage: '' },
       });
-      setSavedKeys((prev) => new Set(prev).add(candidate.key));
+      await load();
     },
-    [],
+    [load],
   );
 
-  const explainCandidate = useCallback(
-    async (candidate: RankedCandidate) => {
-      try {
-        await sendMessage({
-          type: 'explain',
-          payload: {
-            word: candidate.text,
-            context: candidate.context,
-            pageTitle: '',
-            language: settings.targetLanguage?.name || 'English',
-            kind: 'vocabulary',
-          },
-        });
-      } catch (cause) {
-        setScan({ status: 'error', message: aiErrorMessage(cause) });
-      }
+  const onRemove = useCallback(
+    async (item: RadarEntryView) => {
+      await sendMessage({ type: 'radar:remove', payload: { wordKey: item.wordKey } });
+      await load();
     },
-    [settings.targetLanguage],
+    [load],
   );
 
-  const showResults = scan.status !== 'idle' && !query.trim();
+  const items = state.status === 'ready' ? state.items ?? [] : [];
 
   return (
     <div className="flex flex-col gap-3 p-4">
       <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <TargetIcon size={14} className="text-brand-600" aria-hidden="true" />
-        Vocabulary Radar finds words on this page that match your learning goal (set in Settings).
+        Words related to the vocabulary you're learning — generated from words you save and enrich.
       </p>
 
-      {/* Radar smart-search bar — type a term to scan this page for it (works
-          without a learning goal), or leave it empty and use the button to run
-          your goal. Submit with Enter or the Find for my Radar button; it does
-          NOT auto-search on every keystroke. Esc in the field clears the query. */}
       <div className="relative">
         <SearchIcon
           size={15}
@@ -169,247 +88,64 @@ export function RadarPanel() {
           aria-hidden="true"
         />
         <input
-          ref={inputRef}
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setQuery('');
-              inputRef.current?.blur();
-            } else if (event.key === 'Enter') {
-              event.preventDefault();
-              runQuickSearch();
-            }
-          }}
-          placeholder="Search this page…  (or set a goal to scan all)"
-          aria-label="Radar smart search — find vocabulary on this page"
-          title="Type a term to scan this page for it (no learning goal needed), or leave empty and use Find for my Radar to scan with your learning goal. Press Ctrl/Cmd + F to focus."
+          placeholder="Search radar words…"
+          aria-label="Search radar words"
           className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
       </div>
 
-      {/* One always-visible action: 'Find for my Radar'. With a query in the bar
-          it smart-searches that term (no goal needed); with an empty bar it runs
-          the learning-goal scan. Disabled only when there is nothing to scan. */}
-      <Button
-        variant="primary"
-        disabled={!aiAvailable || scan.status === 'scanning' || (!query.trim() && !goal.trim())}
-        onClick={() => (query.trim() ? runQuickSearch() : void runScan())}
-        title={
-          !aiAvailable
-            ? 'AI actions need an API key in settings'
-            : query.trim()
-              ? 'Scan this page for your term with Vocab Radar'
-              : 'Find vocabulary relevant to your learning goal on this page'
-        }
-      >
-        <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />
-        {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
-      </Button>
-
-      {!aiAvailable && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          AI actions need an API key — open settings.
-        </p>
-      )}
-
-      {!goal.trim() && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tip: set a learning goal to auto-find words across the whole page. Or just
-            type above and hit Find for my Radar — no goal needed.
-          </p>
-          <Button variant="secondary" size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
-            <SettingsIcon size={13} className="mr-1.5" aria-hidden="true" />
-            Set a learning goal
-          </Button>
-        </div>
-      )}
-
-      {showPrivacy && goal.trim() && !query.trim() && (
-        <p className="rounded-md bg-slate-100 px-3 py-2 text-[11px] leading-snug text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-          To find vocabulary relevant to your goal, selected page content is sent to your configured AI provider.
-        </p>
-      )}
-
-      {query.trim().length >= MIN_QUERY_LENGTH && (
-        <>
-          {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
-          {scan.status === 'empty' && <EmptyResult query={query} />}
-          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={runQuickSearch} />}
-          {scan.status === 'done' && (
-            <Results
-              result={scan.result}
-              savedKeys={savedKeys}
-              onExplain={explainCandidate}
-              onSave={saveCandidate}
-              onIgnore={ignoreCandidate}
-            />
-          )}
-        </>
-      )}
-
-      {showResults && (
-        <>
-          {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
-          {scan.status === 'empty' && <EmptyResult query={query} />}
-          {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan()} />}
-          {scan.status === 'done' && (
-            <Results
-              result={scan.result}
-              savedKeys={savedKeys}
-              onExplain={explainCandidate}
-              onSave={saveCandidate}
-              onIgnore={ignoreCandidate}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function ScanningState({ done, total }: { done: number; total: number }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-        <SparklesIcon size={14} className="mr-1.5 inline" aria-hidden="true" />
-        Finding useful vocabulary for your Radar…
-      </p>
-      {total > 1 && (
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Analyzing article… {done}/{total} sections
-        </p>
-      )}
-    </div>
-  );
-}
-
-function EmptyResult({ query }: { query?: string }): JSX.Element {
-  const trimmed = query?.trim();
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
-      {trimmed ? (
-        <>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            No vocabulary found matching “{trimmed}” on this page.
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Try a different word or phrase, or use a learning goal to scan the whole page.
-          </p>
-        </>
+      {state.status === 'loading' ? (
+        <p className="text-xs text-slate-400">Loading your Radar…</p>
+      ) : items.length === 0 ? (
+        <EmptyState enabled={settings.radar?.enabled ?? true} />
+      ) : filtered.length === 0 ? (
+        <p className="text-xs text-slate-400">No Radar words match “{query}”.</p>
       ) : (
-        <>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            We couldn’t find enough readable content on this page.
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Open an article or long-form page, then try again.
-          </p>
-        </>
+        <ul className="flex flex-col gap-2">
+          {filtered.map((item) => (
+            <li
+              key={item.id}
+              className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{item.word}</span>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => void onSave(item)}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => void onRemove(item)} aria-label={`Remove ${item.word}`}>
+                    <TrashIcon size={14} aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+              {item.sourceWords.length > 0 && (
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  Related to: {item.sourceWords.join(', ')}
+                </p>
+              )}
+              {item.reason && (
+                <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{item.reason}</p>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function EmptyState({ enabled }: { enabled: boolean }) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-800 dark:bg-red-950/40">
-      <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
-      <Button size="sm" variant="secondary" className="mt-2" onClick={onRetry}>
-        <RotateCwIcon size={13} className="mr-1.5" aria-hidden="true" />
-        Try again
-      </Button>
-    </div>
-  );
-}
-
-function Results({
-  result,
-  savedKeys,
-  onExplain,
-  onSave,
-  onIgnore,
-}: {
-  result: AnalyzePageResult;
-  savedKeys: Set<string>;
-  onExplain: (c: RankedCandidate) => void;
-  onSave: (c: RankedCandidate) => void;
-  onIgnore: (key: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {result.candidates.length} expression{result.candidates.length === 1 ? '' : 's'} found for your goal
-        {result.partial && ' (some sections could not be analyzed)'}
+    <div className="rounded-lg border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
+      <SparklesIcon size={16} className="mx-auto text-slate-400" aria-hidden="true" />
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        {enabled
+          ? 'No Radar words yet. Save and enrich a word to grow your Radar.'
+          : 'Radar is turned off in Settings.'}
       </p>
-      {result.candidates.map((c) => (
-        <CandidateCard
-          key={c.key}
-          candidate={c}
-          alreadySaved={savedKeys.has(c.key)}
-          onExplain={() => onExplain(c)}
-          onSave={() => onSave(c)}
-          onIgnore={() => onIgnore(c.key)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function CandidateCard({
-  candidate,
-  alreadySaved,
-  onExplain,
-  onSave,
-  onIgnore,
-}: {
-  candidate: RankedCandidate;
-  alreadySaved: boolean;
-  onExplain: () => void;
-  onSave: () => void;
-  onIgnore: () => void;
-}) {
-  const high = candidate.tier === 'high';
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-2">
-        {high ? (
-          <FlameIcon size={15} className="shrink-0 text-orange-500" aria-hidden="true" />
-        ) : (
-          <StarOutlineIcon size={15} className="shrink-0 text-amber-400" aria-hidden="true" />
-        )}
-        <span className="font-semibold text-slate-900 dark:text-slate-100">{candidate.text}</span>
-        <span className="text-[10px] font-semibold uppercase text-slate-400">
-          {high ? 'Highly relevant' : 'Relevant'}
-        </span>
-      </div>
-      {candidate.reason && (
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{candidate.reason}</p>
-      )}
-      {candidate.context && (
-        <p className="mt-1 line-clamp-2 text-[11px] italic text-slate-400 dark:text-slate-500">
-          “{candidate.context}”
-        </p>
-      )}
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <Button size="sm" variant="ghost" onClick={onExplain}>
-          Explain
-        </Button>
-        {alreadySaved ? (
-          <span className={`inline-flex items-center gap-1 text-xs font-medium ${tints.successText}`}>
-            <CheckCheckIcon size={14} aria-hidden="true" /> Already saved
-          </span>
-        ) : (
-          <Button size="sm" variant="ghost" onClick={onSave}>
-            Save
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" onClick={onIgnore}>
-          Ignore
-        </Button>
-      </div>
     </div>
   );
 }

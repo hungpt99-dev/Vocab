@@ -3,14 +3,17 @@ import { SETTINGS_KEY, settingsRepository } from '@/storage/settings-repository'
 import { sendMessage } from '@/shared/messaging/client';
 import type { ExplainKind } from '@/shared/types/ai';
 import type { HighlightData } from '@/shared/messaging/contract';
-import { isRadarEnabled, isReadingActiveOnHost } from '@/shared/types/settings';
+import { isReadingActiveOnHost } from '@/shared/types/settings';
 import { HIGHLIGHT_ATTR, HIGHLIGHT_CLASS, highlightRoot, removeHighlights } from './highlighter';
 import {
   highlightRadarRoot,
   removeRadarHighlights,
+  RADAR_HIGHLIGHT_CLASS,
+  RADAR_HIGHLIGHT_ATTR,
   type RadarMatchEntry,
 } from './highlighter';
 import { HoverCard } from './hover-card';
+import { RadarCard } from './radar-card';
 import { VocabularyMatcher, type HighlightEntry } from './matcher';
 import { readSelection } from './selection';
 import {
@@ -30,34 +33,18 @@ import { InlineReader } from './reading/inline-reader';
 import { extractArticle } from './reading/extract';
 import { installSpaNavHandler } from './spa';
 import { isContextInvalidationError } from './context-invalidation';
-import { vocabularyRepository } from '@/storage/vocabulary-repository';
-import { normalizeFamilyKey } from '@/features/radar/rank';
-// The inline reader imports from './domain' directly to keep the module graph
-// acyclic; this import+re-export keeps `matchesDomain` available at the entry
-// (and in the entry's tests) without the old circular dependency.
 import { matchesDomain } from './domain';
 export { matchesDomain };
 
 const RESCAN_DELAY_MS = 400;
-/** Debounce for radar auto-scan re-runs (settings change, SPA nav, lazy load). */
-const RADAR_RESCAN_MS = 1500;
-/** Minimum gap between two real radar analyses, so a burst of mutations or
- * rapid settings writes can't trigger a storm of expensive AI calls. */
-const RADAR_MIN_INTERVAL_MS = 4000;
 
 const hoverCard = new HoverCard();
+const radarCard = new RadarCard();
 const toolbar = new SelectionCard();
 const reader = new InlineReader();
 
 /** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
 let currentSettings: import('@/shared/types/settings').Settings | null = null;
-
-/** Guards so overlapping radar scans don't multiply API calls. */
-let radarScanning = false;
-let radarRescanTimer: ReturnType<typeof setTimeout> | undefined;
-let lastRadarRunAt = 0;
-/** Content hash of the last text we analyzed, to skip no-op rescans. */
-let lastRadarContentHash = '';
 
 /** Whether an AI provider is usable right now (mirrors useAiAvailable in the popup). */
 function isAiAvailable(): boolean {
@@ -70,6 +57,7 @@ function isAiAvailable(): boolean {
 }
 let matcher = new VocabularyMatcher([]);
 let entriesById = new Map<string, HighlightEntry>();
+let radarByKey = new Map<string, HighlightData['radar'][number]>();
 let observer: MutationObserver | null = null;
 let rescanTimer: ReturnType<typeof setTimeout> | undefined;
 /**
@@ -101,7 +89,6 @@ registerMessageHandlers({
   'toggle-bilingual-reading': () => void reader.toggle(),
   'bilingual:refresh': (message) => void reader.refresh(message.force),
   'bilingual:reconcile': () => void reconcileBilingual(),
-  'radar:scan': (message) => runRadarScanHere(message.payload?.goal),
 });
 
 void bootstrap();
@@ -311,9 +298,6 @@ function watchSettings(): void {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes[SETTINGS_KEY]) {
       void refresh();
-      // Radar auto-scan is debounced + guarded inside scheduleRadarAutoScan, so a
-      // settings change that also triggers refresh() won't start two scans.
-      scheduleRadarAutoScan();
     }
   });
 }
@@ -362,6 +346,7 @@ function refreshHighlights(data: HighlightData): void {
   matcher = new VocabularyMatcher(data.entries);
 
   removeHighlights();
+  removeRadarHighlights();
   if (!data.enabled || matcher.size === 0) {
     stopObserving();
     return;
@@ -370,10 +355,9 @@ function refreshHighlights(data: HighlightData): void {
   scan(document.body);
   startObserving();
 
-  // Vocabulary Radar auto-scan (VOC-134): if enabled for this domain, analyse
-  // the page automatically and highlight radar-relevant words inline.
-  // Debounced + guarded so it never races with a concurrent scan.
-  scheduleRadarAutoScan();
+  // Vocabulary Radar: highlight generated candidates from the user's saved
+  // vocabulary. Driven purely by the persisted Radar list — no AI page scan.
+  applyRadarHighlights(data.radar);
 }
 
 /**
@@ -394,106 +378,17 @@ async function refreshVocabulary(): Promise<void> {
   refreshHighlights(data);
 }
 
-/** Cheap, non-cryptographic content hash (FNV-1a) for change detection. */
-function fnv1aHash(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-/**
- * Build the set of vocabulary "families" the user already knows (saved words).
- * Both sides of the radar filter run through `normalizeFamilyKey`, so a saved
- * lemma like "run" suppresses "runs"/"running" on the page. Deterministic and
- * model-free, so it works even before the AI is asked — no wasted suggestions.
- */
-async function buildKnownFamilies(): Promise<string[]> {
-  const entries = await vocabularyRepository.list();
-  const families = new Set<string>();
-  for (const entry of entries) {
-    if (entry.lemma) families.add(normalizeFamilyKey(entry.lemma));
-    if (entry.normalizedForm) families.add(normalizeFamilyKey(entry.normalizedForm));
-    families.add(normalizeFamilyKey(entry.word));
-  }
-  return [...families];
-}
-
-/**
- * Run a Radar scan for the *current page* (invoked from the popup via the
- * background, or directly). Extracts the article text, asks the background to
- * analyse it against the user's Radar goal, then highlights the results inline.
- * The page does the extraction itself so it always reads its own content — this
- * is what fixes the old bug where the background resolved the popup's tab.
- *
- * `goalOverride` lets a caller (e.g. Radar Quick Search) reuse this exact
- * pipeline with an ad-hoc goal without changing the saved Settings goal.
- *
- * Personalization, dedup and rate-limit guards live here so Radar v2 stays
- * quality-first and never multiplies AI calls:
- *  - known families are computed and sent so the worker drops already-known
- *    words before they ever reach the user;
- *  - a content hash + min-interval guard skips no-op / back-to-back rescans.
- */
-async function runRadarScanHere(
-  goalOverride?: string,
-): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
-  const settings = await settingsRepository.get();
-  const goal = goalOverride?.trim() || settings.radar?.goal?.trim() || '';
-  if (!goal) {
-    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
-  }
-  const blocks = extractArticle();
-  const pageText = blocks.map((block) => block.text).join('\n\n');
-  if (!pageText.trim()) {
-    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
-  }
-
-  const contentHash = fnv1aHash(pageText);
-  // Skip if the page content hasn't changed since the last analysis and we are
-  // within the minimum interval — this is what stops SPA/infinite-scroll
-  // mutations and rapid settings writes from re-triggering a full scan.
-  if (contentHash === lastRadarContentHash && Date.now() - lastRadarRunAt < RADAR_MIN_INTERVAL_MS) {
-    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
-  }
-
-  const knownFamilies = await buildKnownFamilies();
-  const result = await sendMessage({
-    type: 'radar:analyze',
-    payload: { goal, pageUrl: location.href, pageText, knownFamilies },
-  });
-  lastRadarContentHash = contentHash;
-  lastRadarRunAt = Date.now();
-
+/** Highlight generated Radar candidates on the page (no AI, no page scan). */
+function applyRadarHighlights(radar: HighlightData['radar']): void {
   removeRadarHighlights();
-  if (result && result.candidates.length > 0) {
-    // Inline-highlight only the high-value tier (Radar v2: quality over noise).
-    // The full ranked list is always available in the popup.
-    const entries: RadarMatchEntry[] = result.candidates
-      .filter((c) => c.tier === 'high')
-      .map((c) => ({ key: c.key, text: c.text, tier: c.tier }));
-    if (entries.length > 0) highlightRadarRoot(document.body, entries);
-  }
-  return result ?? { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
-}
-
-/**
- * Automatically analyse the current page for radar-relevant vocabulary and
- * highlight the high-value candidates inline — only when Radar is enabled for
- * this domain (reusing the per-site domain pattern from Bilingual). Safe no-op
- * otherwise; the manual popup scan remains available in all cases.
- *
- * Guarded so a burst of triggers (settings change, SPA nav, lazy-loaded content)
- * collapses into at most one in-flight scan: overlapping calls are skipped, and
- * repeat triggers are debounced to RADAR_RESCAN_MS.
- */
-function scheduleRadarAutoScan(): void {
-  clearTimeout(radarRescanTimer);
-  radarRescanTimer = setTimeout(() => {
-    void runRadarAutoScan();
-  }, RADAR_RESCAN_MS);
+  radarByKey = new Map(radar.map((r) => [r.wordKey, r]));
+  if (radar.length === 0) return;
+  const entries: RadarMatchEntry[] = radar.map((r) => ({
+    key: r.wordKey,
+    text: r.word,
+    tier: 'high',
+  }));
+  highlightRadarRoot(document.body, entries);
 }
 
 /** Debounce before re-translating after an in-tab (SPA) navigation. */
@@ -544,39 +439,6 @@ function scheduleBilingualRefresh(): void {
     }
   };
   bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_MS);
-}
-
-async function runRadarAutoScan(): Promise<void> {
-  if (radarScanning) return;
-  let settings: import('@/shared/types/settings').Settings;
-  try {
-    settings = await settingsRepository.get();
-  } catch {
-    return;
-  }
-  if (!isRadarEnabled(settings)) {
-    removeRadarHighlights();
-    return;
-  }
-  // Respect the shared reading scope: 'allowed' limits Radar auto-find to the
-  // shared allowedDomains; 'everywhere' runs it on every readable page.
-  if (settings.readingMode === 'allowed') {
-    const host = location.hostname.replace(/^www\./i, '').toLowerCase();
-    if (!matchesDomain(host, settings.allowedDomains)) {
-      removeRadarHighlights();
-      return;
-    }
-  }
-
-  radarScanning = true;
-  try {
-    await runRadarScanHere();
-  } catch {
-    // Auto-scan failures are non-fatal: the page stays readable; the manual
-    // popup scan can surface the real error if the user retries.
-  } finally {
-    radarScanning = false;
-  }
 }
 
 /**
@@ -706,12 +568,11 @@ function startObserving(): void {
 
     clearTimeout(rescanTimer);
     rescanTimer = setTimeout(() => scan(document.body), RESCAN_DELAY_MS);
-    // Dynamic content (SPA route changes, infinite scroll, lazy-loaded
-    // articles) should be re-checked by Radar. scheduleRadarAutoScan debounces
-    // and guards this so we never multiply AI calls on a busy mutation stream,
-    // and runRadarAutoScan itself short-circuits when the page text is
-    // unchanged since the last analysis.
-    scheduleRadarAutoScan();
+    // New page content may contain Radar candidate words — re-apply radar
+    // highlights (driven by the persisted list, no AI page scan).
+    void sendMessage({ type: 'get-highlight-data' }).then((d) => {
+      if (d) applyRadarHighlights(d.radar);
+    }).catch(() => undefined);
     // The same content change may be an in-site (SPA) navigation that swapped
     // the visible article — re-derive Bilingual state and re-translate the new
     // view. BUT many mutations that flip `touchedContent` (e.g. re-highlighting
@@ -744,6 +605,7 @@ function isOwnNode(node: Node): boolean {
   const element = node as Element;
   return (
     element.classList.contains(HIGHLIGHT_CLASS) ||
+    element.classList.contains(RADAR_HIGHLIGHT_CLASS) ||
     element.classList.contains('avs-card') ||
     element.classList.contains('avs-toast') ||
     element.classList.contains('avs-toolbar') ||
@@ -758,6 +620,18 @@ function isOwnNode(node: Node): boolean {
 
 function attachHoverListeners(): void {
   const openFor = async (target: EventTarget | null): Promise<void> => {
+    // Radar candidate highlight → open the Radar card (Save action).
+    const radarMark =
+      target instanceof Element ? target.closest(`.${RADAR_HIGHLIGHT_CLASS}`) : null;
+    if (radarMark instanceof HTMLElement) {
+      const item = radarByKey.get(radarMark.getAttribute(RADAR_HIGHLIGHT_ATTR) ?? '');
+      if (item) {
+        radarCard.show(radarMark, item);
+        hoverCard.hide();
+        return;
+      }
+    }
+
     const mark = target instanceof Element ? target.closest(`.${HIGHLIGHT_CLASS}`) : null;
     if (!(mark instanceof HTMLElement)) return;
     const entry = entriesById.get(mark.getAttribute(HIGHLIGHT_ATTR) ?? '');
@@ -773,10 +647,17 @@ function attachHoverListeners(): void {
     // the card's own mouseenter keeps it open. Only defer when leaving toward the
     // page, so the user has time to cross the gap onto the card.
     const next = event instanceof MouseEvent ? event.relatedTarget : null;
-    if (next instanceof Node && (hoverCard.contains(next) || (next as Element).closest?.(`.${HIGHLIGHT_CLASS}`))) {
+    if (
+      next instanceof Node &&
+      (hoverCard.contains(next) ||
+        radarCard.contains(next) ||
+        (next as Element).closest?.(`.${HIGHLIGHT_CLASS}`) ||
+        (next as Element).closest?.(`.${RADAR_HIGHLIGHT_CLASS}`))
+    ) {
       return;
     }
     hoverCard.scheduleHide(220);
+    radarCard.scheduleHide(220);
   };
 
   document.addEventListener('mouseover', (event) => openFor(event.target));
@@ -784,6 +665,9 @@ function attachHoverListeners(): void {
   document.addEventListener('focusin', (event) => openFor(event.target));
   document.addEventListener('focusout', () => closeFor());
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hoverCard.hide();
+    if (event.key === 'Escape') {
+      hoverCard.hide();
+      radarCard.hide();
+    }
   });
 }

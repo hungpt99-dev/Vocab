@@ -8,8 +8,7 @@ import {
   saveSelection,
   splitVocabularyTerm,
   translateUnit,
-  radarAnalyze,
-  radarScan,
+  deleteVocabulary,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -17,7 +16,6 @@ import { TranslateService } from '@/ai/translate-service';
 import { VocabularyRepository } from '@/storage/vocabulary-repository';
 import { SettingsRepository } from '@/storage/settings-repository';
 import { ExplainService } from '@/ai/explain-service';
-import { radarVocabularyService } from '@/features/radar/radar-service';
 import { dispatch } from '@/shared/messaging/router';
 import { chromeMock } from '@/test/chrome-mock';
 import type { Explanation } from '@/shared/types/vocabulary';
@@ -61,7 +59,6 @@ beforeEach(async () => {
     translate: {
       translate: vi.fn(async () => []),
     } as unknown as TranslateService,
-    radarService: radarVocabularyService,
   };
 });
 
@@ -513,66 +510,16 @@ describe('translateUnit default language', () => {
   });
 });
 
-describe('radarAnalyze', () => {
-  it('returns candidates from the radar service for a page with readable content', async () => {
-    deps.radarService = {
-      analyzePage: vi.fn(async () => ({
-        candidates: [
-          { key: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'x', context: 'x', tier: 'high' },
-        ],
-        chunksAnalyzed: 1,
-        chunksTotal: 1,
-        partial: false,
-      })),
-    } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
+describe('deleteVocabulary', () => {
+  it('removes the saved entry and drops it as a Radar source', async () => {
+    const saved = await deps.vocabulary.save({ word: 'mitigate', sentence: 'We mitigate risk.' });
+    expect(await deps.vocabulary.findByWord('mitigate')).toBeDefined();
 
-    const result = await radarAnalyze(deps, {
-      goal: 'backend engineering',
-      pageUrl: 'https://example.com/article',
-      pageText: 'The API should be idempotent.',
-    });
-    expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0]!.text).toBe('idempotent');
-    expect(deps.radarService.analyzePage).toHaveBeenCalled();
-  });
+    await deleteVocabulary(deps, saved.id);
 
-  it('throws a config error when the goal text is empty', async () => {
-    deps.radarService = { analyzePage: vi.fn() } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
-    await expect(
-      radarAnalyze(deps, { goal: '   ', pageUrl: 'https://example.com', pageText: 'text' }),
-    ).rejects.toThrow();
-  });
-
-  it('returns empty result when the page has no readable content', async () => {
-    deps.radarService = { analyzePage: vi.fn() } as unknown as import('@/features/radar/radar-service').RadarVocabularyService;
-    const result = await radarAnalyze(deps, { goal: 'reading', pageUrl: 'https://example.com', pageText: '   ' });
-    expect(result.candidates).toEqual([]);
-    expect(deps.radarService.analyzePage).not.toHaveBeenCalled();
-  });
-});
-
-describe('radarScan', () => {
-  it('forwards the scan to the active page tab and returns its result', async () => {
-    chromeMock().tabs.query.mockResolvedValue([{ id: 7, url: 'https://example.com/article' }]);
-    const pageResult = {
-      candidates: [],
-      chunksAnalyzed: 1,
-      chunksTotal: 1,
-      partial: false,
-    };
-    chromeMock().tabs.sendMessage.mockResolvedValue({ ok: true, data: pageResult });
-
-    const result = await radarScan();
-    expect(result).toBe(pageResult);
-    // The worker asks the PAGE to scan itself (it has the real DOM + tab), so
-    // the goal override (carried in the radar:scan payload by the popup) is
-    // forwarded, not re-resolved from the popup window.
-    expect(chromeMock().tabs.sendMessage).toHaveBeenCalledWith(7, { type: 'radar:scan' });
-  });
-
-  it('throws when there is no active page tab', async () => {
-    chromeMock().tabs.query.mockResolvedValue([]);
-    await expect(radarScan()).rejects.toThrow();
+    expect(await deps.vocabulary.findByWord('mitigate')).toBeUndefined();
+    // The dropped-source step still broadcasts radar-changed (best-effort).
+    expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({ type: 'radar-changed' });
   });
 });
 
