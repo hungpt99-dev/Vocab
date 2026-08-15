@@ -503,9 +503,14 @@ async function reconcileBilingual(): Promise<void> {
     return;
   }
   if (isActive) {
-    void reader.open();
+    // Same tab re-focused: reveal the existing translation instead of
+    // re-translating from scratch (the DOM + session cache are preserved).
+    if (reader.isOpen) reader.show();
+    else void reader.open();
   } else if (reader.isOpen) {
-    reader.close();
+    // Backgrounded tab: keep the translated DOM but hide it (and pause lazy
+    // loading) so only the front tab shows a translation at a time.
+    reader.hide();
   }
 }
 

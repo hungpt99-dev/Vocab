@@ -373,26 +373,30 @@ describe('InlineReader bilingual injection', () => {
     reader2.close();
   });
 
-  it('re-translates on refresh(), bypassing the session cache', async () => {
+  it('hide() keeps the translated DOM but hides it; show() reveals without re-translating', async () => {
     const reader = new InlineReader();
     resolveSend(glossResponse());
     await reader.open();
     await flush();
     await flush();
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(reader.isOpen).toBe(true);
 
     const aiCallsAfterOpen = vi.mocked(sendMessage).mock.calls.length;
 
-    // A forced refresh() MUST re-translate even though the blocks are cached.
-    resolveSend(glossResponse());
-    await reader.refresh();
-    await flush();
-    await flush();
-
-    // The AI was called again (the cache was bypassed)…
-    expect(vi.mocked(sendMessage).mock.calls.length).toBeGreaterThan(aiCallsAfterOpen);
-    // …and the translations are re-injected (still present on the page).
+    // Background the tab: the reader stays open but its DOM is hidden, not removed.
+    reader.hide();
+    expect(reader.isOpen).toBe(true); // still active — DOM preserved
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect(document.querySelector('.avs-inline-control') as HTMLElement).not.toBeNull();
+    expect((document.querySelector('.avs-inline-control') as HTMLElement).style.display).toBe('none');
+
+    // Re-focus the tab: the existing translation is revealed, NOT re-translated.
+    reader.show();
+    expect((document.querySelector('.avs-inline-control') as HTMLElement).style.display).toBe('');
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    // No new AI call happened during hide/show.
+    expect(vi.mocked(sendMessage).mock.calls.length).toBe(aiCallsAfterOpen);
     reader.close();
   });
 });

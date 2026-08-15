@@ -81,6 +81,43 @@ export class InlineReader {
     await this.observeBlocks(blocks, true);
   }
 
+  /** Reveal a previously hidden reader (tab re-focused) without re-translating. */
+  show(): void {
+    if (!this.active) return;
+    this.restoreVisibility();
+    // Resume lazy translation for any blocks not yet translated; blocks already
+    // in translatedBlockIds are skipped, so nothing already shown is redone.
+    if (!this.observer) {
+      const blocks = extractArticle();
+      if (blocks.length > 0) void this.observeBlocks(blocks);
+    }
+  }
+
+  /** Hide the reader while keeping its translated DOM (tab backgrounded). */
+  hide(): void {
+    if (!this.active) return;
+    this.applyVisibility(false);
+    // Stop lazy-loading hidden blocks so we don't burn AI calls on a tab the
+    // user isn't looking at; observeBlocks() is re-run on show().
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+
+  private applyVisibility(visible: boolean): void {
+    const display = visible ? '' : 'none';
+    if (this.control) this.control.style.display = display;
+    for (const nodes of this.injected.values()) {
+      for (const node of nodes) node.style.display = display;
+    }
+    if (this.banner) this.banner.style.display = display;
+  }
+
+  private restoreVisibility(): void {
+    // Clearing inline display lets each node's own `hidden` attribute (set by
+    // the show/hide-translations toggle) and the CSS take over again.
+    this.applyVisibility(true);
+  }
+
   async open(): Promise<boolean> {
     if (this.active) return true;
     const blocks = extractArticle();
