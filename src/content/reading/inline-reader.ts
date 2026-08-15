@@ -19,6 +19,19 @@ import { isReadingActiveOnHost } from '@/shared/types/settings';
 import { translationCache, cacheKey, type CachedTranslation } from './translation-cache';
 
 /**
+ * Minimum time a skeleton shimmer stays visible. The skeleton is injected
+ * synchronously (before any await) so it always paints, but a fast provider can
+ * resolve in the same frame; without a floor the shimmer would flash for ~0ms
+ * and look like it "never shows". This guarantees a perceptible loading state.
+ * Unit tests override it to 0 so their synchronous assertions don't have to
+ * wait.
+ */
+let MIN_SKELETON_MS = 200;
+export function setMinSkeletonMs(ms: number): void {
+  MIN_SKELETON_MS = ms;
+}
+
+/**
  * Inline bilingual reading: keeps the original page UI intact and injects the
  * translation of each sentence (or paragraph) directly beneath the source text
  * on the live page — like a bilingual book laid over the real article. No
@@ -41,6 +54,8 @@ export class InlineReader {
   private readonly translatedBlockIds = new Set<string>();
   /** Skeleton placeholders currently shown, keyed by block id, for removal. */
   private readonly skeletons = new Map<string, HTMLElement>();
+  /** When each skeleton was shown, so we can enforce a minimum dwell time. */
+  private readonly skeletonShownAt = new Map<string, number>();
   /** Monotonic token; bumped on every (re)inject or close so a stale in-flight
    *  batch can tell it has been superseded and must not append nodes. */
   private generation = 0;
@@ -313,6 +328,7 @@ export class InlineReader {
       const skeleton = this.buildSkeletonLine();
       anchor.after(skeleton);
       this.skeletons.set(block.id, skeleton);
+      this.skeletonShownAt.set(block.id, performance.now());
       skeletonByAnchor.set(anchor, skeleton);
     }
 
@@ -338,6 +354,18 @@ export class InlineReader {
       : await translationCache.get(
           items.map((item) => cacheKey(item.text, language, this.mode)),
         );
+
+    // Enforce a minimum visible dwell for the skeleton shimmer. The skeleton was
+    // injected synchronously above so it always paints, but a fast provider can
+    // resolve in well under a frame; without this floor the loading state would
+    // flash for ~0ms and feel like it "never shows". We wait only for the
+    // shortfall against the earliest-shown skeleton.
+    if (skeletonByAnchor.size > 0 && MIN_SKELETON_MS > 0) {
+      const earliest = Math.min(...[...this.skeletonShownAt.values()]);
+      const elapsed = performance.now() - earliest;
+      const wait = MIN_SKELETON_MS - elapsed;
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
 
     const toTranslate: typeof items = [];
     let injectedSomething = false;
@@ -462,6 +490,7 @@ export class InlineReader {
   private clearSkeletons(): void {
     for (const skeleton of this.skeletons.values()) skeleton.remove();
     this.skeletons.clear();
+    this.skeletonShownAt.clear();
   }
 
   /** Render a persistent, dismissable banner explaining why nothing translated. */

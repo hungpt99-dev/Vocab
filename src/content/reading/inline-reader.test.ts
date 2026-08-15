@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InlineReader } from './inline-reader';
+import { InlineReader, setMinSkeletonMs } from './inline-reader';
 import { sendMessage } from '@/shared/messaging/client';
 import { settingsRepository } from '@/storage/settings-repository';
 import type { WordAlignResult } from '@/ai/types';
@@ -71,6 +71,7 @@ function stubSettings(): void {
 
 describe('InlineReader bilingual injection', () => {
   beforeEach(() => {
+    setMinSkeletonMs(0);
     document.body.innerHTML =
       '<article><p>Hello world</p><p>Goodbye world</p></article>';
     defer();
