@@ -80,9 +80,22 @@ let rescanTimer: ReturnType<typeof setTimeout> | undefined;
  */
 let localBilingualOff = false;
 
+/**
+ * Signature of the article's current block set, used to decide whether a DOM
+ * mutation actually changed the translatable content. Re-highlighting vocabulary
+ * words (e.g. after saving one) mutates the page but leaves the block set the
+ * same, so we must NOT re-translate on those — only on a genuine article change.
+ */
+let lastArticleSig = '';
+
 registerMessageHandlers({
   'get-selection': () => readSelection(),
-  'vocabulary-changed': () => void refresh(),
+  // Word saves change the vocabulary, not the Bilingual scope. Refresh only the
+  // highlights/Radar — NOT the Bilingual reader (which would re-translate the
+  // whole page, looking like an auto-reload on every saved word). Reading-mode
+  // / allowed-list changes come through `settings-changed` and run the full
+  // refresh() that re-evaluates Bilingual scope.
+  'vocabulary-changed': () => void refreshVocabulary(),
   'settings-changed': () => void refresh(),
   'show-toast': (message) => showToast(message.payload.message, message.payload.variant),
   'toggle-bilingual-reading': () => void reader.toggle(),
@@ -118,6 +131,10 @@ async function bootstrap(): Promise<void> {
   // page without a full reload, so nothing else re-triggers Bilingual.
   installSpaNavHandler(scheduleBilingualRefresh);
   await refresh();
+  // Record the initial article signature so the highlight MutationObserver's
+  // re-translate guard knows the starting content (it would otherwise treat the
+  // first post-load mutation as a brand-new article and re-translate on load).
+  lastArticleSig = extractArticle().map((b) => b.id).join('|');
 }
 
 /**
@@ -327,6 +344,19 @@ async function refresh(): Promise<void> {
   // first so the headbar + inline translations appear even when no words are saved.
   syncBilingual(data.readingMode, data.allowedDomains);
 
+  refreshHighlights(data);
+}
+
+/**
+ * Re-apply word highlighting + Radar auto-scan from the latest vocabulary,
+ * WITHOUT touching the Bilingual reader. Word saves broadcast `vocabulary-changed`,
+ * which must refresh highlights/radar but must NOT re-translate the page — the
+ * Bilingual reader keeps its own session cache and re-syncing here would make the
+ * whole page flash + re-translate on every saved word (looks like an auto-reload).
+ * A reading-mode / allowed-list change arrives via `settings-changed`, which calls
+ * the full `refresh()` above and legitimately re-evaluates Bilingual scope.
+ */
+function refreshHighlights(data: HighlightData): void {
   applyHighlightColor(data.color);
   entriesById = new Map(data.entries.map((entry) => [entry.id, entry]));
   matcher = new VocabularyMatcher(data.entries);
@@ -344,6 +374,24 @@ async function refresh(): Promise<void> {
   // the page automatically and highlight radar-relevant words inline.
   // Debounced + guarded so it never races with a concurrent scan.
   scheduleRadarAutoScan();
+}
+
+/**
+ * Lightweight refresh triggered by a vocabulary change (word saved/edited/deleted).
+ * Re-applies only the word highlights + Radar — deliberately does NOT re-sync the
+ * Bilingual reader, whose translation is already in the DOM and session cache;
+ * re-syncing would re-translate the whole page (looks like an auto-reload on every
+ * saved word). Reading-mode / allowed-list changes go through refresh() instead.
+ */
+async function refreshVocabulary(): Promise<void> {
+  let data: HighlightData | undefined;
+  try {
+    data = await sendMessage({ type: 'get-highlight-data' });
+  } catch {
+    return;
+  }
+  if (!data) return;
+  refreshHighlights(data);
 }
 
 /** Cheap, non-cryptographic content hash (FNV-1a) for change detection. */
@@ -477,6 +525,10 @@ function scheduleBilingualRefresh(): void {
       }
       return;
     }
+    // Record the signature of what we're about to translate so the MutationObserver
+    // guard won't re-fire on subsequent same-content mutations (only a genuine
+    // article change will clear this and trigger another re-translate).
+    lastArticleSig = extractArticle().map((b) => b.id).join('|');
     try {
       const settings = await settingsRepository.get();
       if (reader.isOpen) {
@@ -657,13 +709,21 @@ function startObserving(): void {
     // Dynamic content (SPA route changes, infinite scroll, lazy-loaded
     // articles) should be re-checked by Radar. scheduleRadarAutoScan debounces
     // and guards this so we never multiply AI calls on a busy mutation stream,
-    // and runRadarScanHere itself short-circuits when the page text is
+    // and runRadarAutoScan itself short-circuits when the page text is
     // unchanged since the last analysis.
     scheduleRadarAutoScan();
     // The same content change may be an in-site (SPA) navigation that swapped
     // the visible article — re-derive Bilingual state and re-translate the new
-    // view. Guarded/throttled inside scheduleBilingualRefresh itself.
-    scheduleBilingualRefresh();
+    // view. BUT many mutations that flip `touchedContent` (e.g. re-highlighting
+    // vocabulary words after a word is saved) leave the *article* content
+    // untouched — the block set is identical, so re-translating would just flash
+    // the whole page ("auto-reload") for no reason. Only re-translate when the
+    // article's block set actually changed.
+    const sig = extractArticle().map((b) => b.id).join('|');
+    if (sig !== lastArticleSig) {
+      lastArticleSig = sig;
+      scheduleBilingualRefresh();
+    }
   });
   observer.observe(document.body, {
     childList: true,
