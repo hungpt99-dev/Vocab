@@ -451,3 +451,118 @@ test('shows the loading skeleton during SPA translation (not just an instant swa
     server.close();
   }
 });
+
+/**
+ * Regression for the double-translation bug (whole page duplicated:
+ * Source -> Duplicate -> Translation -> Duplicate -> Quote -> Duplicate).
+ *
+ * The extension broadcasts `bilingual:reconcile` to every tab on each tab
+ * switch. Switching away backgrounds the translated tab (reader.hide() nulls
+ * the lazy-load observer but keeps the DOM); switching back re-runs
+ * reader.show() -> observeBlocks() -> translateBlocks() again. The reader dedupes
+ * already-translated blocks by their block id, so the id MUST be stable across
+ * re-extracts. When block ids were random per extractArticle() call, every
+ * re-extract produced brand-new ids and the entire translation was injected a
+ * SECOND time — duplicating the page. This test switches tabs and asserts the
+ * translation count does NOT double.
+ */
+test('switching tabs does not duplicate the translation', async ({ context, extensionId }) => {
+  const PORT = 8771;
+  const server = createServer((req, res) => {
+    if (req.url?.startsWith('/v1')) {
+      const body = JSON.stringify({
+        meaning: '[MOCK] meaning',
+        simpleExplanation: '[MOCK] simple',
+        translation: '[MOCK] bản dịch',
+        examples: ['[MOCK] example.'],
+        synonyms: [],
+        antonyms: [],
+        relatedWords: [],
+        pronunciation: '/mok/',
+        collocations: [],
+        grammar: '[MOCK] noun',
+        provider: 'local-mock',
+        model: 'mock-1',
+        generatedAt: Date.now(),
+      });
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(JSON.stringify({ choices: [{ message: { content: body } }] }));
+      return;
+    }
+    const html = `<!doctype html><html lang="en"><head><title>Tab-switch Dup</title></head>
+<body><main>
+  <p id="a">First paragraph that gets translated.</p>
+  <p id="b">Second paragraph that also gets translated.</p>
+  <blockquote id="q">A quoted sentence that is translated too.</blockquote>
+</main></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(html);
+  });
+  await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', r));
+  const pageUrl = `http://127.0.0.1:${PORT}/`;
+
+  try {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+    await popup.evaluate(
+      ([port]) =>
+        new Promise<void>((resolve) => {
+          const p = {
+            id: 'local-mock',
+            name: 'Local Mock',
+            type: 'ollama',
+            baseUrl: `http://localhost:${port}/v1`,
+            apiKey: '',
+            model: 'mock-1',
+            isBuiltIn: false,
+            requiresApiKey: false,
+            enabled: true,
+          };
+          chrome.storage.local.get('avs:settings', (cur) => {
+            const existing = (cur['avs:settings'] as Record<string, unknown> | undefined) ?? {};
+            const s = {
+              ...existing,
+              providers: [p],
+              activeProviderId: 'local-mock',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              readingMode: 'everywhere',
+              bilingualMode: true,
+              autoExplainOnSave: false,
+            };
+            chrome.storage.local.set({ 'avs:settings': s }, () => resolve());
+          });
+        }),
+      [PORT],
+    );
+    await popup.reload();
+    await popup.waitForTimeout(600);
+    await popup.close();
+
+    const page = await context.newPage();
+    await page.goto(pageUrl);
+    await page.bringToFront();
+    await expect(page.locator('.avs-inline-control').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
+
+    const beforeCount = await page.locator('.avs-inline-translation').count();
+
+    // Switch to a second tab and back — this fires the tab-switch reconcile
+    // broadcast that used to re-inject the whole translation.
+    const other = await context.newPage();
+    await other.goto('about:blank');
+    await other.bringToFront();
+    await page.bringToFront();
+    // Give the reconcile-driven show() + lazy re-translate time to settle.
+    await page.waitForTimeout(1500);
+
+    const afterCount = await page.locator('.avs-inline-translation').count();
+    // No duplication: the count must be unchanged (not doubled).
+    expect(afterCount).toBe(beforeCount);
+    // And each original source block must still have exactly one translation line.
+    expect(afterCount).toBe(3);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});

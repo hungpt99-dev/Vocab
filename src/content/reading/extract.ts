@@ -1,4 +1,3 @@
-import { createId } from '@/shared/lib/id';
 import { collapseWhitespace } from '@/shared/lib/text';
 
 /** Block elements that never belong to the article body. */
@@ -12,6 +11,26 @@ const SKIPPED_TAGS = new Set([
 const BLOCK_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'FIGCAPTION', 'DT', 'DD', 'TD', 'TH', 'SUMMARY',
 ]);
+
+/**
+ * Stable IDs per DOM element. `extractArticle()` is called repeatedly (tab
+ * re-focus, SPA nav, settings refresh) and the reader dedupes already-translated
+ * blocks by `block.id`. If IDs were random (createId), each re-extract would
+ * produce brand-new IDs, so every block would look "new" and the translation
+ * would be injected a SECOND time — duplicating the whole page. Keying the ID
+ * to the element (WeakMap, so it doesn't leak) keeps IDs identical across
+ * re-extracts, so the dedup guard correctly skips blocks we already translated.
+ */
+const blockIds = new WeakMap<Element, string>();
+let blockIdCounter = 0;
+function blockIdFor(element: Element): string {
+  const existing = blockIds.get(element);
+  if (existing) return existing;
+  blockIdCounter += 1;
+  const id = `b${blockIdCounter}`;
+  blockIds.set(element, id);
+  return id;
+}
 
 /** A single translatable block: original element plus its collapsed text. */
 export interface ArticleBlock {
@@ -61,12 +80,20 @@ export function extractArticle(doc: Document = document): ArticleBlock[] {
 function collectBlocks(root: Element, out: ArticleBlock[]): void {
   for (const child of root.children) {
     if (SKIPPED_TAGS.has(child.tagName)) continue;
+    // Skip the extension's own injected nodes (the bilingual translation lines,
+    // the control/headbar, gloss words, …). If we didn't, a re-extract (tab
+    // re-focus, SPA nav, settings refresh) would treat the injected
+    // translations as NEW source paragraphs and translate them AGAIN, doubling
+    // the page every time the user switched tabs or navigated in-site.
+    if (child.classList.contains('avs-inline-translation')) continue;
+    if (child.classList.contains('avs-inline-control')) continue;
+    if (child.closest('.avs-bilingual-control, .avs-inline-control')) continue;
 
     // Known block tags (p, headings, li, …) are collected directly.
     if (BLOCK_TAGS.has(child.tagName)) {
       const text = collapseWhitespace(child.textContent ?? '');
       if (text && isVisible(child)) {
-        out.push({ id: createId(), text, tagName: child.tagName, element: child });
+        out.push({ id: blockIdFor(child), text, tagName: child.tagName, element: child });
       }
       continue;
     }
@@ -82,7 +109,7 @@ function collectBlocks(root: Element, out: ArticleBlock[]): void {
     }
     const text = collapseWhitespace(child.textContent ?? '');
     if (text && isVisible(child)) {
-      out.push({ id: createId(), text, tagName: child.tagName, element: child });
+      out.push({ id: blockIdFor(child), text, tagName: child.tagName, element: child });
     }
   }
 }

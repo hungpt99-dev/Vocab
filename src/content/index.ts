@@ -634,9 +634,22 @@ function scan(root: Node | null): void {
 function startObserving(): void {
   if (observer) return;
   observer = new MutationObserver((mutations) => {
-    const touchedContent = mutations.some((mutation) =>
-      [...mutation.addedNodes].some((node) => !isOwnNode(node)),
-    );
+    const touchedContent = mutations.some((mutation) => {
+      // Added/removed nodes (SPA route swaps, infinite scroll, lazy articles).
+      const addedOwn = [...mutation.addedNodes].some((node) => !isOwnNode(node));
+      if (addedOwn) return true;
+      // Attribute changes that toggle a block's visibility (e.g. an SPA that
+      // shows/hides two pre-rendered views via the `hidden` attribute or
+      // inline `style`/`display`) — these swap the visible article WITHOUT
+      // adding or removing any DOM node, so childList alone would miss them.
+      if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+        const attr = mutation.attributeName;
+        if (attr === 'hidden' || attr === 'style' || attr === 'class' || attr === 'display') {
+          return !isOwnNode(mutation.target);
+        }
+      }
+      return false;
+    });
     if (!touchedContent) return;
 
     clearTimeout(rescanTimer);
@@ -647,8 +660,17 @@ function startObserving(): void {
     // and runRadarScanHere itself short-circuits when the page text is
     // unchanged since the last analysis.
     scheduleRadarAutoScan();
+    // The same content change may be an in-site (SPA) navigation that swapped
+    // the visible article — re-derive Bilingual state and re-translate the new
+    // view. Guarded/throttled inside scheduleBilingualRefresh itself.
+    scheduleBilingualRefresh();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['hidden', 'style', 'class', 'display'],
+  });
 }
 
 function stopObserving(): void {

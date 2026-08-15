@@ -63,4 +63,15 @@ describe('extractArticle', () => {
     expect(texts).not.toContain('Hidden text.');
     expect(texts).not.toContain('Nav link');
   });
+
+  it('assigns STABLE ids keyed to the DOM element across re-extracts', () => {
+    render(`<main><p>One.</p><p>Two.</p></main>`);
+    const first = extractArticle();
+    const second = extractArticle();
+    expect(first.map((b) => b.id)).toEqual(second.map((b) => b.id));
+    // The same element must keep the same id; a fresh element gets a new one.
+    const p = document.querySelector('p')!;
+    expect(first[0]?.id).toBe(second[0]?.id);
+    expect(first[0]?.element).toBe(p);
+  });
 });
