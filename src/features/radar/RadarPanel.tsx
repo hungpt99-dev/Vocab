@@ -158,82 +158,72 @@ export function RadarPanel() {
         Vocabulary Radar finds words on this page that match your learning goal (set in Settings).
       </p>
 
-      {/* Radar smart search bar — an explicit entry point into the existing Radar scan.
-          Type, then press Enter or the Search button; it does NOT auto-search on
-          every keystroke. Esc in the field clears the query. The Search button is
-          visible (not just Enter) so the affordance is obvious. */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <SearchIcon
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            aria-hidden="true"
-          />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                setQuery('');
-                inputRef.current?.blur();
-              } else if (event.key === 'Enter') {
-                event.preventDefault();
-                runQuickSearch();
-              }
-            }}
-            placeholder="Radar smart search…  (Ctrl/Cmd + F)"
-            aria-label="Radar smart search — find vocabulary on this page"
-            title="Type a query, then press Enter or the Search button to run a Radar smart search of this page. Works without a learning goal. Press Ctrl/Cmd + F to focus."
-            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          />
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={query.trim().length < MIN_QUERY_LENGTH || scan.status === 'scanning'}
-          onClick={runQuickSearch}
-          aria-label="Search with Vocab Radar"
-          title="Search this page with Vocab Radar"
-        >
-          <SearchIcon size={14} className="mr-1.5" aria-hidden="true" />
-          Search
-        </Button>
+      {/* Radar smart-search bar — type a term to scan this page for it (works
+          without a learning goal), or leave it empty and use the button to run
+          your goal. Submit with Enter or the Find for my Radar button; it does
+          NOT auto-search on every keystroke. Esc in the field clears the query. */}
+      <div className="relative">
+        <SearchIcon
+          size={15}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          aria-hidden="true"
+        />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setQuery('');
+              inputRef.current?.blur();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              runQuickSearch();
+            }
+          }}
+          placeholder="Search this page…  (or set a goal to scan all)"
+          aria-label="Radar smart search — find vocabulary on this page"
+          title="Type a term to scan this page for it (no learning goal needed), or leave empty and use Find for my Radar to scan with your learning goal. Press Ctrl/Cmd + F to focus."
+          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+        />
       </div>
 
-      {!goal.trim() ? (
+      {/* One always-visible action: 'Find for my Radar'. With a query in the bar
+          it smart-searches that term (no goal needed); with an empty bar it runs
+          the learning-goal scan. Disabled only when there is nothing to scan. */}
+      <Button
+        variant="primary"
+        disabled={!aiAvailable || scan.status === 'scanning' || (!query.trim() && !goal.trim())}
+        onClick={() => (query.trim() ? runQuickSearch() : void runScan())}
+        title={
+          !aiAvailable
+            ? 'AI actions need an API key in settings'
+            : query.trim()
+              ? 'Scan this page for your term with Vocab Radar'
+              : 'Find vocabulary relevant to your learning goal on this page'
+        }
+      >
+        <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />
+        {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
+      </Button>
+
+      {!aiAvailable && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          AI actions need an API key — open settings.
+        </p>
+      )}
+
+      {!goal.trim() && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tip: set a learning goal to auto-find words when you open a page. The smart
-            search below works right now — no goal needed.
+            Tip: set a learning goal to auto-find words across the whole page. Or just
+            type above and hit Find for my Radar — no goal needed.
           </p>
           <Button variant="secondary" size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
             <SettingsIcon size={13} className="mr-1.5" aria-hidden="true" />
             Set a learning goal
           </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="primary"
-            disabled={!aiAvailable || scan.status === 'scanning'}
-            onClick={() => void runScan()}
-            title={
-              !aiAvailable
-                ? 'AI actions need an API key in settings'
-                : 'Auto-find vocabulary relevant to your learning goal on this page'
-            }
-          >
-            <TargetIcon size={15} className="mr-1.5" aria-hidden="true" />
-            {scan.status === 'scanning' ? 'Finding useful vocabulary…' : 'Find for my Radar'}
-          </Button>
-
-          {!aiAvailable && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              AI actions need an API key — open settings.
-            </p>
-          )}
         </div>
       )}
 

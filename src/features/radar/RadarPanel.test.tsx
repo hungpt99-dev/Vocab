@@ -94,20 +94,23 @@ describe('RadarPanel — Quick Search', () => {
     expect(scanCall![0].payload).toEqual({ goal: 'serendip' });
   });
 
-  it('shows a visible Search button that submits the query', async () => {
+  it('always shows a single "Find for my Radar" button that submits a typed query', async () => {
+    seedSettings({ radar: { goal: '' } });
     await act(async () => {
       render(<RadarPanel />);
     });
     const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
 
-    // Search button is present but disabled until the query is long enough (MIN_QUERY_LENGTH = 2).
-    const searchBtn = screen.getByRole('button', { name: /Search/i });
-    expect(searchBtn).toBeDisabled();
+    // One action button, always visible (not gated behind a learning goal), and
+    // disabled only when there is nothing to scan (empty bar AND no goal).
+    const findBtn = screen.getByRole('button', { name: /Find for my Radar/i });
+    expect(findBtn).toBeInTheDocument();
+    expect(findBtn).toBeDisabled();
 
     await userEvent.type(input, 'idempotent');
-    expect(searchBtn).not.toBeDisabled();
+    expect(findBtn).not.toBeDisabled();
 
-    await userEvent.click(searchBtn);
+    await userEvent.click(findBtn);
     await waitFor(
       () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
       { timeout: 2000 },
@@ -161,14 +164,15 @@ describe('RadarPanel — Quick Search', () => {
     expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument();
   });
 
-  it('lets you search without a learning goal set (no blocking prompt)', async () => {
+  it('lets you search without a learning goal set (no blocking prompt, Find button visible)', async () => {
     seedSettings({ radar: { goal: '' } });
     await act(async () => {
       render(<RadarPanel />);
     });
     // The blocking "Set a learning goal in Settings to use Vocab Radar" prompt is gone.
     expect(screen.queryByText(/Set a learning goal in Settings to use Vocab Radar/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: /Find for my Radar/i })).toBeNull();
+    // The single action button is always visible, even with no goal set.
+    expect(screen.getByRole('button', { name: /Find for my Radar/i })).toBeInTheDocument();
 
     const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
     await userEvent.type(input, 'idempotent');
