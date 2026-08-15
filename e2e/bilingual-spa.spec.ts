@@ -340,3 +340,114 @@ test('bilingual auto-turns-on after navigating to an article via SPA', async ({ 
     server.close();
   }
 });
+
+/**
+ * Regression for "SPA translation works but the loading skeleton never shows":
+ * the skeleton must be visible WHILE the translation is in flight (not just for
+ * an imperceptible sub-frame). Uses a mock endpoint that delays ~400ms so the
+ * shimmer is observable, then asserts it appears and is later replaced by the
+ * real translation.
+ */
+test('shows the loading skeleton during SPA translation (not just an instant swap)', async ({ context, extensionId }) => {
+  const PORT = 8770;
+  const server = createServer((req, res) => {
+    if (req.url?.startsWith('/v1')) {
+      // Delay the response so the skeleton shimmer is actually observable.
+      const body = JSON.stringify({
+        meaning: '[MOCK] meaning',
+        simpleExplanation: '[MOCK] simple',
+        translation: '[MOCK] bản dịch',
+        examples: ['[MOCK] example.'],
+        synonyms: [],
+        antonyms: [],
+        relatedWords: [],
+        pronunciation: '/mok/',
+        collocations: [],
+        grammar: '[MOCK] noun',
+        provider: 'local-mock',
+        model: 'mock-1',
+        generatedAt: Date.now(),
+      });
+      setTimeout(() => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.end(JSON.stringify({ choices: [{ message: { content: body } }] }));
+      }, 400);
+      return;
+    }
+    const html = `<!doctype html><html lang="en"><head><title>Skeleton SPA</title></head>
+<body><main>
+  <a href="/about" id="go-about">About</a>
+  <div id="view-home"><p id="home">Pure serendipity on the home view.</p></div>
+  <div id="view-about" hidden><p id="about">A different concept appears on the about view.</p></div>
+</main>
+<script>
+  document.getElementById('go-about').addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState({}, '', '/about');
+    document.getElementById('view-home').hidden = true;
+    document.getElementById('view-about').hidden = false;
+  });
+  window.addEventListener('popstate', () => {});
+</script></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(html);
+  });
+  await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', r));
+  const pageUrl = `http://127.0.0.1:${PORT}/`;
+
+  try {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+    await popup.evaluate(
+      ([port]) =>
+        new Promise<void>((resolve) => {
+          const p = {
+            id: 'local-mock',
+            name: 'Local Mock',
+            type: 'ollama',
+            baseUrl: `http://localhost:${port}/v1`,
+            apiKey: '',
+            model: 'mock-1',
+            isBuiltIn: false,
+            requiresApiKey: false,
+            enabled: true,
+          };
+          chrome.storage.local.get('avs:settings', (cur) => {
+            const existing = (cur['avs:settings'] as Record<string, unknown> | undefined) ?? {};
+            const s = {
+              ...existing,
+              providers: [p],
+              activeProviderId: 'local-mock',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              readingMode: 'everywhere',
+              bilingualMode: true,
+              autoExplainOnSave: false,
+            };
+            chrome.storage.local.set({ 'avs:settings': s }, () => resolve());
+          });
+        }),
+      [PORT],
+    );
+    await popup.reload();
+    await popup.waitForTimeout(600);
+    await popup.close();
+
+    const page = await context.newPage();
+    await page.goto(pageUrl);
+    await page.bringToFront();
+    await expect(page.locator('.avs-inline-control').first()).toBeVisible({ timeout: 10_000 });
+
+    // SPA navigation; the new view must show a skeleton shimmer while loading.
+    await page.click('#go-about');
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.locator('.avs-skeleton-line').first()).toBeVisible({ timeout: 2_000 });
+
+    // And eventually the real translation replaces it.
+    await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.avs-skeleton-line').first()).toHaveCount(0, { timeout: 10_000 });
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});

@@ -118,7 +118,15 @@ export class InlineReader {
     this.applyVisibility(true);
   }
 
-  async open(): Promise<boolean> {
+  /**
+   * Open the reader. Normally translation only runs when reading aids are
+   * effective for this host (readingMode 'everywhere', or 'allowed' + on the
+   * shared list). When the user explicitly requests translation — the popup
+   * Toggle/Refresh buttons — `force` overrides that scope so the current page
+   * is translated regardless of the allowed-list. (`effective` still controls
+   * whether the headbar's scope badge shows, but the translation itself runs.)
+   */
+  async open(force = false): Promise<boolean> {
     if (this.active) return true;
     const blocks = extractArticle();
     if (blocks.length === 0) {
@@ -152,7 +160,7 @@ export class InlineReader {
     document.body.addEventListener('mouseover', this.onWordHover);
     document.body.addEventListener('mouseout', this.onWordLeave);
 
-    if (effective) {
+    if (force || effective) {
       // Lazily translate: eagerly translate what is (or is about to be) visible so
       // the first screenful appears instantly, then top up the rest on scroll.
       // We never "load all" the page up front.
@@ -293,6 +301,29 @@ export class InlineReader {
       return;
     }
 
+    // Show a shimmering skeleton for every pending block RIGHT NOW, before any
+    // await. The translation response (especially from a fast local provider)
+    // can resolve within the same frame as the request, which would insert and
+    // immediately remove the skeleton with nothing ever painted. Injecting up
+    // front guarantees the loading state is visible until the result lands.
+    const skeletonByAnchor = new Map<HTMLElement, HTMLElement>();
+    for (const block of pending) {
+      const anchor = block.element instanceof HTMLElement ? block.element : null;
+      if (!anchor || this.skeletons.has(block.id)) continue;
+      const skeleton = this.buildSkeletonLine();
+      anchor.after(skeleton);
+      this.skeletons.set(block.id, skeleton);
+      skeletonByAnchor.set(anchor, skeleton);
+    }
+
+    const replaceSkeleton = (anchor: HTMLElement, node: HTMLElement | null): void => {
+      const skeleton = skeletonByAnchor.get(anchor);
+      if (!skeleton) return;
+      if (node) skeleton.replaceWith(node);
+      else skeleton.remove();
+      for (const [id, sk] of this.skeletons) if (sk === skeleton) this.skeletons.delete(id);
+    };
+
     // Resolve the language + mode once for the whole batch, and look up the
     // session cache before doing any work. Fetch settings first so the cache key
     // (which depends on the target language) doesn't create a self-referential
@@ -318,32 +349,13 @@ export class InlineReader {
         toTranslate.push(item);
         continue;
       }
-      // Cache hit: render directly, no skeleton, no AI call.
+      // Cache hit: render directly, no AI call, and drop the skeleton we showed.
       this.renderItem(item, hit.translation, hit.pairs, key);
+      replaceSkeleton(item.anchor, null);
       injectedSomething = true;
     }
 
     if (toTranslate.length > 0) {
-      // Skeleton placeholders only for the blocks we actually have to fetch.
-      const skeletonByAnchor = new Map<HTMLElement, HTMLElement>();
-      for (const block of pending) {
-        const anchor = block.element instanceof HTMLElement ? block.element : null;
-        if (!anchor || this.skeletons.has(block.id)) continue;
-        if (!toTranslate.some((it) => it.anchor === anchor)) continue;
-        const skeleton = this.buildSkeletonLine();
-        anchor.after(skeleton);
-        this.skeletons.set(block.id, skeleton);
-        skeletonByAnchor.set(anchor, skeleton);
-      }
-
-      const replaceSkeleton = (anchor: HTMLElement, node: HTMLElement | null): void => {
-        const skeleton = skeletonByAnchor.get(anchor);
-        if (!skeleton) return;
-        if (node) skeleton.replaceWith(node);
-        else skeleton.remove();
-        for (const [id, sk] of this.skeletons) if (sk === skeleton) this.skeletons.delete(id);
-      };
-
       const newCache = new Map<string, CachedTranslation>();
       if (this.mode === 'word') {
         const aligned = await this.alignItems(toTranslate);
@@ -354,7 +366,10 @@ export class InlineReader {
         let lastText: string | null = null;
         for (const item of toTranslate) {
           const result = aligned.map.get(item.id);
-          if (!result) continue;
+          if (!result) {
+            replaceSkeleton(item.anchor, null);
+            continue;
+          }
           this.applyWordGloss(item, result);
           const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
           if (line && line !== lastText) {
@@ -382,7 +397,10 @@ export class InlineReader {
         let lastText: string | null = null;
         for (const item of toTranslate) {
           const translation = translated.map.get(item.id);
-          if (!translation) continue;
+          if (!translation) {
+            replaceSkeleton(item.anchor, null);
+            continue;
+          }
           if (translation === lastText) {
             replaceSkeleton(item.anchor, null);
             continue;
