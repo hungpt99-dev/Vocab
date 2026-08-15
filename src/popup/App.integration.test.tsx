@@ -120,6 +120,15 @@ describe('popup feature tabs — Review, Quiz, Radar', () => {
       await userEvent.click(opts[0]!);
     });
     await waitFor(() => expect(screen.getByText(/Correct|Answer:/i)).toBeInTheDocument());
+
+    // The Quiz tab must NOT render the Library word card's enrichment panel
+    // (it would spoil the answer and clutter the UI). Assert it's absent both
+    // before and after answering.
+    expect(screen.queryByText(/Hide enrich data/i)).toBeNull();
+    expect(screen.queryByText(/Related vocabulary/i)).toBeNull();
+    expect(screen.queryByText(/Refresh explanation/i)).toBeNull();
+    // And the Library list itself is not rendered behind the quiz.
+    expect(screen.queryByRole('button', { name: /Add filter|Clear filters/i })).toBeNull();
   });
 
   it('Radar: single search affordance, no duplicate Search button', async () => {
