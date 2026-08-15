@@ -29,6 +29,7 @@ import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
 import { extractArticle } from './reading/extract';
 import { installSpaNavHandler } from './spa';
+import { isContextInvalidationError } from './context-invalidation';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { normalizeFamilyKey } from '@/features/radar/rank';
 // The inline reader imports from './domain' directly to keep the module graph
@@ -93,6 +94,22 @@ registerMessageHandlers({
 void bootstrap();
 
 async function bootstrap(): Promise<void> {
+  // Swallow "Extension context invalidated" rejections. These happen when the
+  // extension is reloaded/updated while a tab stays open (or the MV3 service
+  // worker is torn down): in-flight or fire-and-forget chrome.* calls (e.g. the
+  // Radar auto-scan triggered by the MutationObserver, or reader.open() during a
+  // tab switch) reject and, being unawaited, would surface as an uncaught error
+  // in content.js. They are harmless once the context is gone, so we ignore them
+  // instead of letting them bubble to the console.
+  window.addEventListener('unhandledrejection', (event) => {
+    // Harmless once the extension context is gone (reload/update, worker killed):
+    // in-flight or fire-and-forget chrome.* calls reject and, being unawaited,
+    // would otherwise surface as an uncaught error in content.js.
+    if (isContextInvalidationError(event.reason)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
   injectStyles();
   attachHoverListeners();
   attachSelectionToolbar();
@@ -563,7 +580,7 @@ async function reconcileBilingual(): Promise<void> {
     // Same tab re-focused: reveal the existing translation instead of
     // re-translating from scratch (the DOM + session cache are preserved).
     if (reader.isOpen) reader.show();
-    else void reader.open();
+    else void reader.open().catch(() => { /* context may be invalidated (reload) */ });
   } else if (reader.isOpen) {
     // Backgrounded tab: keep the translated DOM but hide it (and pause lazy
     // loading) so only the front tab shows a translation at a time.
@@ -601,7 +618,7 @@ function syncBilingual(readingMode: 'off' | 'allowed' | 'everywhere', domains: r
   document.body.classList.add('avs-bilingual-on');
   if (document.visibilityState !== 'visible') return; // will open on tab focus
   if (reader.isOpen) reader.show();
-  else void reader.open();
+  else void reader.open().catch(() => { /* context may be invalidated (reload) */ });
 }
 
 function scan(root: Node | null): void {
