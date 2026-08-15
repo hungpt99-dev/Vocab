@@ -80,9 +80,8 @@ test('bilingual translates a new page after an in-tab SPA (pushState) navigation
               ...existing,
               providers: [p],
               activeProviderId: 'local-mock',
-              // NOTE: language is set as a bare string here only to exercise the
-              // settings migration path; the refactor makes this a Language object.
               targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              readingMode: 'everywhere',
               bilingualMode: true,
               autoExplainOnSave: false,
             };
@@ -196,6 +195,7 @@ test('bilingual translates an async (delayed-mount) SPA route', async ({ context
               providers: [p],
               activeProviderId: 'local-mock',
               targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              readingMode: 'everywhere',
               bilingualMode: true,
               autoExplainOnSave: false,
             };
@@ -221,6 +221,119 @@ test('bilingual translates an async (delayed-mount) SPA route', async ({ context
     // the page stays untranslated. With polling, the new content must appear
     // AND be translated.
     await expect(page.locator('main')).toContainText('A different concept appears', { timeout: 10_000 });
+    await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+/**
+ * Regression for "khi nav không tự bật translate": translation must AUTO-TURN-ON
+ * after an in-tab SPA navigation, even when the previous view had no article and
+ * the reader was never open. The earlier handler only refreshed an already-open
+ * reader, so navigating from a non-article view to an article view left it
+ * untranslated until a manual reload.
+ */
+test('bilingual auto-turns-on after navigating to an article via SPA', async ({ context, extensionId }) => {
+  const PORT = 8769;
+  const server = createServer((req, res) => {
+    if (req.url?.startsWith('/v1')) {
+      const body = JSON.stringify({
+        meaning: '[MOCK] meaning',
+        simpleExplanation: '[MOCK] simple',
+        translation: '[MOCK] bản dịch',
+        examples: ['[MOCK] example.'],
+        synonyms: [],
+        antonyms: [],
+        relatedWords: [],
+        pronunciation: '/mok/',
+        collocations: [],
+        grammar: '[MOCK] noun',
+        provider: 'local-mock',
+        model: 'mock-1',
+        generatedAt: Date.now(),
+      });
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(JSON.stringify({ choices: [{ message: { content: body } }] }));
+      return;
+    }
+    const html = `<!doctype html><html lang="en"><head><title>Auto-on SPA</title></head>
+<body><main>
+  <header>
+    <a href="/article" id="go-article">Read article</a>
+    <p id="home">This intro view has no body text worth translating.</p>
+  </header>
+  <div id="view-article" hidden></div>
+</main>
+<script>
+  document.getElementById('go-article').addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState({}, '', '/article');
+    document.querySelector('header').style.display = 'none';
+    // Synchronous mount of the article (isolates the auto-open behavior; the
+    // async-mount case is covered by the delayed-mount test above).
+    document.getElementById('view-article').innerHTML =
+      '<p id="article">A completely different concept appears here after navigation.</p>';
+    document.getElementById('view-article').hidden = false;
+  });
+  window.addEventListener('popstate', () => {});
+</script></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(html);
+  });
+  await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', r));
+  const pageUrl = `http://127.0.0.1:${PORT}/`;
+
+  try {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
+    await popup.evaluate(
+      ([port]) =>
+        new Promise<void>((resolve) => {
+          const p = {
+            id: 'local-mock',
+            name: 'Local Mock',
+            type: 'ollama',
+            baseUrl: `http://localhost:${port}/v1`,
+            apiKey: '',
+            model: 'mock-1',
+            isBuiltIn: false,
+            requiresApiKey: false,
+            enabled: true,
+          };
+          chrome.storage.local.get('avs:settings', (cur) => {
+            const existing = (cur['avs:settings'] as Record<string, unknown> | undefined) ?? {};
+            const s = {
+              ...existing,
+              providers: [p],
+              activeProviderId: 'local-mock',
+              targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+              readingMode: 'everywhere',
+              bilingualMode: true,
+              autoExplainOnSave: false,
+            };
+            chrome.storage.local.set({ 'avs:settings': s }, () => resolve());
+          });
+        }),
+      [PORT],
+    );
+    await popup.reload();
+    await popup.waitForTimeout(600);
+    await popup.close();
+
+    const page = await context.newPage();
+    await page.goto(pageUrl);
+    await page.bringToFront();
+    // The intro view has no article, so the reader should NOT be open yet.
+    await expect(page.locator('.avs-inline-control').first()).toHaveCount(0, { timeout: 5_000 });
+
+    // SPA navigation to the article view must auto-turn-on translation.
+    await page.click('#go-article');
+    await expect(page).toHaveURL(/\/article$/);
+    await expect(page.locator('main')).toContainText('A completely different concept appears', { timeout: 10_000 });
+    await expect(page.locator('.avs-inline-control').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.avs-inline-translation').first()).toBeVisible({ timeout: 10_000 });
   } finally {
     server.closeAllConnections?.();

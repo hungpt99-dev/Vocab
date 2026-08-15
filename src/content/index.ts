@@ -446,21 +446,32 @@ let bilingualRefreshTimer: number | undefined;
  */
 function scheduleBilingualRefresh(): void {
   if (document.visibilityState !== 'visible') return;
-  if (!bilingualActiveHere || localBilingualOff) return;
   clearTimeout(bilingualRefreshTimer);
-  // SPAs mount the new route asynchronously (data fetch / transition), so the
-  // article may not exist yet at nav time. Poll briefly for content, then
-  // (re)open the reader. `reader.refresh()` handles both already-open (in-place)
-  // and not-yet-open (fresh) states; the only requirement is that the new DOM
-  // has actually painted before we call it.
+  // After an SPA navigation we must re-derive whether translation should be on
+  // for the NEW route (the previous view may not have had it active), and open
+  // it if so. Real client-side routers also mount the new route asynchronously
+  // (data fetch / transition), so poll briefly for the article before acting.
   let attempts = 0;
-  const attempt = () => {
-    if (extractArticle().length > 0) {
-      void reader.refresh();
+  const attempt = async () => {
+    const count = extractArticle().length;
+    if (count === 0) {
+      if (attempts++ < SPA_REFRESH_MAX_ATTEMPTS) {
+        bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_POLL_MS);
+      }
       return;
     }
-    if (attempts++ < SPA_REFRESH_MAX_ATTEMPTS) {
-      bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_POLL_MS);
+    try {
+      const settings = await settingsRepository.get();
+      if (reader.isOpen) {
+        // Already translating this tab: re-translate the new content in place.
+        await reader.refresh();
+        return;
+      }
+      // Not yet open: decide from current settings + this host, then open if it
+      // should be on. This is what makes translation auto-turn-on after SPA nav.
+      syncBilingual(settings.readingMode, settings.allowedDomains);
+    } catch {
+      // Settings read failed; leave the page as-is rather than throwing.
     }
   };
   bilingualRefreshTimer = window.setTimeout(attempt, SPA_REFRESH_MS);
