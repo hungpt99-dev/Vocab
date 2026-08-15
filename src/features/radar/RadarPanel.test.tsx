@@ -94,18 +94,20 @@ describe('RadarPanel — Quick Search', () => {
     expect(scanCall![0].payload).toEqual({ goal: 'serendip' });
   });
 
-  it('has a single search affordance — no floating Search button; Enter submits', async () => {
+  it('shows a visible Search button that submits the query', async () => {
     await act(async () => {
       render(<RadarPanel />);
     });
     const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
+
+    // Search button is present but disabled until the query is long enough (MIN_QUERY_LENGTH = 2).
+    const searchBtn = screen.getByRole('button', { name: /Search/i });
+    expect(searchBtn).toBeDisabled();
+
     await userEvent.type(input, 'idempotent');
+    expect(searchBtn).not.toBeDisabled();
 
-    // The redundant floating "Search" button was removed — the search bar is the
-    // only search affordance, and it submits via Enter.
-    expect(screen.queryByRole('button', { name: /^Search$/i })).toBeNull();
-
-    fireEvent.keyDown(input, { key: 'Enter' });
+    await userEvent.click(searchBtn);
     await waitFor(
       () => expect(screen.getByText(/1 expression found for your goal/i)).toBeInTheDocument(),
       { timeout: 2000 },
@@ -113,6 +115,31 @@ describe('RadarPanel — Quick Search', () => {
     const calls = (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mock.calls;
     const scanCall = calls.find((c) => c[0]?.type === 'radar:scan');
     expect(scanCall![0].payload).toEqual({ goal: 'idempotent' });
+  });
+
+  it('shows a query-aware empty result instead of a generic "no content" message', async () => {
+    seedSettings({ radar: { goal: '' } });
+    // Return zero candidates so the scan resolves to the empty state.
+    (chromeMock().runtime.sendMessage as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (message: { type: string }) => {
+        if (message.type === 'radar:scan') {
+          return { ok: true, data: { candidates: [], chunksAnalyzed: 1, chunksTotal: 1, partial: false } };
+        }
+        return { ok: true, data: null };
+      },
+    );
+    await act(async () => {
+      render(<RadarPanel />);
+    });
+    const input = (await screen.findByLabelText(/Radar smart search/i)) as HTMLInputElement;
+    await userEvent.type(input, 'dsfas');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(
+      () => expect(screen.getByText(/No vocabulary found matching/i)).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
+    expect(screen.getByText(/dsfas/)).toBeInTheDocument();
+    expect(screen.queryByText(/enough readable content/i)).toBeNull();
   });
 
   it('clears the search query with Esc without destroying Radar state', async () => {

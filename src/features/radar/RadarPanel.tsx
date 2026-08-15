@@ -7,7 +7,7 @@ import { useAiAvailable } from '@/shared/hooks/useAiAvailable';
 import { sendMessage } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { Button } from '@/shared/ui/Button';
-import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, XIcon, SettingsIcon } from '@/shared/ui/Icons';
+import { TargetIcon, FlameIcon, StarOutlineIcon, SparklesIcon, CheckCheckIcon, RotateCwIcon, SearchIcon, SettingsIcon } from '@/shared/ui/Icons';
 import { tints } from '@/shared/styles/tokens';
 
 type ScanState =
@@ -159,46 +159,47 @@ export function RadarPanel() {
       </p>
 
       {/* Radar smart search bar — an explicit entry point into the existing Radar scan.
-          Type, then press Enter or the search button; it does NOT auto-search on
-          every keystroke. Esc clears the query. */}
-      <div className="relative">
-        <SearchIcon
-          size={15}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          aria-hidden="true"
-        />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setQuery('');
-              inputRef.current?.blur();
-            } else if (event.key === 'Enter') {
-              event.preventDefault();
-              runQuickSearch();
-            }
-          }}
-          placeholder="Radar smart search…  (Ctrl/Cmd + F)"
-          aria-label="Radar smart search — find vocabulary on this page"
-          title="Type a query, then press Enter or the search button to run a Radar smart search of this page. Works without a learning goal. Press Ctrl/Cmd + F to focus."
-          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery('');
-              inputRef.current?.focus();
+          Type, then press Enter or the Search button; it does NOT auto-search on
+          every keystroke. Esc in the field clears the query. The Search button is
+          visible (not just Enter) so the affordance is obvious. */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <SearchIcon
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            aria-hidden="true"
+          />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setQuery('');
+                inputRef.current?.blur();
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                runQuickSearch();
+              }
             }}
-            aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
-          >
-            <XIcon size={13} aria-hidden="true" />
-          </button>
-        )}
+            placeholder="Radar smart search…  (Ctrl/Cmd + F)"
+            aria-label="Radar smart search — find vocabulary on this page"
+            title="Type a query, then press Enter or the Search button to run a Radar smart search of this page. Works without a learning goal. Press Ctrl/Cmd + F to focus."
+            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          />
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={query.trim().length < MIN_QUERY_LENGTH || scan.status === 'scanning'}
+          onClick={runQuickSearch}
+          aria-label="Search with Vocab Radar"
+          title="Search this page with Vocab Radar"
+        >
+          <SearchIcon size={14} className="mr-1.5" aria-hidden="true" />
+          Search
+        </Button>
       </div>
 
       {!goal.trim() ? (
@@ -245,7 +246,7 @@ export function RadarPanel() {
       {query.trim().length >= MIN_QUERY_LENGTH && (
         <>
           {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
-          {scan.status === 'empty' && <EmptyResult />}
+          {scan.status === 'empty' && <EmptyResult query={query} />}
           {scan.status === 'error' && <ErrorState message={scan.message} onRetry={runQuickSearch} />}
           {scan.status === 'done' && (
             <Results
@@ -262,7 +263,7 @@ export function RadarPanel() {
       {showResults && (
         <>
           {scan.status === 'scanning' && <ScanningState done={scan.done} total={scan.total} />}
-          {scan.status === 'empty' && <EmptyResult />}
+          {scan.status === 'empty' && <EmptyResult query={query} />}
           {scan.status === 'error' && <ErrorState message={scan.message} onRetry={() => void runScan()} />}
           {scan.status === 'done' && (
             <Results
@@ -295,15 +296,29 @@ function ScanningState({ done, total }: { done: number; total: number }) {
   );
 }
 
-function EmptyResult() {
+function EmptyResult({ query }: { query?: string }): JSX.Element {
+  const trimmed = query?.trim();
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
-      <p className="text-sm text-slate-600 dark:text-slate-300">
-        We couldn’t find enough readable content on this page.
-      </p>
-      <p className="mt-1 text-xs text-slate-400">
-        Open an article or long-form page, then try again.
-      </p>
+      {trimmed ? (
+        <>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            No vocabulary found matching “{trimmed}” on this page.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Try a different word or phrase, or use a learning goal to scan the whole page.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            We couldn’t find enough readable content on this page.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Open an article or long-form page, then try again.
+          </p>
+        </>
+      )}
     </div>
   );
 }
