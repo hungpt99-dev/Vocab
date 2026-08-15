@@ -30,6 +30,8 @@ export interface AnalyzePageParams {
   signal?: AbortSignal;
   /** Progress callback: (completedChunks, totalChunks). */
   onProgress?: (done: number, total: number) => void;
+  /** Families (normalized keys) the user already knows/saved — excluded from results. */
+  knownFamilies?: Iterable<string>;
 }
 
 export interface AnalyzePageResult {
@@ -61,19 +63,22 @@ export class RadarVocabularyService {
     settings: Settings,
     params: AnalyzePageParams,
   ): Promise<AnalyzePageResult> {
-    const { goal, pageText, pageUrl, limit = 5, chunkOptions, signal, onProgress } = params;
+    const { goal, pageText, pageUrl, limit = 5, chunkOptions, signal, onProgress, knownFamilies } = params;
+    const knownSet = knownFamilies ? new Set(knownFamilies) : undefined;
 
     const trimmed = pageText.trim();
     if (!trimmed) {
       return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
     }
 
-    // Cache hit: same URL + same goal + same content → reuse.
+    // Cache hit: same URL + same goal + same content → reuse. The known-families
+    // filter is applied on read so a result cached before the user saved a word
+    // still drops it once it becomes known.
     const cached = this.cache.get(pageUrl, goal, trimmed);
     if (cached) {
       onProgress?.(1, 1);
       return {
-        candidates: mergeAndRank(cached, limit),
+        candidates: mergeAndRank(cached, limit, { knownFamilies: knownSet }),
         chunksAnalyzed: 1,
         chunksTotal: 1,
         partial: false,
@@ -127,7 +132,7 @@ export class RadarVocabularyService {
       onProgress?.(analyzed, chunks.length);
     });
 
-    const ranked = mergeAndRank(collected, limit);
+    const ranked = mergeAndRank(collected, limit, { knownFamilies: knownSet });
     if (!failed && analyzed === chunks.length) {
       this.cache.set(pageUrl, goal, trimmed, collected);
     }

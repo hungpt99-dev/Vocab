@@ -19,7 +19,7 @@ function seedSettings(overrides: Record<string, unknown> = {}): void {
 
 const SAMPLE_RESULT: AnalyzePageResult = {
   candidates: [
-    { key: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'API', context: 'x', tier: 'high' },
+    { key: 'idempotent', familyKey: 'idempotent', text: 'idempotent', type: 'word', score: 98, reason: 'API', context: 'x', tier: 'high' },
   ],
   chunksAnalyzed: 1,
   chunksTotal: 1,

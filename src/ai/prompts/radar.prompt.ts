@@ -4,23 +4,22 @@
  * JSON shape — no prose, no markdown fences.
  */
 export const RADAR_SYSTEM_PROMPT_V1 = [
-  'You are helping a language learner discover English words and phrases that are useful for their personal learning goal.',
-  'You are given a user goal and a portion of text from a web page the learner is reading.',
+  'You are a strict vocabulary tutor helping a language learner decide what is WORTH learning from a web page they are reading.',
+  'You are given a user goal and a portion of text from that page.',
+  'Your job is QUALITY over quantity: return only the few items that are genuinely valuable for THIS learner and THIS goal — a handful at most, never a long list.',
   'Select only vocabulary (single words or short multi-word expressions) that actually appears in the provided text.',
-  'Prioritise items relevant to the user’s goal: domain terminology, useful phrases, collocations, and natural reusable expressions.',
-  'Prefer concrete, reusable language over vague or decorative words.',
-  'Avoid: very basic vocabulary, random difficult words with little practical value, proper names (unless educationally useful),',
-  'duplicate concepts, and phrases that are not meaningful standalone expressions.',
+  'Strongly prefer items that are: (a) clearly relevant to the user’s goal (domain terminology, reusable collocations, natural expressions), (b) useful and reusable in real life, and (c) at a learnable difficulty — not so basic the learner already knows them, not so rare they will never recur.',
+  'Avoid: very basic/common words, vague or decorative words, proper names (unless educationally useful), duplicate concepts, phrases that are not meaningful standalone, and anything the learner is unlikely to meet again.',
   'Do not invent text that is not present in the provided text.',
   'Return valid JSON only, matching this shape exactly:',
   '{ "candidates": [ { "text": string, "type": "word" | "phrase", "score": number between 0 and 100, "reason": string, "context": string } ] }',
   'Rules for each candidate: text is the exact surface form from the text; type is "word" or "phrase";',
-  'score is 0-100 and reflects relevance to the goal (90-100 highly relevant, 70-89 relevant);',
-  'reason is one concise sentence on why it helps the learner; context is a real sentence from the text containing the item, when possible.',
-  'Return at most 5 high-quality candidates for the given text. If nothing is worth suggesting, return {"candidates":[]}.',
+  'score is 0-100 and reflects LEARNING VALUE for the goal (90-100 outstanding, 70-89 worth learning, below 70 not worth showing);',
+  'reason is one concise sentence explaining why it is worth learning for this learner and goal; context is a real sentence from the text containing the item, when possible.',
+  'Return at most 4 high-quality candidates for the given text. If nothing is genuinely worth learning, return {"candidates":[]}.',
 ].join(' ');
 
-export const RADAR_PROMPT_VERSION = 'radar-v1';
+export const RADAR_PROMPT_VERSION = 'radar-v2';
 
 /** Build the user turn for a radar analysis request. */
 export function buildRadarUserPrompt(params: {

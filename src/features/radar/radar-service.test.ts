@@ -54,6 +54,58 @@ describe('RadarVocabularyService.analyzePage', () => {
     expect(result.chunksTotal).toBe(0);
   });
 
+  it('excludes saved/known families from results (personalization)', async () => {
+    const page =
+      'The cache must be evicted. The idempotent design avoids stale reads. The pipeline is resilient.';
+    const spy = vi
+      .spyOn(service as unknown as { analyzeChunk: typeof service['analyzeChunk'] }, 'analyzeChunk')
+      .mockImplementation(async (): Promise<RadarCandidate[]> => [
+        { text: 'cache', type: 'word', score: 98, reason: 'storage', context: '' },
+        { text: 'evict', type: 'word', score: 97, reason: 'storage', context: '' },
+        { text: 'idempotent', type: 'word', score: 96, reason: 'design', context: '' },
+      ]);
+
+    const result = await service.analyzePage(settings, {
+      goal: 'backend english',
+      pageText: page,
+      pageUrl: 'https://example.com',
+      knownFamilies: ['cache', 'evict'],
+    });
+    // 'cache' and 'evict' are known → excluded; 'idempotent' remains.
+    expect(result.candidates.map((c) => c.text)).toEqual(['idempotent']);
+    spy.mockRestore();
+  });
+
+  it('re-applies knownFamilies on a cache hit (user saved the word later)', async () => {
+    const page = 'The cache must be evicted. The pipeline is resilient.';
+    const spy = vi
+      .spyOn(service as unknown as { analyzeChunk: typeof service['analyzeChunk'] }, 'analyzeChunk')
+      .mockImplementation(async (): Promise<RadarCandidate[]> => [
+        { text: 'cache', type: 'word', score: 98, reason: 'storage', context: '' },
+        { text: 'evict', type: 'word', score: 97, reason: 'storage', context: '' },
+      ]);
+
+    // First call caches BOTH candidates (no known-families filter yet).
+    await service.analyzePage(settings, {
+      goal: 'backend english',
+      pageText: page,
+      pageUrl: 'https://example.com/cached',
+    });
+    expect(spy.mock.calls.length).toBe(1);
+
+    // Second call hits the cache (no new AI call) but now excludes 'cache'
+    // because it has since been saved/known.
+    const result = await service.analyzePage(settings, {
+      goal: 'backend english',
+      pageText: page,
+      pageUrl: 'https://example.com/cached',
+      knownFamilies: ['cache'],
+    });
+    expect(spy.mock.calls.length).toBe(1); // no extra AI call
+    expect(result.candidates.map((c) => c.text)).toEqual(['evict']);
+    spy.mockRestore();
+  });
+
   it('analyzes chunks concurrently, not serially', async () => {
     // Force many small chunks: each section is one short sentence, and a tiny
     // maxChars makes every section split into >=2 hard chunks. With 8 sections

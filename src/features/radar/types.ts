@@ -17,11 +17,13 @@ export interface RadarAnalysisResponse {
   candidates: RadarCandidate[];
 }
 
-/** A candidate after ranking, with a derived relevance tier for the UI. */
+/** A candidate after ranking, with derived keys/tier for the UI. */
 export interface RankedCandidate extends RadarCandidate {
   /** Normalised key used for deduplication (lowercased, whitespace-collapsed). */
   key: string;
-  /** UI relevance tier derived from the score. */
+  /** Coarse lemma/family key used for de-duplication and known-vocab filtering. */
+  familyKey: string;
+  /** UI relevance tier derived from the (blended) score. */
   tier: 'high' | 'relevant';
 }
 

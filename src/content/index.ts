@@ -28,6 +28,8 @@ import { applyHighlightColor, injectStyles } from './styles';
 import { showToast } from './toast';
 import { InlineReader } from './reading/inline-reader';
 import { extractArticle } from './reading/extract';
+import { vocabularyRepository } from '@/storage/vocabulary-repository';
+import { normalizeFamilyKey } from '@/features/radar/rank';
 // The inline reader imports from './domain' directly to keep the module graph
 // acyclic; this import+re-export keeps `matchesDomain` available at the entry
 // (and in the entry's tests) without the old circular dependency.
@@ -35,6 +37,11 @@ import { matchesDomain } from './domain';
 export { matchesDomain };
 
 const RESCAN_DELAY_MS = 400;
+/** Debounce for radar auto-scan re-runs (settings change, SPA nav, lazy load). */
+const RADAR_RESCAN_MS = 1500;
+/** Minimum gap between two real radar analyses, so a burst of mutations or
+ * rapid settings writes can't trigger a storm of expensive AI calls. */
+const RADAR_MIN_INTERVAL_MS = 4000;
 
 const hoverCard = new HoverCard();
 const toolbar = new SelectionCard();
@@ -42,6 +49,13 @@ const reader = new InlineReader();
 
 /** Latest settings snapshot, kept in sync by refresh(); used for keyless gating. */
 let currentSettings: import('@/shared/types/settings').Settings | null = null;
+
+/** Guards so overlapping radar scans don't multiply API calls. */
+let radarScanning = false;
+let radarRescanTimer: ReturnType<typeof setTimeout> | undefined;
+let lastRadarRunAt = 0;
+/** Content hash of the last text we analyzed, to skip no-op rescans. */
+let lastRadarContentHash = '';
 
 /** Whether an AI provider is usable right now (mirrors useAiAvailable in the popup). */
 function isAiAvailable(): boolean {
@@ -258,7 +272,9 @@ function watchSettings(): void {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes[SETTINGS_KEY]) {
       void refresh();
-      void runRadarAutoScan();
+      // Radar auto-scan is debounced + guarded inside scheduleRadarAutoScan, so a
+      // settings change that also triggers refresh() won't start two scans.
+      scheduleRadarAutoScan();
     }
   });
 }
@@ -304,7 +320,35 @@ async function refresh(): Promise<void> {
 
   // Vocabulary Radar auto-scan (VOC-134): if enabled for this domain, analyse
   // the page automatically and highlight radar-relevant words inline.
-  void runRadarAutoScan();
+  // Debounced + guarded so it never races with a concurrent scan.
+  scheduleRadarAutoScan();
+}
+
+/** Cheap, non-cryptographic content hash (FNV-1a) for change detection. */
+function fnv1aHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Build the set of vocabulary "families" the user already knows (saved words).
+ * Both sides of the radar filter run through `normalizeFamilyKey`, so a saved
+ * lemma like "run" suppresses "runs"/"running" on the page. Deterministic and
+ * model-free, so it works even before the AI is asked — no wasted suggestions.
+ */
+async function buildKnownFamilies(): Promise<string[]> {
+  const entries = await vocabularyRepository.list();
+  const families = new Set<string>();
+  for (const entry of entries) {
+    if (entry.lemma) families.add(normalizeFamilyKey(entry.lemma));
+    if (entry.normalizedForm) families.add(normalizeFamilyKey(entry.normalizedForm));
+    families.add(normalizeFamilyKey(entry.word));
+  }
+  return [...families];
 }
 
 /**
@@ -316,6 +360,12 @@ async function refresh(): Promise<void> {
  *
  * `goalOverride` lets a caller (e.g. Radar Quick Search) reuse this exact
  * pipeline with an ad-hoc goal without changing the saved Settings goal.
+ *
+ * Personalization, dedup and rate-limit guards live here so Radar v2 stays
+ * quality-first and never multiplies AI calls:
+ *  - known families are computed and sent so the worker drops already-known
+ *    words before they ever reach the user;
+ *  - a content hash + min-interval guard skips no-op / back-to-back rescans.
  */
 async function runRadarScanHere(
   goalOverride?: string,
@@ -331,29 +381,53 @@ async function runRadarScanHere(
     return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
   }
 
+  const contentHash = fnv1aHash(pageText);
+  // Skip if the page content hasn't changed since the last analysis and we are
+  // within the minimum interval — this is what stops SPA/infinite-scroll
+  // mutations and rapid settings writes from re-triggering a full scan.
+  if (contentHash === lastRadarContentHash && Date.now() - lastRadarRunAt < RADAR_MIN_INTERVAL_MS) {
+    return { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
+  }
+
+  const knownFamilies = await buildKnownFamilies();
   const result = await sendMessage({
     type: 'radar:analyze',
-    payload: { goal, pageUrl: location.href, pageText },
+    payload: { goal, pageUrl: location.href, pageText, knownFamilies },
   });
+  lastRadarContentHash = contentHash;
+  lastRadarRunAt = Date.now();
+
   removeRadarHighlights();
   if (result && result.candidates.length > 0) {
-    const entries: RadarMatchEntry[] = result.candidates.map((c) => ({
-      key: c.key,
-      text: c.text,
-      tier: c.tier,
-    }));
-    highlightRadarRoot(document.body, entries);
+    // Inline-highlight only the high-value tier (Radar v2: quality over noise).
+    // The full ranked list is always available in the popup.
+    const entries: RadarMatchEntry[] = result.candidates
+      .filter((c) => c.tier === 'high')
+      .map((c) => ({ key: c.key, text: c.text, tier: c.tier }));
+    if (entries.length > 0) highlightRadarRoot(document.body, entries);
   }
   return result ?? { candidates: [], chunksAnalyzed: 0, chunksTotal: 0, partial: false };
 }
 
 /**
  * Automatically analyse the current page for radar-relevant vocabulary and
- * highlight the candidates inline — only when Radar is enabled for this domain
- * (reusing the per-site domain pattern from Bilingual). Safe no-op otherwise;
- * the manual popup scan remains available in all cases.
+ * highlight the high-value candidates inline — only when Radar is enabled for
+ * this domain (reusing the per-site domain pattern from Bilingual). Safe no-op
+ * otherwise; the manual popup scan remains available in all cases.
+ *
+ * Guarded so a burst of triggers (settings change, SPA nav, lazy-loaded content)
+ * collapses into at most one in-flight scan: overlapping calls are skipped, and
+ * repeat triggers are debounced to RADAR_RESCAN_MS.
  */
+function scheduleRadarAutoScan(): void {
+  clearTimeout(radarRescanTimer);
+  radarRescanTimer = setTimeout(() => {
+    void runRadarAutoScan();
+  }, RADAR_RESCAN_MS);
+}
+
 async function runRadarAutoScan(): Promise<void> {
+  if (radarScanning) return;
   let settings: import('@/shared/types/settings').Settings;
   try {
     settings = await settingsRepository.get();
@@ -374,11 +448,14 @@ async function runRadarAutoScan(): Promise<void> {
     }
   }
 
+  radarScanning = true;
   try {
     await runRadarScanHere();
   } catch {
     // Auto-scan failures are non-fatal: the page stays readable; the manual
     // popup scan can surface the real error if the user retries.
+  } finally {
+    radarScanning = false;
   }
 }
 
@@ -476,6 +553,12 @@ function startObserving(): void {
 
     clearTimeout(rescanTimer);
     rescanTimer = setTimeout(() => scan(document.body), RESCAN_DELAY_MS);
+    // Dynamic content (SPA route changes, infinite scroll, lazy-loaded
+    // articles) should be re-checked by Radar. scheduleRadarAutoScan debounces
+    // and guards this so we never multiply AI calls on a busy mutation stream,
+    // and runRadarScanHere itself short-circuits when the page text is
+    // unchanged since the last analysis.
+    scheduleRadarAutoScan();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }

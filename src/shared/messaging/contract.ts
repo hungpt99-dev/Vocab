@@ -90,6 +90,8 @@ export type Message =
         pageUrl: string;
         /** Pre-extracted page text (content script path). */
         pageText: string;
+        /** Families (normalized keys) the user already knows/saved — excluded. */
+        knownFamilies?: string[];
       };
     };
 

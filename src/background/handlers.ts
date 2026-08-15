@@ -245,7 +245,7 @@ export async function translateUnit(
  */
 export async function radarAnalyze(
   deps: BackgroundDeps,
-  payload: { goal: string; pageUrl: string; pageText: string },
+  payload: { goal: string; pageUrl: string; pageText: string; knownFamilies?: string[] },
 ): Promise<import('@/features/radar/radar-service').AnalyzePageResult> {
   const settings = await deps.settings.get();
   const goal = payload.goal.trim();
@@ -260,6 +260,7 @@ export async function radarAnalyze(
     goal,
     pageText,
     pageUrl: payload.pageUrl,
+    knownFamilies: payload.knownFamilies,
   });
 }
 
