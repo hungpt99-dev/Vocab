@@ -374,30 +374,31 @@ describe('InlineReader bilingual injection', () => {
     reader2.close();
   });
 
-  it('hide() keeps the translated DOM but hides it; show() reveals without re-translating', async () => {
+  it('open(force=true) shows the control and translates even when off the allowed list', async () => {
+    // Host is off-list in 'allowed' mode, so a normal open() must NOT translate.
+    vi.spyOn(settingsRepository, 'get').mockResolvedValue({
+      readingMode: 'allowed',
+      allowedDomains: ['some-other-site.com'],
+      targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
+    } as never);
     const reader = new InlineReader();
     resolveSend(glossResponse());
     await reader.open();
     await flush();
     await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-    expect(reader.isOpen).toBe(true);
-
-    const aiCallsAfterOpen = vi.mocked(sendMessage).mock.calls.length;
-
-    // Background the tab: the reader stays open but its DOM is hidden, not removed.
-    reader.hide();
-    expect(reader.isOpen).toBe(true); // still active — DOM preserved
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-    expect(document.querySelector('.avs-inline-control') as HTMLElement).not.toBeNull();
-    expect((document.querySelector('.avs-inline-control') as HTMLElement).style.display).toBe('none');
-
-    // Re-focus the tab: the existing translation is revealed, NOT re-translated.
-    reader.show();
-    expect((document.querySelector('.avs-inline-control') as HTMLElement).style.display).toBe('');
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-    // No new AI call happened during hide/show.
-    expect(vi.mocked(sendMessage).mock.calls.length).toBe(aiCallsAfterOpen);
+    // Off-list + no force: nothing translated, control hidden.
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
+    expect((document.querySelector('.avs-inline-control') as HTMLElement | null)?.hidden).toBe(true);
     reader.close();
+
+    // Now an explicit (forced) open translates the current page regardless of list.
+    const forced = new InlineReader();
+    resolveSend(glossResponse());
+    await forced.open(true);
+    await flush();
+    await flush();
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    expect((document.querySelector('.avs-inline-control') as HTMLElement).hidden).toBe(false);
+    forced.close();
   });
 });

@@ -75,10 +75,12 @@ export class InlineReader {
   }
 
   /** Force a re-translation of the page, bypassing the session cache. */
-  async refresh(): Promise<void> {
+  async refresh(force = false): Promise<void> {
     if (!this.active) {
-      // Nothing is open to refresh; opening it fresh will translate from scratch.
-      void this.open();
+      // Nothing is open to refresh; opening it fresh (with force, so an explicit
+      // Refresh translates the current page even if it's off the allowed list)
+      // will translate from scratch.
+      void this.open(force);
       return;
     }
     const blocks = extractArticle();
@@ -93,7 +95,9 @@ export class InlineReader {
     this.clearSkeletons();
     this.observer?.disconnect();
     this.observer = null;
-    await this.observeBlocks(blocks, true);
+    // An explicit Refresh always re-translates (ignores the session cache); the
+    // `force` flag additionally bypasses the allowed-list scope check.
+    await this.observeBlocks(blocks, force || true);
   }
 
   /** Reveal a previously hidden reader (tab re-focused) without re-translating. */
@@ -163,7 +167,7 @@ export class InlineReader {
     // host: 'everywhere' always, 'allowed' only on the shared allowedDomains.
     const effective = isReadingActiveOnHost(settings, location.hostname);
 
-    this.buildControl(effective);
+    this.buildControl(force || effective);
     this.prefsListener = watchReadingPreferences((next) => {
       this.alignment = next.alignment;
       if (next.mode !== this.mode) {

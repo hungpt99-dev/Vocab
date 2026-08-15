@@ -69,7 +69,7 @@ export type Message =
   | { type: 'translate-article'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
   | { type: 'align-words'; payload: { paragraphs: TranslationParagraphPayload[]; language: string } }
   | { type: 'toggle-bilingual-reading' }
-  | { type: 'bilingual:refresh' }
+  | { type: 'bilingual:refresh'; force?: boolean }
   | { type: 'am-i-active-tab' }
   | { type: 'bilingual:reconcile' }
   | { type: 'open-options' }

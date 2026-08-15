@@ -259,11 +259,13 @@ export function App() {
   }, [refreshStats]);
 
   // Track the active tab's hostname so the reading-mode control can reflect and
-  // steer the per-site scope of the shared 'allowed' mode.
+  // steer the per-site scope of the shared 'allowed' mode. From a popup window,
+  // `currentWindow` is the popup itself (a chrome-extension:// URL), so query
+  // `lastFocusedWindow` to resolve the page the user is actually looking at.
   useEffect(() => {
     let cancelled = false;
     void chrome.tabs
-      .query({ active: true, currentWindow: true })
+      .query({ active: true, lastFocusedWindow: true })
       .then((tabs) => {
         const url = tabs[0]?.url;
         if (cancelled || !url) return;
@@ -295,7 +297,7 @@ export function App() {
       // Route to the active tab's content script, which owns the reader. (Do NOT
       // use sendMessage — that hits the background worker, where bilingual:refresh
       // is not registered, and the call fails silently.)
-      await sendToActiveTab({ type: 'bilingual:refresh' });
+      await sendToActiveTab({ type: 'bilingual:refresh', force: true });
     } catch {
       // The content script reports translation failures via its own banner.
     } finally {
