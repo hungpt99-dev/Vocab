@@ -23,14 +23,13 @@ const entry: VocabularyEntry = makeVocabularyEntry({
   updatedAt: Date.UTC(2026, 0, 1),
 });
 
-function setup(overrides: Partial<VocabularyEntry> = {}, explaining = false, extra: { onQuickAdd?: (word: string) => void; onGenerateRadar?: (entry: VocabularyEntry) => Promise<void> } = {}) {
+function setup(overrides: Partial<VocabularyEntry> = {}, explaining = false, extra: { onQuickAdd?: (word: string) => void } = {}) {
   const handlers = {
     onUpdate: vi.fn(async () => undefined),
     onDelete: vi.fn(async () => undefined),
     onToggleFavorite: vi.fn(async () => undefined),
     onExplain: vi.fn(async () => undefined),
     onQuickAdd: extra.onQuickAdd ?? vi.fn(),
-    onGenerateRadar: extra.onGenerateRadar ?? vi.fn(async () => undefined),
   };
   render(<EntryCard entry={{ ...entry, ...overrides }} explaining={explaining} {...handlers} />);
   return handlers;
@@ -91,40 +90,6 @@ describe('EntryCard', () => {
     const { onExplain } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'AI explain' }));
     expect(onExplain).toHaveBeenCalled();
-  });
-
-  it('shows a Generate Radar button for an enriched word and calls onGenerateRadar', async () => {
-    const onGenerateRadar = vi.fn(async () => undefined);
-    setup(
-      {
-        explanation: {
-          meaning: 'A fortunate accident.',
-          simpleExplanation: '',
-          translation: '',
-          examples: [],
-          synonyms: [],
-          antonyms: [],
-          relatedWords: [],
-          pronunciation: '',
-          collocations: [],
-          grammar: '',
-          provider: 'openai',
-          model: 'gpt-4o-mini',
-          generatedAt: 1,
-        },
-      },
-      false,
-      { onGenerateRadar },
-    );
-
-    const button = screen.getByRole('button', { name: 'Generate Radar' });
-    await userEvent.click(button);
-    expect(onGenerateRadar).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not show Generate Radar when the word is not enriched', () => {
-    setup();
-    expect(screen.queryByRole('button', { name: 'Generate Radar' })).not.toBeInTheDocument();
   });
 
   it('shows a spinner while explaining', () => {

@@ -277,8 +277,8 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       return entry;
     },
     'get-highlight-data': () => buildHighlightData(deps),
-    explain: (message) =>
-      explainWord(
+    explain: async (message) => {
+      const explanation = await explainWord(
         deps,
         message.payload.word,
         message.payload.context,
@@ -286,7 +286,14 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         message.payload.pageTitle,
         message.payload.precedingText,
         message.payload.language,
-      ),
+      );
+      // AI explain doubles as Radar generation: any word the user enriches that
+      // is already saved gets Radar candidates produced automatically (no
+      // separate button). Best-effort; a failed AI call must not break explain.
+      const saved = await deps.vocabulary.findByWord(message.payload.word);
+      if (saved) void generateRadarForWord(saved);
+      return explanation;
+    },
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
     translate: (message) => translateUnit(deps, message.payload),
     'translate-blocks': async (message) => {

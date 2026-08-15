@@ -14,7 +14,6 @@ export interface LibraryListProps {
   onToggleFavorite: (id: string) => Promise<void>;
   onExplain: (entry: VocabularyEntry) => Promise<void>;
   onQuickAdd?: (word: string) => void;
-  onGenerateRadar?: (entry: VocabularyEntry) => Promise<void>;
 }
 
 /**
@@ -64,7 +63,6 @@ export function LibraryList(props: LibraryListProps): JSX.Element {
             onToggleFavorite={props.onToggleFavorite}
             onExplain={props.onExplain}
             onQuickAdd={props.onQuickAdd}
-            onGenerateRadar={props.onGenerateRadar}
           />
         </li>
       ))}

@@ -21,7 +21,6 @@ export interface EntryCardProps {
   onToggleFavorite: (id: string) => Promise<void>;
   onExplain: (entry: VocabularyEntry) => Promise<void>;
   onQuickAdd?: (word: string) => void;
-  onGenerateRadar?: (entry: VocabularyEntry) => Promise<void>;
 }
 
 export function EntryCard({
@@ -32,13 +31,11 @@ export function EntryCard({
   onToggleFavorite,
   onExplain,
   onQuickAdd,
-  onGenerateRadar,
 }: EntryCardProps) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [showEnrich, setShowEnrich] = useState(false);
   const [draft, setDraft] = useState({ word: entry.word, note: entry.note, tags: entry.tags });
-  const [generatingRadar, setGeneratingRadar] = useState(false);
 
   const startEditing = (): void => {
     setDraft({ word: entry.word, note: entry.note, tags: entry.tags });
@@ -160,24 +157,6 @@ export function EntryCard({
               <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
               {entry.explanation ? 'Refresh explanation' : 'AI explain'}
             </Button>
-            {entry.explanation && onGenerateRadar && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={generatingRadar}
-                onClick={async () => {
-                  setGeneratingRadar(true);
-                  try {
-                    await onGenerateRadar(entry);
-                  } finally {
-                    setGeneratingRadar(false);
-                  }
-                }}
-              >
-                <SparklesIcon size={14} className="mr-1.5" aria-hidden="true" />
-                {generatingRadar ? 'Generating…' : 'Generate Radar'}
-              </Button>
-            )}
             {entry.sourceUrl && (
               <a
                 href={entry.sourceUrl}
