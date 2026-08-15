@@ -4,7 +4,7 @@ import type { LibraryFilters } from '@/features/library/LibraryToolbar';
 import { vocabularyRepository } from '@/storage/vocabulary-repository';
 import { reviewRepository } from '@/storage/review-repository';
 import { isOnboarded } from '@/shared/lib/onboarding';
-import { sendMessage } from '@/shared/messaging/client';
+import { sendMessage, sendToActiveTab } from '@/shared/messaging/client';
 import { aiErrorMessage } from '@/ai/types';
 import { useSettings } from '@/shared/hooks/useSettings';
 import { Button } from '@/shared/ui/Button';
@@ -290,11 +290,12 @@ export function App() {
   // Failures surface on the page itself (the reader shows a banner), so the
   // popup only manages the button's pending state here.
   const refreshPageTranslation = useCallback(async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
     setRefreshingTranslation(true);
     try {
-      await sendMessage({ type: 'bilingual:refresh' });
+      // Route to the active tab's content script, which owns the reader. (Do NOT
+      // use sendMessage — that hits the background worker, where bilingual:refresh
+      // is not registered, and the call fails silently.)
+      await sendToActiveTab({ type: 'bilingual:refresh' });
     } catch {
       // The content script reports translation failures via its own banner.
     } finally {

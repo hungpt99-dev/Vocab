@@ -498,10 +498,17 @@ let bilingualActiveHere = false;
  * Content scripts run in EVERY open tab, so a global bilingual setting would
  * otherwise turn translation on in all of them at once (the bug where enabling
  * bilingual hit every open tab). We ask the service worker "am I the active
- * tab?" — it answers via chrome.tabs.query({active:true}) — and only the
- * single active tab ever translates. The service worker also broadcasts
+ * tab?" — it answers via chrome.tabs.get(sender tab id) — and only the single
+ * active tab ever translates. The service worker also broadcasts
  * `bilingual:reconcile` to every tab on tab-switch, so exactly one tab
  * translates at a time and the previous one closes.
+ *
+ * IMPORTANT: this is only for the *cross-tab* single-active enforcement (tab
+ * switches). It must NOT be the gate for *this* tab opening when its own scope
+ * just became active (e.g. the user clicked "Allow site" in the popup). In that
+ * path `syncBilingual` already owns the scope decision synchronously; routing it
+ * through `am-i-active-tab` races with the popup focus and can leave the page
+ * untranslated until a reload. So `syncBilingual` opens directly when in scope.
  */
 async function reconcileBilingual(): Promise<void> {
   if (!bilingualActiveHere || localBilingualOff) {
@@ -553,15 +560,23 @@ function syncBilingual(readingMode: 'off' | 'allowed' | 'everywhere', domains: r
     if (reader.isOpen) reader.close();
     return;
   }
-  // Reading aids are on, but this tab may have opted out locally.
+  // Reading aids are on for this page. Open/refresh the reader directly here —
+  // the scope decision is already made synchronously above, so we don't need
+  // the worker's async am-i-active-tab check (which races with popup focus and
+  // caused "Allow site requires a reload"). We only open when THIS tab is the
+  // one the user is actually looking at (visibilityState), so a background tab
+  // whose scope just became active stays dormant until it's focused — at which
+  // point the broadcast `bilingual:reconcile` (→ reconcileBilingual) opens it.
+  // That keeps the single-active-tab rule intact without a worker round-trip.
   if (localBilingualOff) {
     document.body.classList.remove('avs-bilingual-on');
     if (reader.isOpen) reader.close();
     return;
   }
   document.body.classList.add('avs-bilingual-on');
-  // Open ONLY in the active tab; the worker decides which tab that is.
-  void reconcileBilingual();
+  if (document.visibilityState !== 'visible') return; // will open on tab focus
+  if (reader.isOpen) reader.show();
+  else void reader.open();
 }
 
 function scan(root: Node | null): void {

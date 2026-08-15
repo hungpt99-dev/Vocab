@@ -36,3 +36,18 @@ export async function broadcast(message: Message): Promise<void> {
     tabs.filter((tab) => typeof tab.id === 'number').map((tab) => sendToTab(tab.id!, message)),
   );
 }
+
+/**
+ * Send a message to the active tab's content script (NOT the service worker).
+ * Use this for messages whose handler lives in the content script (e.g.
+ * `bilingual:refresh`, `bilingual:reconcile`) — `sendMessage` only reaches the
+ * background worker, where such handlers are not registered, and would be
+ * rejected as "Unhandled message type".
+ */
+export async function sendToActiveTab<T extends MessageType>(
+  message: Extract<Message, { type: T }>,
+): Promise<ResponseMap[T] | null> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (typeof tab?.id !== 'number') return null;
+  return sendToTab(tab.id, message);
+}
