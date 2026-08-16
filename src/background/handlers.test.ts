@@ -434,6 +434,45 @@ describe('createHandlers', () => {
     expect(result).toMatchObject({ ok: true, data: { meaning: 'A fortunate accident.' } });
   });
 
+  it('settles the durable enrich session when the explain succeeds', async () => {
+    await chromeMock().storage.local.set({
+      'avs:enrich-session': { word: 'cake', kind: null, enriching: true, explanation: null },
+    });
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'cake' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: true });
+    await vi.waitFor(async () => {
+      const session = await chromeMock().storage.local.get('avs:enrich-session');
+      expect(session['avs:enrich-session']).toMatchObject({
+        word: 'cake',
+        enriching: false,
+        explanation: { meaning: 'A fortunate accident.' },
+      });
+    });
+  });
+
+  it('clears the durable enrich session when the explain fails', async () => {
+    (deps.explain.explain as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('AI provider is down'),
+    );
+    await chromeMock().storage.local.set({
+      'avs:enrich-session': { word: 'cake', kind: null, enriching: true, explanation: null },
+    });
+    const result = await dispatch(
+      createHandlers(deps),
+      { type: 'explain', payload: { word: 'cake' } },
+      sender,
+    );
+    expect(result).toMatchObject({ ok: false });
+    await vi.waitFor(async () => {
+      const session = await chromeMock().storage.local.get('avs:enrich-session');
+      expect(session['avs:enrich-session']).toBeUndefined();
+    });
+  });
+
   it('fills a missing translation via keyless Google when the target language is not English', async () => {
     // The AI returned no `translation`; the user's target language is Vietnamese.
     await deps.settings.update({ targetLanguage: { code: 'vi-VN', name: 'Vietnamese' } });

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SelectionPayload } from '@/shared/messaging/contract';
-import type { ExplainKind } from '@/shared/types/ai';
 import type { VocabularyEntry, Explanation } from '@/shared/types/vocabulary';
 import { sendMessage } from '@/shared/messaging/client';
 import { useVocabulary } from '@/shared/hooks/useVocabulary';
@@ -12,30 +11,8 @@ import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { ArrowLeftIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import { aiErrorMessage } from '@/ai/types';
+import { readEnrichSession, writeEnrichSession, type EnrichSession } from './enrich-session';
 import { SaveForm } from './SaveForm';
-
-// Durable in-flight state for the popup's AI enrich action. The popup can close
-// and reopen mid-call (it remounts on blur), which wipes volatile React state
-// and makes the loading spinner vanish. We mirror the enrich session in storage
-// so a reloaded popup resumes the spinner and keeps the result — same durable
-// pattern as `avs:pending-explain`.
-const ENRICH_SESSION_KEY = 'avs:enrich-session';
-interface EnrichSession {
-  word: string;
-  kind: ExplainKind | null;
-  enriching: boolean;
-  explanation: Explanation | null;
-}
-const readEnrichSession = (): Promise<EnrichSession | null> =>
-  new Promise((resolve) => {
-    chrome.storage.local.get(ENRICH_SESSION_KEY, (v) =>
-      resolve((v[ENRICH_SESSION_KEY] as EnrichSession | undefined) ?? null),
-    );
-  });
-const writeEnrichSession = (s: EnrichSession | null): void => {
-  if (s) chrome.storage.local.set({ [ENRICH_SESSION_KEY]: s });
-  else chrome.storage.local.remove(ENRICH_SESSION_KEY);
-};
 
 export interface SaveWordScreenProps {
   /** Called after a word is saved, so the dashboard can refresh its stats. */
@@ -125,14 +102,16 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
 
   const enrichWord = selection?.word ?? word;
 
-  // Resume a popup that was reopened mid-enrich: restore the loading spinner and
-  // any finished result so a reload doesn't wipe the in-flight state (the AI call
-  // keeps running in the background worker).
+  // Resume a popup that was reopened mid-enrich: restore any finished result so
+  // a reload doesn't wipe it. We deliberately never restore the loading flag —
+  // the background worker settles the session when the call actually finishes
+  // (see `settleEnrichSession`), so a stored `enriching: true` may describe a
+  // call that already completed while the popup was closed, or one whose worker
+  // died. Restoring it would revive a phantom spinner that can never clear.
   useEffect(() => {
     let cancelled = false;
     void readEnrichSession().then((s) => {
       if (cancelled || !s || s.word !== enrichWord) return;
-      if (s.enriching) setEnriching(true);
       if (s.explanation) setEnrich({ word: s.word, explanation: s.explanation });
     });
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string): void => {

@@ -19,6 +19,7 @@ import {
 import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
 import { generateRadarForWord, removeRadarWord, dropRadarSource } from '@/features/radar/radar-background';
 import { radarStore } from '@/features/radar/radar-store';
+import { settleEnrichSession } from '@/features/capture/enrich-session';
 
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
@@ -278,20 +279,31 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'get-highlight-data': () => buildHighlightData(deps),
     explain: async (message) => {
-      const explanation = await explainWord(
-        deps,
-        message.payload.word,
-        message.payload.context,
-        message.payload.kind,
-        message.payload.pageTitle,
-        message.payload.precedingText,
-        message.payload.language,
-      );
-      // AI explain doubles as Radar generation: any word the user enriches that
-      // is already saved gets Radar candidates produced automatically (no
-      // separate button). Best-effort; a failed AI call must not break explain.
-      const saved = await deps.vocabulary.findByWord(message.payload.word);
-      if (saved) void generateRadarForWord(saved);
+      let explanation: Explanation;
+      try {
+        explanation = await explainWord(
+          deps,
+          message.payload.word,
+          message.payload.context,
+          message.payload.kind,
+          message.payload.pageTitle,
+          message.payload.precedingText,
+          message.payload.language,
+        );
+        // AI explain doubles as Radar generation: any word the user enriches that
+        // is already saved gets Radar candidates produced automatically (no
+        // separate button). Best-effort; a failed AI call must not break explain.
+        const saved = await deps.vocabulary.findByWord(message.payload.word);
+        if (saved) void generateRadarForWord(saved);
+      } catch (error) {
+        // Settle any durable enrich session for this word: the popup may have
+        // closed mid-call and reopened, and must never resume a stuck spinner.
+        void settleEnrichSession(message.payload.word, null);
+        throw error;
+      }
+      // The worker always runs to completion, so it — not the popup — settles
+      // the enrich session. A popup that reopened mid-call picks up the result.
+      void settleEnrichSession(message.payload.word, explanation);
       return explanation;
     },
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
