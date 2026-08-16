@@ -135,4 +135,31 @@ describe('googleTranslate (keyless fallback)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
     await expect(googleTranslate.translate(['Hello'], 'Vietnamese')).rejects.toThrow(/network/i);
   });
+
+  it('times out instead of hanging forever when the endpoint never responds', async () => {
+    vi.useFakeTimers();
+    try {
+      // A request that never resolves unless its signal aborts — like a real
+      // fetch on a blocked connection (no OS-level TCP timeout fires at all).
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init?: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => {
+                reject(new DOMException('The operation was aborted.', 'AbortError'));
+              });
+            }),
+        ),
+      );
+      const pending = googleTranslate.translate(['Hello'], 'Vietnamese');
+      // Attach a handler before advancing timers so the (expected) rejection is
+      // never reported as unhandled by the runtime.
+      void pending.catch(() => {});
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(pending).rejects.toThrow(/timed out/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -28,7 +28,9 @@ interface GtxResponse {
  */
 const SEP = '\n';
 
-/** Translate a single string. Returns the source text unchanged on failure. */
+/** Keyless translation of a single string. Returns the source text unchanged on failure. */
+const TIMEOUT_MS = 30_000;
+
 async function translateText(text: string, target: string, source = 'auto'): Promise<string> {
   if (!text.trim()) return text;
   const params = new URLSearchParams({
@@ -38,8 +40,13 @@ async function translateText(text: string, target: string, source = 'auto'): Pro
     dt: 't',
     q: text.slice(0, 5000),
   });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(`${GTX_BASE}?${params.toString()}`, { method: 'GET' });
+    const response = await fetch(`${GTX_BASE}?${params.toString()}`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
     if (!response.ok) return text;
     const data = (await response.json()) as GtxResponse;
     const chunks = (data[0] ?? []).map((segment) => segment[0] ?? '').join('');
@@ -48,10 +55,17 @@ async function translateText(text: string, target: string, source = 'auto'): Pro
     // Network/blocked failure: surface it so the caller can tell the user, rather
     // than silently returning the source text (which makes bilingual look broken
     // with no explanation). A clean 200 that returned empty still falls back to
-    // the source above.
+    // the source above. A hung connection is also bounded here — without a
+    // timeout the fetch would pend forever and stall every caller (the explain
+    // card's Google fallback hung the popup's "Asking your AI…" spinner).
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Keyless translation timed out.');
+    }
     throw err instanceof Error
       ? new Error(`Keyless translation failed to reach the network: ${err.message}`)
       : new Error('Keyless translation failed to reach the network.');
+  } finally {
+    clearTimeout(timer);
   }
 }
 
