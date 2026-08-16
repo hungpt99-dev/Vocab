@@ -30,8 +30,12 @@ Declared in `scripts/manifest.ts`. Each permission is requested for one reason:
 | `storage` | Persist settings in `chrome.storage.local` and receive change events | No settings; no live updates to open tabs |
 | `contextMenus` | The "Save … to vocabulary" right-click entry | Context-menu capture |
 | `activeTab` | Read the selection from the tab the user acted on | Capture from menu and shortcut |
-| `unlimitedStorage` | Avoid a quota ceiling on a growing vocabulary | Large libraries could hit the default quota |
 | `host_permissions: <all_urls>` | Highlighting must work on any page the user reads | Highlighting would be limited to an allow-list |
+
+`unlimitedStorage` is deliberately not requested. Vocabulary data lives in
+IndexedDB, whose quota already scales with the free space on the user's disk
+(generally gigabytes), and every `chrome.storage.local` write is a small
+settings object — well inside the default 10 MB limit.
 
 `<all_urls>` is the broadest request here and will be questioned in Chrome Web Store review. The
 honest justification: the product's value is that saved words are highlighted **wherever** the user

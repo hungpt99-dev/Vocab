@@ -98,8 +98,11 @@ submission:
 | `storage` | Persist settings and the API key in `chrome.storage.local`. |
 | `contextMenus` | The "Save … to vocabulary" right-click menu item. |
 | `activeTab` | Read the selected text and current tab when the user invokes capture. |
-| `unlimitedStorage` | Vocabularies can grow large; raise IndexedDB quota concerns on some profiles. |
 | `host_permissions: <all_urls>` | Highlight, capture and bilingual reading on any page the user browses. |
+
+`unlimitedStorage` is deliberately not requested — vocabulary lives in
+IndexedDB (quota scales with free disk space), and `chrome.storage.local`
+holds only small settings objects.
 
 A consistent, honest message for reviewers: the extension is local-first, the key
 is the user's own, and outbound traffic is limited to provider calls the user

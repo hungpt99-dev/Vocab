@@ -226,7 +226,7 @@ That is the accepted cost of a script that actually executes.
 | --- | --- | --- |
 | Worker evicted mid-flow | Chrome restarts it on the next event | Automatic; no state was held |
 | Content script cannot inject (`chrome://`, Web Store, PDF) | Capture and highlighting unavailable on that page | Expected; documented in [Known limitations](KNOWN_LIMITATIONS.md) |
-| IndexedDB unavailable or full | Repository throws; UI surfaces the error | User frees space; `unlimitedStorage` is requested to make this rare |
+| IndexedDB unavailable or full | Repository throws; UI surfaces the error | User frees space; the default quota already scales with free disk space, so this is rare in practice |
 | Provider unreachable | `AiError('network')` naming the base URL | User checks connectivity or that their local model is running |
 | Malformed AI response | `AiError('bad_response')`; entry unchanged | User retries or switches model |
 | Corrupt import file | Rejected before any write | Nothing changed; user re-exports |

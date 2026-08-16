@@ -116,10 +116,11 @@ these features in Settings.*
 
 **Declare permissions:** `storage` — persist settings and user-supplied API
 key locally; `contextMenus` — right-click "Save to vocabulary"; `activeTab` —
-read the user's selection when they invoke capture; `unlimitedStorage` —
-vocabularies can grow beyond the default quota; `<all_urls>` host permission —
+read the user's selection when they invoke capture; `<all_urls>` host permission —
 highlight saved words and enable bilingual reading on any page the user
-reads.
+reads. `unlimitedStorage` is deliberately NOT requested: the vocabulary lives
+in IndexedDB, whose quota already scales with free disk space, and the only
+`chrome.storage.local` writes are small settings objects.
 
 ---
 

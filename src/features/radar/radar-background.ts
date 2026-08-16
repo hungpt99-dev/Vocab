@@ -49,7 +49,6 @@ export async function generateRadarForWord(entry: VocabularyEntry): Promise<numb
   };
 
   let candidates: RadarCandidateInput[] = [];
-  let usedFallback = false;
   try {
     const result = await radarGeneratorService.generate(settings, {
       word: entry.word,
@@ -64,15 +63,11 @@ export async function generateRadarForWord(entry: VocabularyEntry): Promise<numb
 
   if (candidates.length === 0) {
     candidates = seedFromExplanation();
-    usedFallback = candidates.length > 0;
   }
 
   if (candidates.length > 0) {
     await radarStore.addCandidates(entry, candidates);
     await broadcastRadarChanged();
-    console.info(
-      `[radar] generated ${candidates.length} candidate(s) for "${entry.word}"${usedFallback ? ' (from explanation fallback)' : ''}`,
-    );
   } else {
     console.warn(`[radar] no candidates for "${entry.word}" (no AI output and no explanation terms)`);
   }

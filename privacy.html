@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vocab — Privacy Policy</title>
+    <meta
+      name="description"
+      content="Privacy policy for the Vocab Chrome extension: what data it processes, where it is stored, and what is sent to AI providers."
+    />
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --accent: #4f46e5;
+        --border: #e2e8f0;
+        --code: #f1f5f9;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 48px 20px 80px;
+      }
+      header { border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+      header h1 { margin: 0 0 4px; font-size: 28px; }
+      header p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+      h2 { font-size: 19px; margin: 32px 0 10px; }
+      h3 { font-size: 15px; margin: 20px 0 6px; }
+      p, li { color: #1e293b; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin: 14px 0;
+      }
+      .card p { margin: 0 0 8px; }
+      .card p:last-child { margin-bottom: 0; }
+      code, .key {
+        background: var(--code);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 13px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: 14px;
+      }
+      th, td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th { background: var(--code); font-weight: 600; }
+      .summary {
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 10px;
+        padding: 16px 20px;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      a { color: var(--accent); }
+      .updated {
+        display: inline-block;
+        background: var(--accent);
+        color: #fff;
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        margin-bottom: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Vocab — Privacy Policy</h1>
+        <p>
+          <span class="updated">Last updated: August 16, 2026</span><br />
+          This policy applies to the <strong>Vocab</strong> Chrome extension.
+          It describes exactly what the extension processes, what stays on your
+          device, and what leaves it. It was written against the implementation
+          itself — nothing here is aspirational.
+        </p>
+      </header>
+
+      <div class="summary">
+        <p>
+          <strong>The short version:</strong> Vocab is a local-first vocabulary
+          learning extension. <strong>No account, no sign-in, no telemetry, no
+          analytics, no ads, and no backend.</strong> Your vocabulary and
+          settings never leave your browser. Two things can leave your device,
+          and only when a feature you use requires them: text you ask to be
+          explained is sent to the AI provider <em>you</em> configured, and
+          text from the page you are reading may be sent to Google's keyless
+          Translate endpoint for the bilingual-reading feature.
+        </p>
+      </div>
+
+      <h2>1. What data the extension processes</h2>
+      <p>
+        When you use Vocab, it processes the following data. All of it exists
+        only because the vocabulary-learning features need it.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>When it is processed</th>
+            <th>Stored?</th>
+            <th>Sent anywhere?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Words you select or save on a webpage</td>
+            <td>When you save, explain or translate a selection</td>
+            <td>Yes — locally</td>
+            <td>Only to your AI provider or Google Translate when you trigger it</td>
+          </tr>
+          <tr>
+            <td>The sentence a saved word appeared in, plus up to 200 characters of preceding text</td>
+            <td>When you save or explain a word</td>
+            <td>Yes — locally</td>
+            <td>Only to your AI provider when you trigger an explanation</td>
+          </tr>
+          <tr>
+            <td>Page title and URL of the page you saved a word from</td>
+            <td>When you save a word</td>
+            <td>Yes — locally</td>
+            <td>Page title/URL may be included in an AI explanation prompt you trigger</td>
+          </tr>
+          <tr>
+            <td>Article text of the page you are reading</td>
+            <td>Only while the bilingual-reading feature is active on that page</td>
+            <td>Session cache only</td>
+            <td>To Google's keyless Translate endpoint (see §3)</td>
+          </tr>
+          <tr>
+            <td>Saved vocabulary entries: word, note, tags, AI explanations, review schedule</td>
+            <td>Stored as you build your library</td>
+            <td>Yes — locally</td>
+            <td>Never</td>
+          </tr>
+          <tr>
+            <td>Settings, including your AI provider choice and API key</td>
+            <td>Stored when you configure them</td>
+            <td>Yes — locally</td>
+            <td>Your API key is sent only to the provider it belongs to (§4)</td>
+          </tr>
+          <tr>
+            <td>Browsing history</td>
+            <td>Never</td>
+            <td>No</td>
+            <td>Never</td>
+          </tr>
+          <tr>
+            <td>Passwords, form input, payment information</td>
+            <td>Never</td>
+            <td>No</td>
+            <td>Never</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>2. Where data is stored</h2>
+      <p>Everything Vocab stores lives inside your browser profile:</p>
+      <ul>
+        <li>
+          <strong>Your vocabulary</strong> (saved words, sentences, notes,
+          tags, AI explanations, review schedule) — IndexedDB database named
+          <code>vocab</code>, scoped to the extension.
+        </li>
+        <li>
+          <strong>Settings and your AI API key(s)</strong> —
+          <code>chrome.storage.local</code>. The API key is stored locally so
+          requests can go directly from your browser to the provider you
+          configured; it is never sent to Vocab, because Vocab has no server.
+        </li>
+        <li>
+          <strong>Reading preferences</strong> — <code>chrome.storage.local</code>.
+        </li>
+        <li>
+          <strong>A random, locally generated identifier</strong> used to scope
+          vocabulary data within the extension. It is never transmitted.
+        </li>
+        <li>
+          <strong>A short-lived translation cache</strong> —
+          <code>chrome.storage.session</code>, cleared automatically when the
+          browser restarts.
+        </li>
+      </ul>
+      <p>
+        Nothing is stored on any Vocab server, because no Vocab server exists.
+        Uninstalling the extension removes all of the above from your browser.
+      </p>
+
+      <h2>3. What is sent over the network</h2>
+      <p>There are exactly two kinds of outbound request, both HTTPS:</p>
+
+      <div class="card">
+        <h3>a) Your configured AI provider</h3>
+        <p>
+          When you click an AI action (explain a word, generate examples,
+          generate "Radar" related vocabulary, test a connection), the word or
+          phrase you chose and its short sentence context are sent directly
+          from your browser to the provider you configured — for example
+          OpenAI, Anthropic, Google Gemini, OpenRouter, or a local model such
+          as Ollama or LM Studio running on your own machine. Vocab does not
+          route, store or log these requests.
+        </p>
+        <p>
+          If you enable "auto-explain on save" (off by default), saving a word
+          triggers one explanation request with that word and its sentence.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>b) Google's keyless Translate endpoint</h3>
+        <p>
+          The bilingual-reading feature (on by default, can be turned off in
+          Options) and quick translations send the text being read or
+          translated to
+          <code>translate.googleapis.com</code> — the same public, keyless
+          endpoint the Google Translate widget uses. No API key is involved.
+          Only extracted article prose (paragraphs, headings, sentences, and
+          per-word glosses) of the page you are reading is sent — never the
+          full page, scripts, forms or hidden content. Pages without
+          article-like content are not sent.
+        </p>
+      </div>
+
+      <p>
+        <strong>What is never sent anywhere:</strong> your full vocabulary
+        library, notes, tags, saved URLs, browsing history, page content when
+        no reading or AI feature is active, and your API key (except to the
+        provider it belongs to).
+      </p>
+
+      <h2>4. How your API key is handled</h2>
+      <ul>
+        <li>Vocab never supplies, generates or stores its own API key.</li>
+        <li>Your key is stored only in your browser's local extension storage.</li>
+        <li>Requests go directly from your browser to the provider you configured — Vocab has no backend that could see or proxy the key.</li>
+        <li>The key is sent only to the provider it belongs to, over HTTPS (or to a local model on <code>localhost</code>, which never leaves your machine).</li>
+        <li>The key is not included in backup/export files, is not written to logs, and appears masked in the settings UI.</li>
+        <li>You can remove a stored key at any time by editing or deleting the provider in Options.</li>
+      </ul>
+      <p>
+        Because the key is held in standard browser storage, anyone with access
+        to your browser profile could in principle read it. We recommend
+        scoping your key at the provider, setting a spending cap, and rotating
+        it periodically.
+      </p>
+
+      <h2>5. Analytics, advertising and sharing</h2>
+      <ul>
+        <li><strong>Analytics:</strong> none. Vocab contains no analytics, tracking or crash-reporting code.</li>
+        <li><strong>Advertising:</strong> none.</li>
+        <li><strong>Data sales:</strong> Vocab does not sell, rent or trade any data — it collects nothing to sell.</li>
+        <li><strong>Sharing:</strong> the only third parties that ever see anything are (a) the AI provider you configured, for text you choose to have explained, and (b) Google's keyless Translate endpoint, for text you read with bilingual reading or quick-translate. Their respective terms and privacy policies apply to those requests.</li>
+        <li><strong>Remote code:</strong> none. The extension is fully bundled; it loads no scripts from the internet.</li>
+        <li><strong>Cookies:</strong> the extension sets no cookies.</li>
+      </ul>
+
+      <h2>6. Deleting your data</h2>
+      <ul>
+        <li>Open <strong>Options → Your data</strong> to clear all stored data, export a backup file (vocabulary only — never API keys), or import one.</li>
+        <li>Uninstalling the extension removes the IndexedDB database and extension storage from your browser.</li>
+        <li>Requests already sent to your AI provider or Google Translate cannot be recalled; see their privacy policies for their retention.</li>
+      </ul>
+
+      <h2>7. Changes to this policy</h2>
+      <p>
+        If the extension's data handling changes, this policy will be updated
+        and the "last updated" date above will be revised. Vocab will never
+        begin collecting data without updating this policy first.
+      </p>
+
+      <footer>
+        Questions about this policy can be sent to the extension's maintainers.
+        This extension is provided free of charge and without any warranty.
+      </footer>
+    </main>
+  </body>
+</html>

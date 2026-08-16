@@ -103,7 +103,7 @@ function parseCandidates(raw: string): RadarCandidateInput[] {
 /** Build a ProviderConfig from a saved provider for the chat-completion call. */
 function providerConfig(provider: SavedProvider) {
   return {
-    apiKey: provider.apiKey ? `sk-${provider.apiKey.slice(-4)}` : '',
+    apiKey: provider.apiKey ?? '',
     model: provider.model,
     baseUrl: provider.baseUrl,
     temperature: provider.temperature ?? 0.4,
