@@ -373,9 +373,9 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         if (!entry.explanation) continue;
         const has = await radarStore.findByWordKey(entry.wordKey);
         if (has) continue;
-        // Local-only: re-derive Radar from each word's existing explanation
-        // terms without spending AI requests (safe to run on demand).
-        await generateRadarForWord(entry, { localOnly: true });
+        // Explicit user action: use the AI path (with local fallback) so each
+        // word gets distinct discovery candidates, not just its own terms.
+        await generateRadarForWord(entry);
       }
     },
     'radar:backfill': async () => {

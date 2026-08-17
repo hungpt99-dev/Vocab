@@ -70,6 +70,17 @@ function LibraryScreen({
 
   const { entries, tags, loading, error, reload, update, remove, toggleFavorite } = useVocabulary(query);
 
+  // The background persists + broadcasts `vocabulary-changed` as soon as an
+  // explain completes (often before the popup's sendMessage response arrives,
+  // or when the service worker is evicted mid-request and the response is lost).
+  // When that broadcast reloads the entry with its explanation, clear the
+  // spinner immediately instead of waiting on the (possibly lost) response.
+  useEffect(() => {
+    if (!explainingId) return;
+    const explaining = entries.find((e) => e.id === explainingId);
+    if (explaining?.explanation) setExplainingId(null);
+  }, [entries, explainingId]);
+
   const handleRemove = useCallback(
     async (id: string) => {
       await remove(id);
@@ -118,11 +129,16 @@ function LibraryScreen({
       } catch (cause) {
         notify(aiErrorMessage(cause), 'error');
       } finally {
-        // Reconcile from storage: the background saved the explanation even if
-        // its response never reached us. Clearing explainingId here (not just
-        // on success) is what stops the permanent "Asking your AI…" spinner.
-        await reload();
+        // Clear the spinner first so it can never strand, then reconcile from
+        // storage (the background saved the explanation even if its response
+        // never reached us). Reload is best-effort — a slow/failed reload must
+        // not keep the spinner up, because the broadcast above already updates it.
         setExplainingId(null);
+        try {
+          await reload();
+        } catch {
+          // best-effort; the vocabulary-changed broadcast also refreshes the list
+        }
       }
     },
     [update, reload, notify],
