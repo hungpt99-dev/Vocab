@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InlineReader, setMinSkeletonMs } from './inline-reader';
 import { sendMessage } from '@/shared/messaging/client';
 import { settingsRepository } from '@/storage/settings-repository';
-import type { WordAlignResult } from '@/ai/types';
 
 vi.mock('@/shared/messaging/client', () => ({
   sendMessage: vi.fn(),
@@ -39,26 +38,10 @@ function defer(): void {
   });
 }
 
-function glossResponse(): WordAlignResult[] {
+function sentenceResponse(): Array<{ id: string; translation: string }> {
   return [
-    {
-      id: '0',
-      text: 'Hello world',
-      pairs: [
-        { source: 'Hello', target: 'Xin' },
-        { source: 'world', target: 'chào' },
-      ],
-      translation: 'Xin chào',
-    },
-    {
-      id: '1',
-      text: 'Goodbye world',
-      pairs: [
-        { source: 'Goodbye', target: 'Tạm biệt' },
-        { source: 'world', target: 'chào' },
-      ],
-      translation: 'Tạm biệt chào',
-    },
+    { id: '0', translation: 'Xin chào thế giới' },
+    { id: '1', translation: 'Tạm biệt thế giới' },
   ];
 }
 
@@ -72,8 +55,7 @@ function stubSettings(): void {
 describe('InlineReader bilingual injection', () => {
   beforeEach(() => {
     setMinSkeletonMs(0);
-    document.body.innerHTML =
-      '<article><p>Hello world</p><p>Goodbye world</p></article>';
+    document.body.innerHTML = '<article><p>Hello world</p><p>Goodbye world</p></article>';
     defer();
     // sendMessage resolves via the controllable deferred so tests can freeze a
     // translate batch mid-flight (resolveSend) and assert discard/cache behaviour.
@@ -81,14 +63,16 @@ describe('InlineReader bilingual injection', () => {
     stubSettings();
     // Default IntersectionObserver: report every observed element as intersecting
     // (jsdom has no layout). This makes open() translate all blocks eagerly,
-    // matching the historical behaviour the other tests rely on. Individual
-    // tests can override this with a non-auto-firing mock.
+    // matching the historical behaviour the other tests rely on.
     vi.stubGlobal(
       'IntersectionObserver',
       class {
         constructor(private readonly cb: IntersectionObserverCallback) {}
         observe(el: Element): void {
-          this.cb([{ target: el, isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+          this.cb(
+            [{ target: el, isIntersecting: true } as unknown as IntersectionObserverEntry],
+            {} as IntersectionObserver,
+          );
         }
         unobserve(): void {}
         disconnect(): void {}
@@ -97,15 +81,15 @@ describe('InlineReader bilingual injection', () => {
         }
       } as unknown as typeof IntersectionObserver,
     );
+    // translate-article echoes the requested paragraphs (resolved on demand).
     vi.mocked(sendMessage).mockImplementation(async (message) => {
-      if (message.type === 'align-words') {
+      if (message.type === 'translate-article') {
         const paragraphs = message.payload.paragraphs as Array<{ id: string; text: string }>;
-        const data = (await sendDeferred) as WordAlignResult[];
+        const data = (await sendDeferred) as Array<{ id: string; translation: string }>;
         // Echo the requested ids so injected nodes map to real paragraphs.
         return paragraphs.map((paragraph, index) => ({
           id: paragraph.id,
           text: paragraph.text,
-          pairs: data[index]?.pairs ?? [],
           translation: data[index]?.translation ?? '',
         })) as never;
       }
@@ -119,7 +103,7 @@ describe('InlineReader bilingual injection', () => {
     document.body.innerHTML = '';
   });
 
-  it('does not duplicate glosses when closed while a batch is in flight', async () => {
+  it('does not inject when closed while a batch is in flight', async () => {
     const reader = new InlineReader();
 
     // Kick off open() but do NOT await it: injectAll is now parked on sendMessage.
@@ -129,53 +113,44 @@ describe('InlineReader bilingual injection', () => {
     // A rapid close() supersedes the in-flight batch (generation bumped).
     reader.close();
 
-    // The stalled align response finally arrives …
-    resolveSend(glossResponse());
+    // The stalled response finally arrives …
+    resolveSend(sentenceResponse());
     await flush();
     await flush();
 
     // … but the stale batch must have been discarded, not appended.
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
-    // A fresh open() in word mode wraps each source word in a gloss span and
-    // emits one translation line per paragraph. The two paragraphs differ, so
-    // two distinct lines appear (dedup only suppresses identical neighbours).
+    // A fresh open() emits one translation line per paragraph.
     await reader.open();
     await flush();
     await flush();
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
 
     reader.close();
   });
 
-  it('injects a single gloss per paragraph on a normal open (word mode: one translation line, deduped)', async () => {
+  it('injects one translation line per paragraph on a normal open', async () => {
     const reader = new InlineReader();
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await reader.open();
     await flush();
     await flush();
-    // Word mode wraps source words and emits one translation line per paragraph
-    // (the two test paragraphs are different, so two distinct lines appear).
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
     reader.close();
   });
 
   it('dedupes consecutive identical translation lines (same paragraph text repeated)', async () => {
-    document.body.innerHTML =
-      '<article><p>Hello world</p><p>Hello world</p></article>';
+    document.body.innerHTML = '<article><p>Hello world</p><p>Hello world</p></article>';
     defer();
     stubSettings();
     vi.mocked(sendMessage).mockImplementation(async (message) => {
-      if (message.type === 'align-words') {
+      if (message.type === 'translate-article') {
         const paragraphs = message.payload.paragraphs as Array<{ id: string; text: string }>;
-        const data = (await sendDeferred) as WordAlignResult[];
+        const data = (await sendDeferred) as Array<{ id: string; translation: string }>;
         return paragraphs.map((paragraph, index) => ({
           id: paragraph.id,
           text: paragraph.text,
-          pairs: data[index]?.pairs ?? [],
           translation: data[index]?.translation ?? '',
         })) as never;
       }
@@ -183,35 +158,35 @@ describe('InlineReader bilingual injection', () => {
     });
 
     const reader = new InlineReader();
-    // Both paragraphs are "Hello world"; force the mock to return the same
-    // translation for both so we exercise the consecutive-dedup guard.
+    // Both paragraphs are "Hello world"; force the same translation for both so
+    // we exercise the consecutive-dedup guard.
     resolveSend([
-      { id: '0', text: 'Hello world', pairs: [{ source: 'Hello', target: 'Xin' }, { source: 'world', target: 'chào' }], translation: 'Xin chào' },
-      { id: '1', text: 'Hello world', pairs: [{ source: 'Hello', target: 'Xin' }, { source: 'world', target: 'chào' }], translation: 'Xin chào' },
-    ] as WordAlignResult[]);
+      { id: '0', translation: 'Xin chào thế giới' },
+      { id: '1', translation: 'Xin chào thế giới' },
+    ]);
     await reader.open();
     await flush();
     await flush();
     // Two identical paragraphs resolve to the same translation; the guard keeps
     // only one visible line instead of stacking a duplicate.
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(1);
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(4);
     reader.close();
   });
 
   it('translates the whole page on open (not just the viewport) — async in parallel', async () => {
     // A long article: many paragraphs, far more than one viewport.
-    const paragraphs = Array.from({ length: 40 }, (_, i) => `<p id="p${i}">Paragraph number ${i} about linguistics</p>`).join('');
+    const paragraphs = Array.from(
+      { length: 40 },
+      (_, i) => `<p id="p${i}">Paragraph number ${i} about linguistics</p>`,
+    ).join('');
     document.body.innerHTML = `<article>${paragraphs}</article>`;
 
-    // align-words echoes the requested paragraphs (resolved on demand).
     vi.mocked(sendMessage).mockImplementation(async (message) => {
-      if (message.type === 'align-words') {
+      if (message.type === 'translate-article') {
         const paragraphsReq = message.payload.paragraphs as Array<{ id: string; text: string }>;
         return paragraphsReq.map((paragraph) => ({
           id: paragraph.id,
           text: paragraph.text,
-          pairs: [{ source: 'linguistics', target: 'ngôn ngữ học' }],
           translation: `[vi]${paragraph.text}`,
         })) as never;
       }
@@ -232,7 +207,8 @@ describe('InlineReader bilingual injection', () => {
 
   it('shows a persistent banner when the AI call fails (no silent monolingual page)', async () => {
     vi.mocked(sendMessage).mockImplementation(async (message) => {
-      if (message.type === 'align-words') throw Object.assign(new Error('An API key is required.'), { code: 'missing_api_key' });
+      if (message.type === 'translate-article')
+        throw Object.assign(new Error('An API key is required.'), { code: 'missing_api_key' });
       return [] as never;
     });
 
@@ -242,7 +218,6 @@ describe('InlineReader bilingual injection', () => {
     await flush();
 
     // Nothing injected, but the failure must be reported — not swallowed.
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
     const banner = document.querySelector('.avs-bilingual-banner');
@@ -254,7 +229,7 @@ describe('InlineReader bilingual injection', () => {
 
   it('shows a skeleton while a block translates, then replaces it with the line', async () => {
     const reader = new InlineReader();
-    // Keep the align response pending so we can observe the loading state.
+    // Keep the response pending so we can observe the loading state.
     void reader.open();
     await flush();
 
@@ -263,7 +238,7 @@ describe('InlineReader bilingual injection', () => {
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
 
     // The translation arrives.
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await flush();
     await flush();
 
@@ -275,7 +250,7 @@ describe('InlineReader bilingual injection', () => {
 
   it('removes skeleton placeholders when closed mid-flight (no orphaned shimmer)', async () => {
     const reader = new InlineReader();
-    // Start open() but keep the align response pending so skeletons are showing.
+    // Start open() but keep the response pending so skeletons are showing.
     void reader.open();
     await flush();
 
@@ -285,21 +260,20 @@ describe('InlineReader bilingual injection', () => {
     reader.close();
 
     // The pending response arrives after close — must not re-add anything.
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await flush();
     await flush();
 
     // No skeleton shimmer and no injected lines remain on the page.
     expect(document.querySelectorAll('.avs-skeleton-line').length).toBe(0);
     expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
-    expect(document.querySelectorAll('.avs-gloss-word').length).toBe(0);
   });
 
   it('reuses cached translations on reopen instead of re-calling the AI', async () => {
     const reader = new InlineReader();
 
-    // First open: nothing cached yet, so align-words IS called.
-    resolveSend(glossResponse());
+    // First open: nothing cached yet, so translate-article IS called.
+    resolveSend(sentenceResponse());
     await reader.open();
     await flush();
     await flush();
@@ -311,7 +285,7 @@ describe('InlineReader bilingual injection', () => {
     // Simulate the page reopening (e.g. tab switch back, or a reload): a fresh
     // reader instance, but the session cache persists the prior translations.
     const reader2 = new InlineReader();
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await reader2.open();
     await flush();
     await flush();
@@ -332,7 +306,7 @@ describe('InlineReader bilingual injection', () => {
       targetLanguage: { code: 'vi-VN', name: 'Vietnamese' },
     } as never);
     const reader = new InlineReader();
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await reader.open();
     await flush();
     await flush();
@@ -343,7 +317,7 @@ describe('InlineReader bilingual injection', () => {
 
     // Now an explicit (forced) open translates the current page regardless of list.
     const forced = new InlineReader();
-    resolveSend(glossResponse());
+    resolveSend(sentenceResponse());
     await forced.open(true);
     await flush();
     await flush();

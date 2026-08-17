@@ -5,7 +5,6 @@
  * into the host page. */
 import {
   AlignVerticalJustifyStart,
-  AlignHorizontalSpaceBetween,
   Book,
   Bookmark,
   BookOpen,
@@ -50,8 +49,6 @@ export const ICON_FILE = icon(FileText);
 export const ICON_WAND = icon(Wand2);
 /** Bilingual-book sentence alignment toggle (stacked facing lines). */
 export const ICON_ALIGN_SENTENCE = icon(AlignVerticalJustifyStart);
-/** Word-by-word interlinear gloss mode (two facing columns). */
-export const ICON_GLOSS_WORD = icon(AlignHorizontalSpaceBetween);
 /** X-Ray Reading: see through complex text to the simple idea inside. */
 export const ICON_XRAY = icon(ScanSearch);
 /** Re-translate the current page's bilingual content, bypassing the cache. */

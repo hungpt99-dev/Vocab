@@ -26,13 +26,6 @@ describe('reading preferences', () => {
     });
   });
 
-  it('defaults the bilingual mode to word-by-word and persists a change', async () => {
-    expect((await getReadingPreferences()).mode).toBe('word');
-    const next = await setReadingPreferences({ mode: 'sentence' });
-    expect(next.mode).toBe('sentence');
-    expect((await getReadingPreferences()).mode).toBe('sentence');
-  });
-
   it('clamps the font size to the supported range', async () => {
     expect((await setReadingPreferences({ fontSize: 99 })).fontSize).toBe(24);
     expect((await setReadingPreferences({ fontSize: 2 })).fontSize).toBe(12);

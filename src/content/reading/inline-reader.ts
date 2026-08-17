@@ -3,18 +3,15 @@ import { settingsRepository } from '@/storage/settings-repository';
 import { splitIntoSentences } from '@/shared/lib/text';
 import {
   getReadingPreferences,
-  setReadingPreferences,
   watchReadingPreferences,
   type ReadingAlignment,
-  type ReadingMode,
 } from './preferences';
 import { extractArticle, type ArticleBlock } from './extract';
-import { buildSentenceBlock, wrapWords } from './gloss';
-import { WordGlossPopover } from './word-gloss-popover';
-import type { WordAlignResult, BilingualPerf } from '@/ai/types';
+import { buildSentenceBlock } from './gloss';
+import type { BilingualPerf } from '@/ai/types';
 import { aiErrorMessage } from '@/ai/types';
 import { bilingualLog, contentTimer } from '@/shared/lib/bilingual-log';
-import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_GLOSS_WORD, ICON_REFRESH } from '../icons';
+import { ICON_BOOK_OPEN, ICON_CLOSE, ICON_LANGUAGES, ICON_REFRESH } from '../icons';
 import { isReadingActiveOnHost } from '@/shared/types/settings';
 import { translationCache, cacheKey, type CachedTranslation } from './translation-cache';
 
@@ -40,13 +37,10 @@ export function setMinSkeletonMs(ms: number): void {
 export class InlineReader {
   private readonly injected = new Map<string, HTMLElement[]>();
   private control: HTMLElement | null = null;
-  private modeButton: HTMLButtonElement | null = null;
   private prefsListener: (() => void) | null = null;
   private banner: HTMLElement | null = null;
-  private readonly popover = new WordGlossPopover();
   private readonly hostOriginal = new Map<HTMLElement, string>();
   private alignment: ReadingAlignment = 'sentence';
-  private mode: ReadingMode = 'word';
   private active = false;
   /** IntersectionObserver that triggers translation as blocks enter the viewport. */
   private observer: IntersectionObserver | null = null;
@@ -158,7 +152,6 @@ export class InlineReader {
 
     const [prefs, settings] = await Promise.all([getReadingPreferences(), settingsRepository.get()]);
     this.alignment = prefs.alignment;
-    this.mode = prefs.mode;
     this.active = true;
     this.generation += 1;
     this.lastError = null;
@@ -170,14 +163,8 @@ export class InlineReader {
     this.buildControl(force || effective);
     this.prefsListener = watchReadingPreferences((next) => {
       this.alignment = next.alignment;
-      if (next.mode !== this.mode) {
-        this.mode = next.mode;
-        void this.rerender(blocks);
-      }
       this.refreshControl();
     });
-    document.body.addEventListener('mouseover', this.onWordHover);
-    document.body.addEventListener('mouseout', this.onWordLeave);
 
     if (force || effective) {
       // Translate the whole page up front (concurrent, via translateBlocks) so
@@ -187,21 +174,6 @@ export class InlineReader {
     return true;
   }
 
-  private readonly onWordHover = (event: MouseEvent): void => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (this.popover.contains(target)) return;
-    const word = target.closest<HTMLElement>('.avs-gloss-word');
-    if (word) this.popover.show(word);
-    else this.popover.scheduleHide();
-  };
-
-  private readonly onWordLeave = (event: MouseEvent): void => {
-    const related = event.relatedTarget;
-    if (related instanceof Node && this.popover.contains(related)) return;
-    this.popover.scheduleHide();
-  };
-
   close(): void {
     this.active = false;
     this.generation += 1;
@@ -209,9 +181,6 @@ export class InlineReader {
     this.observer = null;
     this.translatedBlockIds.clear();
     this.clearSkeletons();
-    document.body.removeEventListener('mouseover', this.onWordHover);
-    document.body.removeEventListener('mouseout', this.onWordLeave);
-    this.popover.destroy();
     for (const [element, html] of this.hostOriginal) element.innerHTML = html;
     this.hostOriginal.clear();
     for (const nodes of this.injected.values()) {
@@ -222,26 +191,11 @@ export class InlineReader {
     this.banner = null;
     this.control?.remove();
     this.control = null;
-    this.modeButton = null;
     this.prefsListener?.();
     this.prefsListener = null;
   }
 
   /** Re-inject translations after a mode change (clears the old ones first). */
-  private async rerender(blocks: ArticleBlock[]): Promise<void> {
-    this.generation += 1;
-    this.restoreHost();
-    for (const nodes of this.injected.values()) {
-      for (const node of nodes) node.remove();
-    }
-    this.injected.clear();
-    this.translatedBlockIds.clear();
-    this.clearSkeletons();
-    this.observer?.disconnect();
-    this.observer = null;
-    if (blocks.length > 0) this.observeBlocks(blocks);
-  }
-
   /** Undo any word wrapping we applied to the host page. */
   private restoreHost(): void {
     for (const [element, html] of this.hostOriginal) element.innerHTML = html;
@@ -348,7 +302,7 @@ export class InlineReader {
     const cached = force
       ? new Map()
       : await translationCache.get(
-          items.map((item) => cacheKey(item.text, language, this.mode)),
+          items.map((item) => cacheKey(item.text, language, 'sentence')),
         );
 
     // Enforce a minimum visible dwell for the skeleton shimmer. The skeleton was
@@ -367,81 +321,48 @@ export class InlineReader {
     let injectedSomething = false;
 
     for (const item of items) {
-      const key = cacheKey(item.text, language, this.mode);
+      const key = cacheKey(item.text, language, 'sentence');
       const hit = cached.get(key);
       if (!hit) {
         toTranslate.push(item);
         continue;
       }
       // Cache hit: render directly, no AI call, and drop the skeleton we showed.
-      this.renderItem(item, hit.translation, hit.pairs, key);
+      this.renderItem(item, hit.translation, key);
       replaceSkeleton(item.anchor, null);
       injectedSomething = true;
     }
 
     if (toTranslate.length > 0) {
       const newCache = new Map<string, CachedTranslation>();
-      if (this.mode === 'word') {
-        const aligned = await this.alignItems(toTranslate);
-        if (this.generation !== generation) {
-          for (const sk of skeletonByAnchor.values()) sk.remove();
-          return;
-        }
-        let lastText: string | null = null;
-        for (const item of toTranslate) {
-          const result = aligned.map.get(item.id);
-          if (!result) {
-            replaceSkeleton(item.anchor, null);
-            continue;
-          }
-          this.applyWordGloss(item, result);
-          const line = result.translation || result.pairs.map((pair) => pair.target).join(' ');
-          if (line && line !== lastText) {
-            const node = buildSentenceBlock(line);
-            replaceSkeleton(item.anchor, node);
-            this.track(item.id, node);
-            lastText = result.translation;
-            injectedSomething = true;
-          } else {
-            replaceSkeleton(item.anchor, null);
-          }
-          newCache.set(cacheKey(item.text, language, 'word'), { translation: result.translation, pairs: result.pairs });
-        }
-        const swPerf = aligned.perf;
-        bilingualLog.content(
-          `word batch: ${toTranslate.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
-          swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
-        );
-      } else {
-        const translated = await this.translateItems(toTranslate);
-        if (this.generation !== generation) {
-          for (const sk of skeletonByAnchor.values()) sk.remove();
-          return;
-        }
-        let lastText: string | null = null;
-        for (const item of toTranslate) {
-          const translation = translated.map.get(item.id);
-          if (!translation) {
-            replaceSkeleton(item.anchor, null);
-            continue;
-          }
-          if (translation === lastText) {
-            replaceSkeleton(item.anchor, null);
-            continue;
-          }
-          lastText = translation;
-          const node = buildSentenceBlock(translation);
-          replaceSkeleton(item.anchor, node);
-          this.track(item.id, node);
-          injectedSomething = true;
-          newCache.set(cacheKey(item.text, language, 'sentence'), { translation, pairs: null });
-        }
-        const swPerf = translated.perf;
-        bilingualLog.content(
-          `sentence batch: ${toTranslate.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
-          swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
-        );
+      const translated = await this.translateItems(toTranslate);
+      if (this.generation !== generation) {
+        for (const sk of skeletonByAnchor.values()) sk.remove();
+        return;
       }
+      let lastText: string | null = null;
+      for (const item of toTranslate) {
+        const translation = translated.map.get(item.id);
+        if (!translation) {
+          replaceSkeleton(item.anchor, null);
+          continue;
+        }
+        if (translation === lastText) {
+          replaceSkeleton(item.anchor, null);
+          continue;
+        }
+        lastText = translation;
+        const node = buildSentenceBlock(translation);
+        replaceSkeleton(item.anchor, node);
+        this.track(item.id, node);
+        injectedSomething = true;
+        newCache.set(cacheKey(item.text, language, 'sentence'), { translation, pairs: null });
+      }
+      const swPerf = translated.perf;
+      bilingualLog.content(
+        `sentence batch: ${toTranslate.length} items, ${(performance.now() - t0).toFixed(0)}ms wall`,
+        swPerf ? { providerMs: swPerf.providerMs, rateLimitWaitMs: swPerf.rateLimitWaitMs, swTotalMs: swPerf.totalMs } : 'no perf',
+      );
       if (newCache.size > 0) await translationCache.set(newCache);
     }
 
@@ -456,18 +377,13 @@ export class InlineReader {
   }
 
   /**
-   * Render one translated item from a cached or fresh result. Shared by the cache
-   * fast-path and (for the gloss) the live align path.
+   * Render one translated item from a cached or fresh result.
    */
   private renderItem(
     item: { id: string; text: string; anchor: HTMLElement },
     translation: string,
-    pairs: Array<{ source: string; target: string }> | null,
     cacheKeyForTrack: string,
   ): void {
-    if (pairs && pairs.length > 0 && this.mode === 'word') {
-      this.applyWordGloss(item, { id: item.id, text: item.text, pairs, translation });
-    }
     if (!translation) return;
     const node = buildSentenceBlock(translation);
     item.anchor.after(node);
@@ -521,43 +437,10 @@ export class InlineReader {
     this.banner = null;
   }
 
-  /** Wrap matched source words in hoverable gloss spans (saved for undo). */
-  private applyWordGloss(item: { id: string; text: string; anchor: HTMLElement }, result: WordAlignResult): void {
-    const source = item.anchor;
-    if (!this.hostOriginal.has(source)) {
-      this.hostOriginal.set(source, source.innerHTML);
-    }
-    wrapWords(source, result);
-  }
-
   private track(id: string, node: HTMLElement): void {
     const list = this.injected.get(id) ?? [];
     list.push(node);
     this.injected.set(id, list);
-  }
-
-  private async alignItems(
-    items: Array<{ id: string; text: string }>,
-  ): Promise<{ map: Map<string, WordAlignResult>; perf?: BilingualPerf }> {
-    const out = new Map<string, WordAlignResult>();
-    let perf: BilingualPerf | undefined;
-    try {
-      const settings = await settingsRepository.get();
-      const language = settings.targetLanguage?.name || 'English';
-      const results = await sendMessage({
-        type: 'align-words',
-        payload: { paragraphs: items.map(({ id, text }) => ({ id, text })), language },
-      });
-      for (const result of results) {
-        if (result.perf && !perf) perf = result.perf;
-        out.set(result.id, result);
-      }
-    } catch (cause) {
-      // Record the failure so the caller can surface an actionable message
-      // instead of leaving the page silently monolingual.
-      this.lastError = aiErrorMessage(cause);
-    }
-    return { map: out, perf };
   }
 
   private async translateItems(
@@ -654,17 +537,6 @@ export class InlineReader {
     });
     control.dataset.on = 'true';
 
-    const align = document.createElement('button');
-    align.type = 'button';
-    align.className = 'avs-inline-btn';
-    align.innerHTML = this.mode === 'word' ? ICON_GLOSS_WORD : ICON_LANGUAGES;
-    align.title = this.mode === 'word' ? 'Word-by-word gloss (click for sentence)' : 'Sentence translation (click for word-by-word)';
-    align.setAttribute('aria-label', 'Switch bilingual mode: word-by-word or sentence');
-    align.addEventListener('click', () => {
-      const next: ReadingMode = this.mode === 'word' ? 'sentence' : 'word';
-      void setReadingPreferences({ mode: next });
-    });
-
     const refresh = document.createElement('button');
     refresh.type = 'button';
     refresh.className = 'avs-inline-btn';
@@ -681,16 +553,12 @@ export class InlineReader {
     close.setAttribute('aria-label', 'Close bilingual reading');
     close.addEventListener('click', () => this.close());
 
-    control.append(label, toggle, align, refresh, close);
+    control.append(label, toggle, refresh, close);
     document.body.append(control);
     this.control = control;
-    this.modeButton = align;
   }
 
   private refreshControl(): void {
-    if (!this.modeButton) return;
-    this.modeButton.innerHTML = this.mode === 'word' ? ICON_GLOSS_WORD : ICON_LANGUAGES;
-    this.modeButton.title =
-      this.mode === 'word' ? 'Word-by-word gloss (click for sentence)' : 'Sentence translation (click for word-by-word)';
+    // No mode toggle anymore — bilingual always renders sentence translations.
   }
 }

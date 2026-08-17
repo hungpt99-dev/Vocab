@@ -1,7 +1,6 @@
 import type {
   TranslationParagraph,
   TranslationResult,
-  WordAlignResult,
   BilingualPerf,
 } from './types';
 import type { Settings } from '@/shared/types/settings';
@@ -33,10 +32,6 @@ interface CacheEntry {
  */
 export class TranslateService {
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly alignCache = new Map<
-    string,
-    { results: WordAlignResult[]; expiresAt: number }
-  >();
   private readonly cacheTtlMs: number;
 
   constructor(
@@ -83,42 +78,6 @@ export class TranslateService {
     return out;
   }
 
-  /** Word-by-word aligned translation: returns ordered source→target glosses. */
-  async alignWords(
-    paragraphs: readonly TranslationParagraph[],
-    language: string,
-    signal?: AbortSignal,
-  ): Promise<WordAlignResult[]> {
-    const settings = await this.settings.get();
-    return this.alignWith(settings, paragraphs, language, signal);
-  }
-
-  async alignWith(
-    _settings: Settings,
-    paragraphs: readonly TranslationParagraph[],
-    language: string,
-    signal?: AbortSignal,
-  ): Promise<WordAlignResult[]> {
-    // Bilingual reading never uses the AI provider — keyless Google Translate.
-    // See VOC-101.
-    const perf = this.makePerfCollector(Math.ceil(paragraphs.length / CHUNK_SIZE) || 1);
-    const chunks: TranslationParagraph[][] = [];
-    for (let start = 0; start < paragraphs.length; start += CHUNK_SIZE) {
-      chunks.push(paragraphs.slice(start, start + CHUNK_SIZE));
-    }
-    const chunked = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, (chunk) =>
-      this.alignChunk(chunk, language, signal, perf),
-    );
-    const out = chunked.flat();
-    perf.finish();
-    perf.attach(out[0]);
-    bilingualLog.sw(
-      `align ${paragraphs.length} paragraphs → ${chunks.length} chunks (google keyless)`,
-      perf.summary(),
-    );
-    return out;
-  }
-
   private async translateChunk(
     chunk: readonly TranslationParagraph[],
     language: string,
@@ -140,33 +99,6 @@ export class TranslateService {
       text: paragraph.text,
       translation: translations[index] ?? '',
     }));
-  }
-
-  private async alignChunk(
-    chunk: readonly TranslationParagraph[],
-    language: string,
-    _signal: AbortSignal | undefined,
-    perf: PerfCollector,
-  ): Promise<WordAlignResult[]> {
-    const cached = this.readAlignCache(GOOGLE_CACHE_PROVIDER, chunk, language);
-    if (cached) perf.markCacheHit();
-    const results =
-      cached ??
-      (await googleTranslate.align(
-        chunk.map((p) => ({ id: p.id, text: p.text })),
-        language,
-      ));
-    if (!cached) this.writeAlignCache(GOOGLE_CACHE_PROVIDER, chunk, language, results);
-    // The cache is keyed by text but stores the FIRST requester's block ids.
-    // A second tab reading the same article gets a cache hit with foreign ids,
-    // and its reader can never match them — every injection silently dropped.
-    // Re-key the results to the caller's ids on every return (VOC-124).
-    return chunk.map((paragraph, index) => {
-      const hit = results[index];
-      return hit
-        ? { ...hit, id: paragraph.id, pairs: [...hit.pairs] }
-        : { id: paragraph.id, text: paragraph.text, pairs: [], translation: '' };
-    });
   }
 
   private cacheKey(
@@ -198,39 +130,6 @@ export class TranslateService {
   ): void {
     this.cache.set(this.cacheKey(providerKey, paragraphs, language), {
       translations: [...translations],
-      expiresAt: Date.now() + this.cacheTtlMs,
-    });
-  }
-
-  private alignCacheKey(
-    providerKey: string,
-    paragraphs: readonly TranslationParagraph[],
-    language: string,
-  ): string {
-    const body = paragraphs.map(({ text }) => text).join('␞');
-    return `align|${providerKey}|${language}|${body}`;
-  }
-
-  private readAlignCache(
-    providerKey: string,
-    paragraphs: readonly TranslationParagraph[],
-    language: string,
-  ): WordAlignResult[] | null {
-    const key = this.alignCacheKey(providerKey, paragraphs, language);
-    const entry = this.alignCache.get(key);
-    if (entry && entry.expiresAt > Date.now()) return entry.results;
-    this.alignCache.delete(key);
-    return null;
-  }
-
-  private writeAlignCache(
-    providerKey: string,
-    paragraphs: readonly TranslationParagraph[],
-    language: string,
-    results: readonly WordAlignResult[],
-  ): void {
-    this.alignCache.set(this.alignCacheKey(providerKey, paragraphs, language), {
-      results: results.map((r) => ({ ...r, pairs: [...r.pairs] })),
       expiresAt: Date.now() + this.cacheTtlMs,
     });
   }
