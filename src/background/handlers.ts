@@ -21,6 +21,30 @@ import { generateRadarForWord, removeRadarWord, dropRadarSource, backfillRadar }
 import { radarStore } from '@/features/radar/radar-store';
 import { settleEnrichSession } from '@/features/capture/enrich-session';
 
+/**
+ * Translate a single saved word into the user's target language, for caching on
+ * the entry at save time (VOC-178). Best-effort: returns '' when translation is
+ * unavailable or identical to the source so the card falls back to a live lookup
+ * for legacy entries.
+ */
+async function translateSavedWord(
+  deps: BackgroundDeps,
+  word: string,
+  sourceLanguage: string,
+): Promise<string> {
+  const settings = await deps.settings.get();
+  const target = settings.targetLanguage?.name || 'English';
+  // No point translating a word that is already in the target language.
+  if (sourceLanguage && sourceLanguage.toLowerCase() === target.toLowerCase()) return '';
+  try {
+    const [result] = await deps.translate.translate([{ id: 'w', text: word }], target);
+    const translation = result?.translation?.trim() ?? '';
+    return translation && translation !== word ? translation : '';
+  } catch {
+    return '';
+  }
+}
+
 export interface BackgroundDeps {
   vocabulary: VocabularyRepository;
   settings: SettingsRepository;
@@ -55,6 +79,7 @@ export async function saveSelection(
     sourceUrl: selection.sourceUrl,
     sourceTitle: selection.sourceTitle,
     sourceLanguage: selection.sourceLanguage,
+    translation: await translateSavedWord(deps, selection.word, selection.sourceLanguage ?? ''),
   });
   // Schedule the new word for spaced-repetition review (best-effort, never blocks save).
   await deps.review.ensureScheduled(saved).catch(() => undefined);
@@ -260,7 +285,9 @@ export async function deleteVocabulary(
 export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
   return {
     'save-entry': async (message) => {
-      const entry = await deps.vocabulary.save(message.payload);
+      const translation = message.payload.translation ??
+        (await translateSavedWord(deps, message.payload.word, message.payload.sourceLanguage ?? ''));
+      const entry = await deps.vocabulary.save({ ...message.payload, translation });
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
@@ -352,6 +379,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         sourceUrl,
         sourceTitle,
         sourceLanguage,
+        translation: await translateSavedWord(deps, word, sourceLanguage ?? ''),
       });
       await removeRadarWord(message.payload.wordKey);
       await broadcast({ type: 'vocabulary-changed' });

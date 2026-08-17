@@ -31,6 +31,19 @@ describe('save', () => {
     expect(entry.createdAt).toBeGreaterThan(0);
   });
 
+  it('persists the translation captured at save time (VOC-178)', async () => {
+    const entry = await repo.save({ word: 'Serendipity', translation: 'vận may mắn' });
+    expect(entry.translation).toBe('vận may mắn');
+
+    const reread = await repo.get(entry.id);
+    expect(reread?.translation).toBe('vận may mắn');
+  });
+
+  it('defaults translation to empty string when not supplied', async () => {
+    const entry = await repo.save({ word: 'Serendipity' });
+    expect(entry.translation).toBe('');
+  });
+
   it('marks multi-word selections as phrases', async () => {
     const entry = await repo.save({ word: 'piece of cake' });
     expect(entry.phrase).toBe('piece of cake');

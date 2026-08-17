@@ -28,6 +28,7 @@ export function makeVocabularyEntry(
     tags: partial.tags ?? [],
     favorite: partial.favorite ?? false,
     sourceLanguage: partial.sourceLanguage ?? '',
+    translation: partial.translation ?? '',
     explanation: partial.explanation ?? null,
     createdAt: partial.createdAt ?? 1,
     updatedAt: partial.updatedAt ?? 1,

@@ -102,6 +102,7 @@ export class VocabularyRepository {
       tags: normalizeTags(input.tags ?? []),
       favorite: input.favorite ?? false,
       sourceLanguage: input.sourceLanguage ?? '',
+      translation: input.translation ?? '',
       explanation: input.explanation ?? null,
       createdAt: now,
       updatedAt: now,
@@ -366,6 +367,7 @@ function mergeIntoExisting(
     tags: normalizeTags([...existing.tags, ...(input.tags ?? [])]),
     favorite: input.favorite ?? existing.favorite,
     sourceLanguage: input.sourceLanguage ?? existing.sourceLanguage,
+    translation: input.translation ?? existing.translation,
     // Canonical concept fields adopt the latest analysis (the family identity
     // never changes on merge, but the lemma/POS may refine).
     normalizedForm: normalized.normalizedForm,

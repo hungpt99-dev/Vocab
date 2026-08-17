@@ -76,6 +76,13 @@ export interface VocabularyEntry {
   favorite: boolean;
   /** Detected language of the word/phrase, when known (BCP-47-ish label). */
   sourceLanguage: string;
+  /**
+   * The word/phrase translated into the user's target language, captured at
+   * save time (VOC-178) so the library card can show it instantly without
+   * re-translating. Populated from AI enrichment when present, otherwise from
+   * keyless Google. Empty when unavailable or identical to the source.
+   */
+  translation: string;
   explanation: Explanation | null;
   createdAt: number;
   updatedAt: number;
@@ -94,6 +101,8 @@ export interface NewVocabularyEntry {
   /** Detected source language; defaults to '' and is filled by the caller when known. */
   sourceLanguage?: string;
   explanation?: Explanation | null;
+  /** Word translated into the target language (see `VocabularyEntry.translation`). */
+  translation?: string;
 }
 
 /** Fields that may be patched on an existing entry. */
@@ -109,6 +118,7 @@ export type VocabularyPatch = Partial<
     | 'tags'
     | 'favorite'
     | 'sourceLanguage'
+    | 'translation'
     | 'explanation'
   >
 >;

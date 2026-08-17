@@ -87,8 +87,13 @@ export function EntryCard({
                 </p>
                 <PronunciationButton word={entry.word} language={entry.sourceLanguage} />
               </div>
-              <EntryTranslation text={entry.word} />
-              {entry.phrase && entry.phrase.trim() && <EntryTranslation text={entry.phrase} />}
+              <EntryTranslation text={entry.word} translation={entry.translation} />
+              {entry.phrase && entry.phrase.trim() && (
+                <EntryTranslation
+                  text={entry.phrase}
+                  translation={entry.phrase === entry.word ? entry.translation : undefined}
+                />
+              )}
               {entry.sentence && (
                 <p className="mt-0.5 line-clamp-2 text-xs italic text-slate-500 dark:text-slate-400">
                   “{entry.sentence}”
@@ -194,32 +199,39 @@ export function EntryCard({
  * skeleton while in flight and renders nothing when the call fails or the
  * source comes back unchanged.
  */
-function EntryTranslation({ text }: { text: string }) {
-  const [translation, setTranslation] = useState<string | null>(null);
+function EntryTranslation({ text, translation }: { text: string; translation?: string }) {
+  const [fetched, setFetched] = useState<string | null>(null);
 
+  // A translation cached on the entry at save time (VOC-178) is shown instantly,
+  // with no skeleton and no network round-trip. Only fall back to a live lookup
+  // for legacy entries that were saved before this field existed.
   useEffect(() => {
+    if (translation) {
+      setFetched(translation);
+      return;
+    }
     let cancelled = false;
-    setTranslation(null);
+    setFetched(null);
     const source = text.trim();
     if (!source) {
-      setTranslation('');
+      setFetched('');
       return;
     }
     void sendMessage({ type: 'translate', payload: { text: source } })
       .then((result) => {
         if (cancelled) return;
-        setTranslation(result && result !== source ? result : '');
+        setFetched(result && result !== source ? result : '');
       })
       .catch(() => {
         if (cancelled) return;
-        setTranslation('');
+        setFetched('');
       });
     return () => {
       cancelled = true;
     };
-  }, [text]);
+  }, [text, translation]);
 
-  if (translation === null) {
+  if (fetched === null) {
     return (
       <div
         aria-hidden="true"
@@ -228,10 +240,10 @@ function EntryTranslation({ text }: { text: string }) {
       />
     );
   }
-  if (!translation) return null;
+  if (!fetched) return null;
   return (
     <p data-role="translation" className="mt-0.5 text-xs text-brand-700 dark:text-brand-300">
-      {translation}
+      {fetched}
     </p>
   );
 }

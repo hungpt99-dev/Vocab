@@ -11,6 +11,7 @@ import { ToastProvider, useToast } from '@/shared/ui/Toast';
 import { ArrowLeftIcon, SparklesIcon } from '@/shared/ui/Icons';
 import { ExplanationView } from '@/features/library/ExplanationView';
 import { aiErrorMessage } from '@/ai/types';
+import { translateText } from '@/shared/lib/translation';
 import { readEnrichSession, writeEnrichSession, type EnrichSession } from './enrich-session';
 import { SaveForm } from './SaveForm';
 
@@ -78,6 +79,12 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
         // Attach any inline enrich data for the highlighted word when it matches.
         const explanation =
           enrich && enrich.word.toLowerCase() === savedWord.toLowerCase() ? enrich.explanation : null;
+        // Capture the word's translation at save time (VOC-178) so the library
+        // card can show it instantly without re-translating. Prefer the
+        // enrichment's translation; otherwise fall back to keyless Google.
+        const translation =
+          explanation?.translation ||
+          (await translateText(savedWord).catch(() => ''));
         await vocabularyRepository.save({
           word: savedWord,
           note,
@@ -87,6 +94,7 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
           sourceTitle: selection?.sourceTitle ?? '',
           sourceLanguage: selection?.sourceLanguage ?? '',
           explanation,
+          translation,
         });
         if (explanation) setEnrich(null);
         notify(`Saved “${savedWord}”.`, 'success');
@@ -182,9 +190,11 @@ function SaveWordScreenInner({ onSaved, onBack }: SaveWordScreenProps) {
       try {
         let entry = await vocabularyRepository.findByWord(w);
         if (!entry) {
+          const translation = await translateText(w).catch(() => '');
           entry = await vocabularyRepository.save({
             word: w,
             sentence: pending.context ?? '',
+            translation,
           });
         }
         if (!cancelled) await handleExplain(entry);

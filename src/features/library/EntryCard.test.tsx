@@ -195,5 +195,17 @@ describe('EntryCard', () => {
       });
       expect(screen.getByText('serendipity')).toBeInTheDocument();
     });
+
+    it('shows the translation cached on the entry at save time, with no translate call (VOC-178)', async () => {
+      vi.mocked(sendMessage).mockResolvedValue('vận may mắn');
+      setup({ translation: 'vận may mắn' });
+
+      // The cached value renders immediately…
+      expect(await screen.findByText('vận may mắn')).toBeInTheDocument();
+      // …and the card never asked the network to translate it again.
+      expect(sendMessage).not.toHaveBeenCalledWith({ type: 'translate', payload: { text: 'serendipity' } });
+      // No skeleton either — it was instant.
+      expect(screen.queryByTestId('entry-translation-skeleton')).not.toBeInTheDocument();
+    });
   });
 });
