@@ -3,7 +3,6 @@ import type { VocabularyEntry } from '@/shared/types/vocabulary';
 import type { RadarEntry } from '@/features/radar/types';
 
 export const DB_NAME = 'vocab';
-export const DB_VERSION = 5;
 
 export interface ReviewRecord {
   /** Matches the vocabulary entry's id so a review card links to its word. */
@@ -70,10 +69,9 @@ export function createDatabase(name: string = DB_NAME): VocabularyDatabase {
   // VOC-160: Radar vocabulary store. Each row is a generated candidate derived
   // from a saved word; `wordKey` is unique so the same candidate is never
   // stored twice (multiple saved sources are merged into `sourceIds`).
-  db.version(4)
-    .stores({
-      radar: 'id, &wordKey, userId, sourceId, createdAt',
-    });
+  db.version(4).stores({
+    radar: 'id, &wordKey, userId, sourceId, createdAt',
+  });
   // VOC-165: key deduplication on the exact word (userId + `wordKey`) instead of
   // the AI-derived familyId. The old (userId, familyId) compound index could
   // fold a newly-saved word into an *existing* entry sharing a family — e.g.

@@ -1,8 +1,14 @@
-import type { TranslationParagraph, TranslationResult, WordAlignResult, BilingualPerf } from './types';
+import type {
+  TranslationParagraph,
+  TranslationResult,
+  WordAlignResult,
+  BilingualPerf,
+} from './types';
 import type { Settings } from '@/shared/types/settings';
 import { settingsRepository, type SettingsRepository } from '@/storage/settings-repository';
 import { googleTranslate } from './google-translate';
 import { bilingualLog } from '@/shared/lib/bilingual-log';
+import { mapWithConcurrency } from '@/shared/lib/concurrency';
 
 /** Stable cache key for bilingual translations, which always use keyless Google. */
 const GOOGLE_CACHE_PROVIDER = 'google-keyless';
@@ -12,28 +18,6 @@ const CHUNK_SIZE = 16;
 
 /** How many chunks may be in flight at once (network overlap, bounded). */
 const CHUNK_CONCURRENCY = 3;
-
-/** Run `task` over items with a bounded number of concurrent executions. */
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  task: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function worker(): Promise<void> {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      const item = items[index];
-      if (item === undefined) continue;
-      results[index] = await task(item);
-    }
-  }
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, worker);
-  await Promise.all(workers);
-  return results;
-}
 
 interface CacheEntry {
   translations: string[];
@@ -49,7 +33,10 @@ interface CacheEntry {
  */
 export class TranslateService {
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly alignCache = new Map<string, { results: WordAlignResult[]; expiresAt: number }>();
+  private readonly alignCache = new Map<
+    string,
+    { results: WordAlignResult[]; expiresAt: number }
+  >();
   private readonly cacheTtlMs: number;
 
   constructor(
@@ -140,7 +127,12 @@ export class TranslateService {
   ): Promise<TranslationResult[]> {
     const cached = this.readCache(GOOGLE_CACHE_PROVIDER, chunk, language);
     if (cached) perf.markCacheHit();
-    const translations = cached ?? (await googleTranslate.translate(chunk.map((p) => p.text), language));
+    const translations =
+      cached ??
+      (await googleTranslate.translate(
+        chunk.map((p) => p.text),
+        language,
+      ));
     if (!cached) this.writeCache(GOOGLE_CACHE_PROVIDER, chunk, language, translations);
 
     return chunk.map((paragraph, index) => ({

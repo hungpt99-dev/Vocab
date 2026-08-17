@@ -22,8 +22,6 @@ export const RADAR_GENERATE_SYSTEM_PROMPT = [
   'If nothing is genuinely worth proposing, return {"candidates":[]}.',
 ].join(' ');
 
-export const RADAR_GENERATE_PROMPT_VERSION = 'radar-generate-v1';
-
 /** Build the user turn for a Radar generation request. */
 export function buildRadarGenerateUserPrompt(params: {
   word: string;
@@ -36,7 +34,9 @@ export function buildRadarGenerateUserPrompt(params: {
   if (partOfSpeech) lines.push(`Part of speech: ${partOfSpeech}`);
   if (meaning) lines.push(`Meaning: ${meaning}`);
   if (existingRelated && existingRelated.length > 0) {
-    lines.push(`The learner already knows these related terms — do not repeat them: ${existingRelated.join(', ')}.`);
+    lines.push(
+      `The learner already knows these related terms — do not repeat them: ${existingRelated.join(', ')}.`,
+    );
   }
   lines.push('');
   lines.push('Propose related vocabulary (JSON only).');

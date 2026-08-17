@@ -63,11 +63,7 @@ export class ExplainService {
     request: ExplainRequest,
     signal?: AbortSignal,
   ): Promise<Explanation> {
-    return runAiCall(
-      provider,
-      (adapter, config) => adapter.explain(request, config),
-      signal,
-    );
+    return runAiCall(provider, (adapter, config) => adapter.explain(request, config), signal);
   }
 
   private cacheKey(provider: SavedProvider, request: ExplainRequest): string {
@@ -82,7 +78,11 @@ export class ExplainService {
     return null;
   }
 
-  private writeCache(provider: SavedProvider, request: ExplainRequest, explanation: Explanation): void {
+  private writeCache(
+    provider: SavedProvider,
+    request: ExplainRequest,
+    explanation: Explanation,
+  ): void {
     this.cache.set(this.cacheKey(provider, request), {
       explanation,
       expiresAt: Date.now() + this.cacheTtlMs,
@@ -91,4 +91,3 @@ export class ExplainService {
 }
 
 export const explainService = new ExplainService();
-export const aiService = explainService;

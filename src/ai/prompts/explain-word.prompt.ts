@@ -125,11 +125,6 @@ const EXPLAIN_KIND_SYSTEM_PROMPTS: Record<ExplainKind, string> = {
       ' antonyms, pronunciation, collocations, grammar, register and etymology are empty.',
   ),
 };
-
-/** The original word-explanation system prompt, unchanged for compatibility. */
-export const EXPLAIN_WORD_SYSTEM_PROMPT_KIND = EXPLAIN_KIND_SYSTEM_PROMPTS.word;
-
-/** System prompt for a specific analysis kind. Defaults to the word prompt. */
 export function buildExplainSystemPrompt(kind: ExplainKind = 'word', template?: string): string {
   // The user's custom template describes the word-explanation JSON shape, so it
   // must not hijack X-Ray Reading, which returns a different structure.
@@ -145,11 +140,15 @@ export function buildExplainSystemPrompt(kind: ExplainKind = 'word', template?: 
  * Unknown tokens are left untouched; this is plain string interpolation
  * (never evaluated), so a user template cannot execute code.
  */
-export function substituteTemplate(template: string, kind: ExplainKind = 'word', vars?: {
-  language?: string;
-  word?: string;
-  context?: string;
-}): string {
+export function substituteTemplate(
+  template: string,
+  kind: ExplainKind = 'word',
+  vars?: {
+    language?: string;
+    word?: string;
+    context?: string;
+  },
+): string {
   const ctx = vars?.context ?? '';
   return template
     .replace(/\{\{\s*language\s*\}\}/g, vars?.language ?? 'English')
@@ -193,7 +192,9 @@ export function buildExplainWordUserPrompt({
   if (sourceTitle && !pageTitle) lines.push(`Page title: "${sourceTitle}"`);
   if (sourceUrl && !context) lines.push(`Source URL: ${sourceUrl}`);
   if (sourceLanguage) lines.push(`The source language is ${sourceLanguage}.`);
-  lines.push(kind === 'word' ? `Explain it in ${language}.` : `Use ${language} for the explanation.`);
+  lines.push(
+    kind === 'word' ? `Explain it in ${language}.` : `Use ${language} for the explanation.`,
+  );
   lines.push('Respond with JSON only.');
   return lines.join('\n');
 }

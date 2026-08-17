@@ -1,4 +1,5 @@
 import { collectTranslationUnits, type TranslationUnit } from './dom';
+import { mapWithConcurrency } from '@/shared/lib/concurrency';
 
 export interface TranslateEngineDeps {
   /** Translate one unit's source text. Injected so the engine stays provider-agnostic. */
@@ -52,27 +53,4 @@ export async function translateUnits(
   });
 
   return { translated, skipped, ...(error ? { error } : {}) };
-}
-
-/** Run `fn` over items with at most `concurrency` in flight. */
-async function mapWithConcurrency<T>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  const active = Math.max(1, Math.min(concurrency, items.length));
-  let next = 0;
-
-  const run = async (): Promise<void> => {
-    for (;;) {
-      const index = next;
-      next += 1;
-      if (index >= items.length) return;
-      const item = items[index];
-      if (item === undefined) return;
-      await fn(item);
-    }
-  };
-
-  await Promise.all(Array.from({ length: active }, () => run()));
 }
