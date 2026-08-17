@@ -75,6 +75,9 @@ describe('InlineReader bilingual injection', () => {
     document.body.innerHTML =
       '<article><p>Hello world</p><p>Goodbye world</p></article>';
     defer();
+    // sendMessage resolves via the controllable deferred so tests can freeze a
+    // translate batch mid-flight (resolveSend) and assert discard/cache behaviour.
+    vi.mocked(sendMessage).mockImplementation(() => sendDeferred as unknown as Promise<never>);
     stubSettings();
     // Default IntersectionObserver: report every observed element as intersecting
     // (jsdom has no layout). This makes open() translate all blocks eagerly,
@@ -196,35 +199,12 @@ describe('InlineReader bilingual injection', () => {
     reader.close();
   });
 
-  it('translates lazily — only in-view blocks initially, more as they intersect', async () => {
+  it('translates the whole page on open (not just the viewport) — async in parallel', async () => {
     // A long article: many paragraphs, far more than one viewport.
     const paragraphs = Array.from({ length: 40 }, (_, i) => `<p id="p${i}">Paragraph number ${i} about linguistics</p>`).join('');
     document.body.innerHTML = `<article>${paragraphs}</article>`;
 
-    // jsdom has no layout, so getBoundingClientRect returns zeros and nothing is
-    // "near visible" on open — translation must come solely from the observer.
-    // Force a zero-height viewport so the "near visible" heuristic sees nothing
-    // as visible on open() — translation must come solely from the observer.
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 0 });
-
-    const observers: Array<{ cb: IntersectionObserverCallback; elements: Element[] }> = [];
-    class MockIO {
-      public elements: Element[] = [];
-      constructor(public cb: IntersectionObserverCallback) {
-        observers.push({ cb, elements: this.elements });
-      }
-      observe(el: Element): void {
-        this.elements.push(el);
-      }
-      unobserve(): void {}
-      disconnect(): void {}
-      takeRecords(): IntersectionObserverEntry[] {
-        return [];
-      }
-    }
-    vi.stubGlobal('IntersectionObserver', MockIO as unknown as typeof IntersectionObserver);
-
-    // align-words echoes the requested paragraphs (resolved immediately).
+    // align-words echoes the requested paragraphs (resolved on demand).
     vi.mocked(sendMessage).mockImplementation(async (message) => {
       if (message.type === 'align-words') {
         const paragraphsReq = message.payload.paragraphs as Array<{ id: string; text: string }>;
@@ -243,39 +223,9 @@ describe('InlineReader bilingual injection', () => {
     await flush();
     await flush();
 
-    // Nothing translated yet — the page was NOT loaded all at once.
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(0);
-
-    const observer = observers[0]!;
-    const firstEl = document.getElementById('p0')!;
-    const lastEl = document.getElementById('p39')!;
-
-    // Simulate the top block scrolling into view.
-    await observer.cb(
-      [{ target: firstEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    );
-    await flush();
-    await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(1);
-
-    // Simulate the last block intersecting.
-    await observer.cb(
-      [{ target: lastEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    );
-    await flush();
-    await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
-
-    // Re-intersecting the same block must NOT re-translate it.
-    await observer.cb(
-      [{ target: firstEl, isIntersecting: true } as unknown as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    );
-    await flush();
-    await flush();
-    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(2);
+    // The open() full-page pass requests EVERY block at once (not lazily on
+    // scroll), so the whole article translates in parallel.
+    expect(document.querySelectorAll('.avs-inline-translation').length).toBe(40);
 
     reader.close();
   });

@@ -180,9 +180,8 @@ export class InlineReader {
     document.body.addEventListener('mouseout', this.onWordLeave);
 
     if (force || effective) {
-      // Lazily translate: eagerly translate what is (or is about to be) visible so
-      // the first screenful appears instantly, then top up the rest on scroll.
-      // We never "load all" the page up front.
+      // Translate the whole page up front (concurrent, via translateBlocks) so
+      // the entire article fills in at once instead of trickling in on scroll.
       await this.observeBlocks(blocks);
     }
     return true;
@@ -250,32 +249,25 @@ export class InlineReader {
   }
 
   /**
-   * Lazily translate the page. An IntersectionObserver watches every block; only
-   * blocks that are in (or near) the viewport are sent for translation, and
-   * more are translated as the reader scrolls. This keeps first paint instant
-   * and avoids translating an entire long article up front.
+   * Translate the page. We kick off a full-page translation immediately
+   * (translateBlocks batches every block through the concurrent service, so the
+   * whole article fills in at once — "translate all page" in parallel, not a
+   * per-block sequential await). An IntersectionObserver then tops up any block
+   * that appears later (dynamic content, lazy-loaded sections) or that scrolled
+   * in after the first pass.
    */
   private async observeBlocks(blocks: ArticleBlock[], force = false): Promise<void> {
     const generation = this.generation;
-    const visible = blocks.filter((b) => {
-      const el = b.element;
-      if (!(el instanceof HTMLElement)) return false;
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      // Anything within one viewport below the fold is considered "near" and is
-      // translated eagerly so it's ready just as the reader reaches it.
-      return rect.top < vh * 2 && rect.bottom > -vh;
-    });
 
-    // Translate what's already (near) visible right away, so the first screenful
-    // appears without waiting for a scroll.
-    if (visible.length > 0) await this.translateBlocks(visible, force);
+    // Translate the entire article up front, concurrently.
+    if (blocks.length > 0) await this.translateBlocks(blocks, force);
 
     // A close()/rerender() may have superseded this run while we awaited the
-    // eager batch; if so, don't set up the observer (it would fire stale work).
+    // batch; if so, don't set up the observer (it would fire stale work).
     if (this.generation !== generation) return;
 
-    // Top up the rest as it scrolls into view.
+    // Top up any block that arrives later (dynamic content) or that the first
+    // pass skipped (e.g. already translated once marked).
     this.observer = new IntersectionObserver(
       (entries) => {
         const entering = entries
