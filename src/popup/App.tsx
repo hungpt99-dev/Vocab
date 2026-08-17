@@ -23,6 +23,15 @@ import { ReviewScreen } from '@/features/review/ReviewScreen';
 import { QuizScreen } from '@/features/quiz/QuizScreen';
 import { ProgressScreen } from '@/features/progress/ProgressScreen';
 import { RadarPanel } from '@/features/radar/RadarPanel';
+
+// How long to wait for the explain response before reconciling from storage.
+// MV3 service workers can be evicted mid-request; if sendMessage never settles
+// we must still clear the spinner and reload the saved explanation. Tests may
+// lower this via __setExplainSettleMs to avoid a 2-minute real-time wait.
+let EXPLAIN_SETTLE_MS = 120_000;
+export function __setExplainSettleMs(ms: number): void {
+  EXPLAIN_SETTLE_MS = ms;
+}
 import { SaveWordScreen } from '@/features/capture/SaveWordScreen';
 
 const EMPTY_FILTERS: LibraryFilters = { search: '', favoritesOnly: false, tag: '' };
@@ -92,18 +101,31 @@ function LibraryScreen({
     async (entry: VocabularyEntry) => {
       setExplainingId(entry.id);
       try {
-        const explanation = await sendMessage({
-          type: 'explain',
-          payload: { word: entry.word, context: entry.sentence, pageTitle: entry.sourceTitle },
-        });
-        await update(entry.id, { explanation });
+        // MV3: a long explain call can be killed when the service worker is
+        // evicted, leaving sendMessage neither resolving nor rejecting. The
+        // background handler still persists the explanation + broadcasts
+        // vocabulary-changed, so we must reconcile from storage rather than
+        // trust the response. Race the call against a timeout so the spinner
+        // can never strand, and reload() in finally to reflect what was saved.
+        const explanation = await Promise.race([
+          sendMessage({
+            type: 'explain',
+            payload: { word: entry.word, context: entry.sentence, pageTitle: entry.sourceTitle },
+          }),
+          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), EXPLAIN_SETTLE_MS)),
+        ]);
+        if (explanation) await update(entry.id, { explanation });
       } catch (cause) {
         notify(aiErrorMessage(cause), 'error');
       } finally {
+        // Reconcile from storage: the background saved the explanation even if
+        // its response never reached us. Clearing explainingId here (not just
+        // on success) is what stops the permanent "Asking your AI…" spinner.
+        await reload();
         setExplainingId(null);
       }
     },
-    [update, notify],
+    [update, reload, notify],
   );
 
   const isFiltered = Boolean(debouncedSearch || filters.favoritesOnly || filters.tag);
