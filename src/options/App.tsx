@@ -8,7 +8,7 @@ import { PopupSettings } from '@/features/settings/PopupSettings';
 import { DataSettings } from '@/features/settings/DataSettings';
 import { Spinner } from '@/shared/ui/Spinner';
 import { ToastProvider, useToast } from '@/shared/ui/Toast';
-import { SettingsIcon, KeyIcon, LanguagesIcon, TargetIcon, PaletteIcon, DatabaseIcon, SlidersIcon } from '@/shared/ui/Icons';
+import { SettingsIcon, KeyIcon, LanguagesIcon, TargetIcon, PaletteIcon, DatabaseIcon, SlidersIcon, ArrowRightIcon } from '@/shared/ui/Icons';
 
 type SectionId = 'providers' | 'bilingual' | 'radar' | 'popup' | 'appearance' | 'data';
 
@@ -140,6 +140,28 @@ function SettingsScreen() {
             )}
           </div>
         )}
+
+        {/* About / project link */}
+        <a
+          href="https://hungpt99-dev.github.io/vocab-landing-page/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View the Vocab project page (opens in a new tab)"
+          className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:border-brand-500 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-400 dark:hover:bg-slate-800/60"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+              About Vocab
+            </span>
+            <span className="block truncate text-[12px] text-slate-500 dark:text-slate-400">
+              Features, how it works, and the story behind the extension.
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-300">
+            View Vocab Project
+            <ArrowRightIcon size={16} aria-hidden="true" />
+          </span>
+        </a>
       </main>
     </div>
   );
