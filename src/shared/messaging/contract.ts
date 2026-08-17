@@ -92,7 +92,8 @@ export type Message =
   | { type: 'radar:remove'; payload: { wordKey: string } }
   | { type: 'radar:list' }
   | { type: 'radar:generate'; payload: { id: string } }
-  | { type: 'radar:generate-all' };
+  | { type: 'radar:generate-all' }
+  | { type: 'radar:backfill' };
 
 export type MessageType = Message['type'];
 
@@ -153,6 +154,7 @@ export interface ResponseMap {
   'radar:list': import('@/features/radar/types').RadarEntryView[];
   'radar:generate': void;
   'radar:generate-all': void;
+  'radar:backfill': void;
 }
 
 export type MessageResult<T extends MessageType> =

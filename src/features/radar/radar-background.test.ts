@@ -8,15 +8,17 @@ const h = vi.hoisted(() => {
     async (_entry: VocabularyEntry, _candidates: readonly { word: string }[]) => [],
   );
   const listViews = vi.fn(async () => []);
+  const findByWordKey = vi.fn(async () => undefined);
   const generate = vi.fn();
   const settingsGet = vi.fn(async () => ({ radar: { enabled: true } } as never));
-  return { addCandidates, listViews, generate, settingsGet };
+  return { addCandidates, listViews, findByWordKey, generate, settingsGet };
 });
 
 vi.mock('./radar-store', () => ({
   radarStore: {
     addCandidates: h.addCandidates,
     listViews: h.listViews,
+    findByWordKey: h.findByWordKey,
     removeByWordKey: vi.fn(),
     dropSource: vi.fn(),
   },
@@ -30,7 +32,7 @@ vi.mock('@/storage/settings-repository', () => ({
   settingsRepository: { get: h.settingsGet },
 }));
 
-import { generateRadarForWord } from './radar-background';
+import { generateRadarForWord, backfillRadar } from './radar-background';
 
 const explanation: Explanation = {
   meaning: 'A fortunate accident.',
@@ -103,6 +105,40 @@ describe('generateRadarForWord', () => {
   it('returns 0 (and does not store) when radar is disabled', async () => {
     h.settingsGet.mockResolvedValue({ radar: { enabled: false } } as never);
     const count = await generateRadarForWord(entry);
+    expect(count).toBe(0);
+    expect(h.addCandidates).not.toHaveBeenCalled();
+  });
+});
+
+describe('backfillRadar', () => {
+  beforeEach(() => {
+    h.findByWordKey.mockResolvedValue(undefined);
+  });
+
+  it('turns already-enriched words into Radar candidates (the pre-ship gap)', async () => {
+    // Words enriched before Radar shipped had no candidates. Backfill must
+    // derive them from each word's existing explanation terms, with no AI call.
+    const enriched = [
+      { ...entry, id: 'e1', word: 'serendipity', wordKey: 'serendipity' },
+      {
+        ...entry,
+        id: 'e2',
+        word: 'ubiquitous',
+        wordKey: 'ubiquitous',
+        explanation: { ...explanation, synonyms: ['omnipresent'], relatedWords: ['everywhere'] },
+      },
+    ];
+    const count = await backfillRadar({ list: async () => enriched as VocabularyEntry[] });
+    expect(count).toBeGreaterThan(0);
+    // No AI generation during a local-only backfill.
+    expect(h.generate).not.toHaveBeenCalled();
+    // Every enriched word produced at least one candidate.
+    expect(h.addCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips words that are already in Radar', async () => {
+    h.findByWordKey.mockResolvedValue({ id: 'r1' } as never);
+    const count = await backfillRadar({ list: async () => [entry] as VocabularyEntry[] });
     expect(count).toBe(0);
     expect(h.addCandidates).not.toHaveBeenCalled();
   });

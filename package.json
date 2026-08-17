@@ -1,6 +1,6 @@
 {
   "name": "vocab",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Local-first Chrome extension to save, review and AI-explain vocabulary while browsing.",

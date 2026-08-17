@@ -145,4 +145,14 @@ describe('RadarPanel — local list', () => {
       }),
     );
   });
+
+  it('backfills Radar from existing enriched words on mount (radar:backfill)', async () => {
+    seedRadarList([]);
+    await act(async () => {
+      render(<RadarPanel />);
+    });
+    await waitFor(() =>
+      expect(chromeMock().runtime.sendMessage).toHaveBeenCalledWith({ type: 'radar:backfill' }),
+    );
+  });
 });

@@ -17,7 +17,7 @@ import {
   vocabularyRepository as defaultVocabularyRepository,
 } from '@/storage/vocabulary-repository';
 import { ReviewRepository, reviewRepository as defaultReviewRepository } from '@/storage/review-repository';
-import { generateRadarForWord, removeRadarWord, dropRadarSource } from '@/features/radar/radar-background';
+import { generateRadarForWord, removeRadarWord, dropRadarSource, backfillRadar } from '@/features/radar/radar-background';
 import { radarStore } from '@/features/radar/radar-store';
 import { settleEnrichSession } from '@/features/capture/enrich-session';
 
@@ -94,7 +94,7 @@ export async function buildHighlightData(deps: BackgroundDeps): Promise<Highligh
     targetLanguage: settings.targetLanguage?.name || 'English',
     readingExperience: settings.readingExperience,
     radar:
-      settings.radar?.enabled
+      settings.radar?.enabled !== false
         ? (await radarStore.listViews()).map((r) => ({
             word: r.word,
             wordKey: r.wordKey,
@@ -373,8 +373,13 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         if (!entry.explanation) continue;
         const has = await radarStore.findByWordKey(entry.wordKey);
         if (has) continue;
-        await generateRadarForWord(entry);
+        // Local-only: re-derive Radar from each word's existing explanation
+        // terms without spending AI requests (safe to run on demand).
+        await generateRadarForWord(entry, { localOnly: true });
       }
+    },
+    'radar:backfill': async () => {
+      await backfillRadar(deps.vocabulary);
     },
     'radar:remove': async (message) => {
       await radarStore.removeByWordKey(message.payload.wordKey);

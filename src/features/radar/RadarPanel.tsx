@@ -29,8 +29,15 @@ export function RadarPanel() {
   }, []);
 
   useEffect(() => {
+    // Radar was only generated for words enriched *after* the feature shipped,
+    // so pre-existing enriched words never became Radar candidates. Backfill on
+    // open (idempotent, local-only — no AI cost) so the list always reflects the
+    // vocabulary the user already has.
+    if (settings.radar?.enabled !== false) {
+      void sendMessage({ type: 'radar:backfill' }).catch(() => undefined);
+    }
     void load();
-  }, [load]);
+  }, [load, settings.radar?.enabled]);
 
   // Keep the list fresh when the background broadcasts a Radar change.
   useEffect(() => {

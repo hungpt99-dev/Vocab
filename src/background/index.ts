@@ -2,6 +2,7 @@ import { registerMessageHandlers } from '@/shared/messaging/router';
 import { broadcast, sendToTab } from '@/shared/messaging/client';
 import { createHandlers, defaultDeps, readActiveSelection, saveSelection } from './handlers';
 import { settingsRepository } from '@/storage/settings-repository';
+import { backfillRadar } from '@/features/radar/radar-background';
 
 const CONTEXT_MENU_ID = 'avs-save-selection';
 
@@ -15,6 +16,13 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ['selection'],
     });
   });
+});
+
+// Backfill Radar from words enriched before the feature shipped (idempotent,
+// local-only — no AI cost). Runs whenever the worker starts so the Radar tab
+// and page highlights reflect existing vocabulary even if the tab is never opened.
+chrome.runtime.onStartup.addListener(() => {
+  void backfillRadar(defaultDeps.vocabulary);
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
