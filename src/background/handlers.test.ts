@@ -9,6 +9,7 @@ import {
   splitVocabularyTerm,
   translateUnit,
   deleteVocabulary,
+  resetHighlightDataCache,
   type BackgroundDeps,
 } from './handlers';
 import { createDatabase } from '@/storage/database';
@@ -50,6 +51,7 @@ let deps: BackgroundDeps;
 let counter = 0;
 
 beforeEach(async () => {
+  resetHighlightDataCache();
   counter += 1;
   const db = createDatabase(`bg-db-${counter}`);
   await db.open();
@@ -220,6 +222,56 @@ describe('buildHighlightData', () => {
 
     const data = await buildHighlightData(deps);
     expect(data.radar).toEqual([]);
+  });
+});
+
+describe('buildHighlightData memoization (CPU/leak fix)', () => {
+  it('does NOT re-read the whole vocabulary on every call', async () => {
+    await deps.vocabulary.save({ word: 'alpha' });
+    const listSpy = vi.spyOn(deps.vocabulary, 'list');
+
+    const first = await buildHighlightData(deps);
+    const second = await buildHighlightData(deps);
+    const third = await buildHighlightData(deps);
+
+    // The MutationObserver used to call get-highlight-data on every DOM mutation,
+    // each forcing a full Dexie toArray(). The cache must serve repeated calls
+    // from memory and only hit the store once.
+    expect(listSpy).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+  });
+
+  it('re-reads after a write invalidates the cache', async () => {
+    await deps.vocabulary.save({ word: 'alpha' });
+    const listSpy = vi.spyOn(deps.vocabulary, 'list');
+
+    const first = await buildHighlightData(deps);
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // A save goes through createHandlers, which must invalidate the cache.
+    const handlers = createHandlers(deps);
+    await handlers['save-entry']!({ type: 'save-entry', payload: { word: 'beta' } } as never, {} as never);
+
+    const after = await buildHighlightData(deps);
+    expect(listSpy).toHaveBeenCalledTimes(2);
+    expect(after).not.toBe(first);
+    expect(after.entries.map((e) => e.wordKey).sort()).toEqual(['alpha', 'beta']);
+  });
+
+  it('re-reads when markHighlightDataDirty is called directly', async () => {
+    await deps.vocabulary.save({ word: 'alpha' });
+    const listSpy = vi.spyOn(deps.vocabulary, 'list');
+    await buildHighlightData(deps);
+    expect(listSpy).toHaveBeenCalledTimes(1);
+
+    // vocabulary-changed / settings-changed / radar:* handlers all call this.
+    // Import is local; re-trigger via the public handler map to mirror runtime.
+    const handlers = createHandlers(deps);
+    await handlers['settings-changed']!({ type: 'settings-changed' }, {} as never);
+
+    await buildHighlightData(deps);
+    expect(listSpy).toHaveBeenCalledTimes(2);
   });
 });
 

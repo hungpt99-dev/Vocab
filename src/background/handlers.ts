@@ -105,7 +105,42 @@ export async function saveSelection(
   return saved;
 }
 
-export async function buildHighlightData(deps: BackgroundDeps): Promise<HighlightData> {
+/**
+ * Memoize buildHighlightData. The content-script MutationObserver fires on every
+ * DOM change (YouTube emits hundreds–thousands of mutations/sec), and its
+ * callback asked for get-highlight-data on every batch — which ran a FULL
+ * Dexie `vocabulary.toArray()` + radar listView on each call. That turned the
+ * observer into a message storm that pinned the service worker at ~77% CPU and
+ * ~1.2 GB RAM (see perf investigation). Cache the built payload and invalidate
+ * it only when the underlying data actually changes.
+ */
+let cachedHighlightData: HighlightData | null = null;
+let highlightDataDirty = true;
+
+function markHighlightDataDirty(): void {
+  highlightDataDirty = true;
+}
+
+export function buildHighlightData(deps: BackgroundDeps): Promise<HighlightData> {
+  return buildHighlightDataImpl(deps);
+}
+
+async function buildHighlightDataImpl(deps: BackgroundDeps): Promise<HighlightData> {
+  if (!highlightDataDirty && cachedHighlightData) {
+    return cachedHighlightData;
+  }
+  cachedHighlightData = await computeHighlightData(deps);
+  highlightDataDirty = false;
+  return cachedHighlightData;
+}
+
+/** Reset the buildHighlightData memo cache. Test-only; safe to call in beforeEach. */
+export function resetHighlightDataCache(): void {
+  cachedHighlightData = null;
+  highlightDataDirty = true;
+}
+
+async function computeHighlightData(deps: BackgroundDeps): Promise<HighlightData> {
   const [settings, entries] = await Promise.all([
     deps.settings.get(),
     deps.vocabulary.list({ sortBy: 'word', sortDirection: 'asc' }),
@@ -288,6 +323,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       const translation = message.payload.translation ??
         (await translateSavedWord(deps, message.payload.word, message.payload.sourceLanguage ?? ''));
       const entry = await deps.vocabulary.save({ ...message.payload, translation });
+      markHighlightDataDirty();
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
@@ -296,11 +332,13 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       const selection = await readActiveSelection();
       if (!selection?.word.trim()) return null;
       const entry = await saveSelection(deps, selection);
+      markHighlightDataDirty();
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
     'save-selection': async (message) => {
       const entry = await saveSelection(deps, message.payload);
+      markHighlightDataDirty();
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
@@ -331,6 +369,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       // The worker always runs to completion, so it — not the popup — settles
       // the enrich session. A popup that reopened mid-call picks up the result.
       void settleEnrichSession(message.payload.word, explanation);
+      markHighlightDataDirty();
       return explanation;
     },
     'save-difficult-words': (message) => saveDifficultWords(deps, message.payload),
@@ -356,10 +395,18 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
     },
     'am-i-active-tab': (_message, sender) => isActiveTab(sender.tab?.id),
     'bilingual:reconcile': () => undefined,
-    'vocabulary-changed': () => undefined,
-    'settings-changed': () => undefined,
+    // The content-script MutationObserver asks for highlight data on every DOM
+    // change. Returning the cached payload (invalidated only on real writes)
+    // is what stops the message storm that pinned the service worker.
+    'vocabulary-changed': () => {
+      markHighlightDataDirty();
+    },
+    'settings-changed': () => {
+      markHighlightDataDirty();
+    },
     'delete-entry': async (message) => {
       await deleteVocabulary(deps, message.payload.id);
+      markHighlightDataDirty();
     },
     'radar:save': async (message) => {
       // Move a Radar candidate into Saved Vocabulary, then remove it from Radar.
@@ -373,6 +420,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         translation: await translateSavedWord(deps, word, sourceLanguage ?? ''),
       });
       await removeRadarWord(message.payload.wordKey);
+      markHighlightDataDirty();
       await broadcast({ type: 'vocabulary-changed' });
       return entry;
     },
@@ -385,6 +433,7 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
       }
       const updated = (await deps.vocabulary.findByWord(entry.word)) ?? entry;
       await generateRadarForWord(updated);
+      markHighlightDataDirty();
     },
     'radar:generate-all': async () => {
       const saved = await deps.vocabulary.list({ sortBy: 'word', sortDirection: 'asc' });
@@ -396,12 +445,15 @@ export function createHandlers(deps: BackgroundDeps = defaultDeps): HandlerMap {
         // word gets distinct discovery candidates, not just its own terms.
         await generateRadarForWord(entry);
       }
+      markHighlightDataDirty();
     },
     'radar:backfill': async () => {
       await backfillRadar(deps.vocabulary);
+      markHighlightDataDirty();
     },
     'radar:remove': async (message) => {
       await radarStore.removeByWordKey(message.payload.wordKey);
+      markHighlightDataDirty();
       await broadcast({ type: 'radar-changed' });
     },
     'radar:list': async () => radarStore.listViews(),

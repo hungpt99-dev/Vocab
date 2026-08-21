@@ -76,6 +76,47 @@ let localBilingualOff = false;
  */
 let lastArticleSig = '';
 
+/**
+ * Local mirror of the Radar list, captured from the last `refreshHighlights`.
+ * The MutationObserver used to re-fetch it from the service worker on EVERY DOM
+ * mutation batch (a full Dexie read per call) — the heart of the message storm
+ * that pinned the worker. Radar data only changes on a `vocabulary-changed` /
+ * `radar-changed` broadcast, which re-runs `refreshHighlights` and refreshes this
+ * cache, so re-applying from here is always in sync without a round-trip.
+ */
+let lastRadar: HighlightData['radar'] = [];
+
+/** Development-only performance instrumentation. Disabled in production. */
+const ENABLE_DIAGNOSTICS = false;
+const diag = {
+  observers: 0,
+  messagesSent: 0,
+  radarResyncs: 0,
+  domScans: 0,
+  fullBodyScans: 0,
+  incrementalScans: 0,
+  mutationsSeen: 0,
+  getHighlightDataCalls: 0,
+};
+function diagSnapshot(): string {
+  return [
+    'Vocab Extension Diagnostics',
+    `Observers: ${diag.observers}`,
+    `Messages sent: ${diag.messagesSent}`,
+    `get-highlight-data calls: ${diag.getHighlightDataCalls}`,
+    `Radar re-syncs (local): ${diag.radarResyncs}`,
+    `DOM scans: ${diag.domScans} (full ${diag.fullBodyScans} / incremental ${diag.incrementalScans})`,
+    `Mutations seen: ${diag.mutationsSeen}`,
+  ].join('\n');
+}
+
+if (ENABLE_DIAGNOSTICS && typeof window !== 'undefined') {
+  (window as unknown as { __vocabDiag?: unknown }).__vocabDiag = {
+    snapshot: () => diagSnapshot(),
+    diag,
+  };
+}
+
 registerMessageHandlers({
   'get-selection': () => readSelection(),
   // Word saves change the vocabulary, not the Bilingual scope. Refresh only the
@@ -306,6 +347,10 @@ function watchSettings(): void {
 async function refresh(): Promise<void> {
   let data: HighlightData | undefined;
   try {
+    if (ENABLE_DIAGNOSTICS) {
+      diag.messagesSent += 1;
+      diag.getHighlightDataCalls += 1;
+    }
     data = await sendMessage({ type: 'get-highlight-data' });
   } catch {
     // The service worker is asleep or the extension was reloaded.
@@ -367,6 +412,7 @@ function refreshHighlights(data: HighlightData): void {
   // Radar is INDEPENDENT of the saved-word highlight toggle above: turning
   // saved-word highlighting off (or having no saved words on the page) must
   // NOT suppress Radar highlights.
+  lastRadar = data.radar;
   applyRadarHighlights(data.radar);
 }
 
@@ -380,6 +426,10 @@ function refreshHighlights(data: HighlightData): void {
 async function refreshVocabulary(): Promise<void> {
   let data: HighlightData | undefined;
   try {
+    if (ENABLE_DIAGNOSTICS) {
+      diag.messagesSent += 1;
+      diag.getHighlightDataCalls += 1;
+    }
     data = await sendMessage({ type: 'get-highlight-data' });
   } catch {
     return;
@@ -547,7 +597,34 @@ function syncBilingual(readingMode: 'off' | 'allowed' | 'everywhere', domains: r
 
 function scan(root: Node | null): void {
   if (!root) return;
-  const run = (): void => void highlightRoot(root, matcher);
+  const run = (): void => {
+    diag.domScans += 1;
+    diag.fullBodyScans += 1;
+    void highlightRoot(root, matcher);
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(run, { timeout: 1000 });
+  } else {
+    run();
+  }
+}
+
+/**
+ * Incremental scan: re-highlight ONLY the nodes that were just added, not the
+ * whole document. YouTube fires thousands of mutations/sec; re-walking
+ * `document.body` on every batch was a major CPU sink. Added nodes are collected
+ * by the observer and passed here. When the change was an attribute-only
+ * visibility toggle (no added nodes), we fall back to a single full-body scan.
+ */
+function scanNodes(nodes: Node[]): void {
+  if (nodes.length === 0) return;
+  const run = (): void => {
+    diag.domScans += 1;
+    diag.incrementalScans += 1;
+    for (const node of nodes) {
+      if (node.nodeType === Node.ELEMENT_NODE) void highlightRoot(node, matcher);
+    }
+  };
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(run, { timeout: 1000 });
   } else {
@@ -557,43 +634,62 @@ function scan(root: Node | null): void {
 
 function startObserving(): void {
   if (observer) return;
+  diag.observers += 1;
+  let pendingAdded: Node[] = [];
   observer = new MutationObserver((mutations) => {
-    const touchedContent = mutations.some((mutation) => {
+    diag.mutationsSeen += mutations.length;
+    let childListTouched = false;
+    let attributeTouched = false;
+    for (const mutation of mutations) {
       // Added/removed nodes (SPA route swaps, infinite scroll, lazy articles).
-      const addedOwn = [...mutation.addedNodes].some((node) => !isOwnNode(node));
-      if (addedOwn) return true;
-      // Attribute changes that toggle a block's visibility (e.g. an SPA that
-      // shows/hides two pre-rendered views via the `hidden` attribute or
-      // inline `style`/`display`) — these swap the visible article WITHOUT
-      // adding or removing any DOM node, so childList alone would miss them.
-      if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-        const attr = mutation.attributeName;
-        if (attr === 'hidden' || attr === 'style' || attr === 'class' || attr === 'display') {
-          return !isOwnNode(mutation.target);
+      for (const node of mutation.addedNodes) {
+        if (!isOwnNode(node)) {
+          childListTouched = true;
+          if (node.nodeType === Node.ELEMENT_NODE) pendingAdded.push(node);
         }
       }
-      return false;
-    });
-    if (!touchedContent) return;
+      // Attribute changes that toggle a block's visibility (e.g. an SPA that
+      // shows/hides two pre-rendered views via the `hidden` attribute or inline
+      // `style`/`display`) swap the visible article WITHOUT adding/removing any
+      // DOM node, so childList alone would miss them.
+      if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+        const attr = mutation.attributeName;
+        if (
+          (attr === 'hidden' || attr === 'style' || attr === 'class' || attr === 'display') &&
+          !isOwnNode(mutation.target)
+        ) {
+          attributeTouched = true;
+        }
+      }
+    }
+    if (!childListTouched && !attributeTouched) return;
 
     clearTimeout(rescanTimer);
-    rescanTimer = setTimeout(() => scan(document.body), RESCAN_DELAY_MS);
-    // New page content may contain Radar candidate words — re-apply radar
-    // highlights (driven by the persisted list, no AI page scan).
-    void sendMessage({ type: 'get-highlight-data' }).then((d) => {
-      if (d) applyRadarHighlights(d.radar);
-    }).catch(() => undefined);
-    // The same content change may be an in-site (SPA) navigation that swapped
-    // the visible article — re-derive Bilingual state and re-translate the new
-    // view. BUT many mutations that flip `touchedContent` (e.g. re-highlighting
-    // vocabulary words after a word is saved) leave the *article* content
-    // untouched — the block set is identical, so re-translating would just flash
-    // the whole page ("auto-reload") for no reason. Only re-translate when the
-    // article's block set actually changed.
-    const sig = extractArticle().map((b) => b.id).join('|');
-    if (sig !== lastArticleSig) {
-      lastArticleSig = sig;
-      scheduleBilingualRefresh();
+    const addedNow = pendingAdded;
+    pendingAdded = [];
+    rescanTimer = setTimeout(() => {
+      if (addedNow.length > 0) scanNodes(addedNow);
+      else scan(document.body); // attribute-only visibility change: needs full pass
+    }, RESCAN_DELAY_MS);
+
+    // Re-apply Radar highlights from the LOCAL cache — never a service-worker
+    // round-trip. The previous code re-fetched get-highlight-data on every
+    // mutation batch, turning the observer into a message storm. Radar list only
+    // changes on a vocabulary/radar broadcast, which refreshes `lastRadar`.
+    if (lastRadar.length > 0) {
+      diag.radarResyncs += 1;
+      applyRadarHighlights(lastRadar);
+    }
+
+    // Only re-derive the Bilingual article signature when actual content was
+    // added/removed — not on every attribute flicker — so we don't walk the
+    // whole DOM (extractArticle) on every YouTube player mutation.
+    if (childListTouched) {
+      const sig = extractArticle().map((b) => b.id).join('|');
+      if (sig !== lastArticleSig) {
+        lastArticleSig = sig;
+        scheduleBilingualRefresh();
+      }
     }
   });
   observer.observe(document.body, {
