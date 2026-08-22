@@ -443,12 +443,12 @@ function applyRadarHighlights(radar: HighlightData['radar']): void {
   removeRadarHighlights();
   radarByKey = new Map(radar.map((r) => [r.wordKey, r]));
   if (radar.length === 0) return;
-  const entries: RadarMatchEntry[] = radar.map((r) => ({
-    key: r.wordKey,
-    text: r.word,
-    tier: 'high',
-  }));
-  highlightRadarRoot(document.body, entries);
+  highlightRadarRoot(document.body, radarEntries(radar));
+}
+
+/** Build the RadarMatcher entries (key/text/tier) consumed by highlightRadarRoot. */
+function radarEntries(radar: HighlightData['radar']): RadarMatchEntry[] {
+  return radar.map((r) => ({ key: r.wordKey, text: r.word, tier: 'high' }));
 }
 
 /** Debounce before re-translating after an in-tab (SPA) navigation. */
@@ -668,18 +668,30 @@ function startObserving(): void {
     const addedNow = pendingAdded;
     pendingAdded = [];
     rescanTimer = setTimeout(() => {
-      if (addedNow.length > 0) scanNodes(addedNow);
-      else scan(document.body); // attribute-only visibility change: needs full pass
+      if (addedNow.length > 0) {
+        scanNodes(addedNow);
+        // Re-apply Radar highlights INCREMENTALLY over the same newly-added
+        // nodes — NOT the whole document.body. The old code called
+        // applyRadarHighlights(lastRadar) here, which walked every text node on
+        // the entire page on every mutation batch. On YouTube (constant live
+        // chat / player / view-count mutations) that was a full-page scan every
+        // ~400ms, forever — the sustained high CPU on word-heavy pages.
+        if (lastRadar.length > 0) {
+          diag.radarResyncs += 1;
+          radarByKey = new Map(lastRadar.map((r) => [r.wordKey, r]));
+          const entries = radarEntries(lastRadar);
+          for (const node of addedNow) {
+            if (node.nodeType === Node.ELEMENT_NODE) void highlightRadarRoot(node, entries);
+          }
+        }
+      } else {
+        scan(document.body); // attribute-only visibility change: needs full pass
+        if (lastRadar.length > 0) {
+          diag.radarResyncs += 1;
+          applyRadarHighlights(lastRadar);
+        }
+      }
     }, RESCAN_DELAY_MS);
-
-    // Re-apply Radar highlights from the LOCAL cache — never a service-worker
-    // round-trip. The previous code re-fetched get-highlight-data on every
-    // mutation batch, turning the observer into a message storm. Radar list only
-    // changes on a vocabulary/radar broadcast, which refreshes `lastRadar`.
-    if (lastRadar.length > 0) {
-      diag.radarResyncs += 1;
-      applyRadarHighlights(lastRadar);
-    }
 
     // Only re-derive the Bilingual article signature when actual content was
     // added/removed — not on every attribute flicker — so we don't walk the
