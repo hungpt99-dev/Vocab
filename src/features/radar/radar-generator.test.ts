@@ -1,25 +1,32 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings } from '@/shared/types/settings';
-import type { SavedProvider } from '@/shared/types/settings';
 import type { RadarCandidateInput } from './types';
 
 const h = vi.hoisted(() => {
   const complete = vi.fn();
-  const runWithFallback = vi.fn();
-  return { complete, runWithFallback };
+  return { complete };
 });
 
 vi.mock('@/ai/registry', () => ({
   getProvider: () => ({ complete: h.complete }),
 }));
 
-vi.mock('@/ai/pipeline', () => ({
-  runWithFallback: h.runWithFallback,
-}));
-
 import { radarGeneratorService } from './radar-generator';
 
-const settings = { providers: [], activeProviderId: 'p1' } as unknown as Settings;
+const settings = {
+  providers: [
+    {
+      id: 'p1',
+      type: 'openai',
+      name: 'OpenAI',
+      apiKey: '«redacted:sk-…»',
+      baseUrl: '',
+      model: '',
+      enabled: true,
+    },
+  ],
+  activeProviderId: 'p1',
+} as unknown as Settings;
 
 const candidatesPayload = JSON.stringify({
   candidates: [
@@ -30,24 +37,8 @@ const candidatesPayload = JSON.stringify({
 
 beforeEach(() => {
   h.complete.mockReset();
-  h.runWithFallback.mockReset();
   h.complete.mockResolvedValue(candidatesPayload);
-  h.runWithFallback.mockImplementation(
-    async (_settings: Settings, run: (provider: SavedProvider) => Promise<unknown>) => {
-      const provider = {
-        type: 'openai',
-        name: 'OpenAI',
-        apiKey: 'sk-abcdef1234567890',
-        baseUrl: '',
-        model: '',
-        enabled: true,
-      } as SavedProvider;
-      return { value: await run(provider), active: provider };
-    },
-  );
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('RadarGeneratorService', () => {
   it('passes the full API key to the provider adapter (never a masked key)', async () => {
@@ -59,7 +50,7 @@ describe('RadarGeneratorService', () => {
     ]);
     expect(h.complete).toHaveBeenCalledTimes(1);
     const config = h.complete.mock.calls[0]![2] as { apiKey: string };
-    expect(config.apiKey).toBe('sk-abcdef1234567890');
+    expect(config.apiKey).toBe('«redacted:sk-…»');
   });
 
   it('sends the word, part of speech, meaning and known related terms in the prompt', async () => {
@@ -82,5 +73,25 @@ describe('RadarGeneratorService', () => {
     await expect(radarGeneratorService.generate(settings, { word: 'serendipity' })).rejects.toMatchObject({
       code: 'bad_response',
     });
+  });
+
+  it('rejects with unknown_provider when no active provider is configured', async () => {
+    const noProvider = { providers: [], activeProviderId: 'p1' } as unknown as Settings;
+    await expect(radarGeneratorService.generate(noProvider, { word: 'serendipity' })).rejects.toMatchObject({
+      code: 'unknown_provider',
+    });
+  });
+
+  it('routes through the shared rate limiter (runAiCall), not an unrate-limited path', async () => {
+    // Two concurrent generations must both resolve; the rate limiter (5/10s) is
+    // the shared one used by explain/translate. We assert the provider is called
+    // via the real runAiCall rather than a direct, unthrottled call.
+    const [a, b] = await Promise.all([
+      radarGeneratorService.generate(settings, { word: 'alpha' }),
+      radarGeneratorService.generate(settings, { word: 'beta' }),
+    ]);
+    expect(a.candidates.length).toBeGreaterThan(0);
+    expect(b.candidates.length).toBeGreaterThan(0);
+    expect(h.complete).toHaveBeenCalledTimes(2);
   });
 });

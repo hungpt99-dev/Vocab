@@ -1,11 +1,10 @@
-import type { Settings, SavedProvider } from '@/shared/types/settings';
+import type { Settings } from '@/shared/types/settings';
 import type { RadarCandidateInput, RadarRelationship } from './types';
 import {
   RADAR_GENERATE_SYSTEM_PROMPT,
   buildRadarGenerateUserPrompt,
 } from '@/ai/prompts/radar-generate.prompt';
-import { runWithFallback } from '@/ai/pipeline';
-import { getProvider } from '@/ai/registry';
+import { runAiCall } from '@/ai/pipeline';
 import { AiError } from '@/ai/types';
 import { extractJsonObject } from '@/ai/parse';
 
@@ -52,6 +51,11 @@ export class RadarGeneratorService {
     const { word } = params;
     if (!word.trim()) return { candidates: [] };
 
+    const active = settings.providers.find((p) => p.id === settings.activeProviderId);
+    if (!active) {
+      throw new AiError('unknown_provider', 'No active AI provider is configured.');
+    }
+
     const userPrompt = buildRadarGenerateUserPrompt({
       word,
       partOfSpeech: params.partOfSpeech,
@@ -59,14 +63,14 @@ export class RadarGeneratorService {
       existingRelated: params.existingRelated,
     });
 
-    const { value } = await runWithFallback<string>(
-      settings,
-      (provider: SavedProvider, signal?: AbortSignal) =>
-        getProvider(provider.type).complete(
-          RADAR_GENERATE_SYSTEM_PROMPT,
-          userPrompt,
-          { ...providerConfig(provider), signal },
-        ),
+    // Route through runAiCall so Radar generation shares the SAME rate limiter as
+    // explain/translate (5 req / 10s). Previously this called runWithFallback
+    // directly and was UNRATE-LIMITED, so enriching many words (or
+    // radar:generate-all over a large library) fired unbounded concurrent AI
+    // requests and pinned the service worker at ~100% CPU.
+    const value = await runAiCall<string>(
+      active,
+      (adapter, config) => adapter.complete(RADAR_GENERATE_SYSTEM_PROMPT, userPrompt, config),
       params.signal,
     );
 
@@ -98,18 +102,6 @@ function parseCandidates(raw: string): RadarCandidateInput[] {
   }
   // Bound the list so a verbose model cannot blow up the Radar store.
   return out.slice(0, 20);
-}
-
-/** Build a ProviderConfig from a saved provider for the chat-completion call. */
-function providerConfig(provider: SavedProvider) {
-  return {
-    apiKey: provider.apiKey ?? '',
-    model: provider.model,
-    baseUrl: provider.baseUrl,
-    temperature: provider.temperature ?? 0.4,
-    maxTokens: provider.maxTokens ?? 1024,
-    timeoutMs: provider.timeoutMs,
-  };
 }
 
 export const radarGeneratorService = new RadarGeneratorService();
